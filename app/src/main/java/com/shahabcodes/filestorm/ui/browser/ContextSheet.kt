@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesomeMosaic
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
@@ -65,6 +66,7 @@ fun EntryContextSheet(
     onDismiss: () -> Unit,
     onOpen: () -> Unit,
     onOpenInNewTab: (() -> Unit)? = null,
+    onArrange: (() -> Unit)? = null,
     onProperties: () -> Unit,
     onRename: () -> Unit,
     onEditDate: (() -> Unit)? = null,
@@ -121,6 +123,12 @@ fun EntryContextSheet(
                 if (isFolder && onOpenInNewTab != null) {
                     RowSeparator(startIndent = 54.dp)
                     ContextRow(Icons.Rounded.Tab, "Open in new tab") { onDismiss(); onOpenInNewTab() }
+                }
+                if (isFolder && onArrange != null) {
+                    RowSeparator(startIndent = 54.dp)
+                    ContextRow(Icons.Rounded.AutoAwesomeMosaic, "Auto arrange into months…") {
+                        onDismiss(); onArrange()
+                    }
                 }
                 RowSeparator(startIndent = 54.dp)
                 ContextRow(

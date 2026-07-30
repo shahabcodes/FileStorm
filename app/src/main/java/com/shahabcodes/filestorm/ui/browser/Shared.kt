@@ -25,6 +25,9 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.InsertDriveFile
+import androidx.compose.material.icons.rounded.RestoreFromTrash
 import androidx.compose.material.icons.rounded.DriveFileMove
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material3.AlertDialog
@@ -63,6 +66,8 @@ import com.shahabcodes.filestorm.ui.components.FileIconView
 import com.shahabcodes.filestorm.ui.components.SelectionCircle
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.util.Formatters
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -420,21 +425,139 @@ fun NameDialog(
     )
 }
 
+/**
+ * Spells out exactly what is about to be deleted: how many files and folders,
+ * their combined size, the names involved, and where they end up.
+ */
 @Composable
 fun ConfirmDeleteDialog(
-    count: Int,
+    entries: List<FsEntry>,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
+    var files by remember(entries) { mutableStateOf(entries.count { !it.isDirectory }) }
+    var folders by remember(entries) { mutableStateOf(entries.count { it.isDirectory }) }
+    var bytes by remember(entries) { mutableStateOf(entries.filter { !it.isDirectory }.sumOf { it.size }) }
+    var counting by remember(entries) { mutableStateOf(entries.any { it.isDirectory }) }
+
+    // Folders need a walk to say how much is really going away.
+    LaunchedEffect(entries) {
+        if (entries.none { it.isDirectory }) return@LaunchedEffect
+        val stats = withContext(Dispatchers.IO) {
+            var f = entries.count { !it.isDirectory }
+            var d = 0
+            var b = entries.filter { !it.isDirectory }.sumOf { it.size }
+            entries.filter { it.isDirectory }.forEach { entry ->
+                val queue = ArrayDeque<File>()
+                queue.add(entry.toFile())
+                d++
+                while (queue.isNotEmpty()) {
+                    val dir = queue.removeFirst()
+                    val children = dir.listFiles() ?: continue
+                    for (child in children) {
+                        if (child.isDirectory) {
+                            d++
+                            queue.add(child)
+                        } else {
+                            f++
+                            b += child.length()
+                        }
+                    }
+                }
+            }
+            Triple(f, d, b)
+        }
+        files = stats.first
+        folders = stats.second
+        bytes = stats.third
+        counting = false
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = fsColors.card,
-        title = { Text("Move $count item${if (count == 1) "" else "s"} to Trash?", color = fsColors.label) },
-        text = {
+        icon = {
+            Icon(Icons.Rounded.DeleteOutline, null, tint = fsColors.red)
+        },
+        title = {
             Text(
-                "Items go to File Storm's Trash, where you can restore them later or delete them forever.",
-                color = fsColors.secondaryLabel,
+                "Move ${entries.size} item${if (entries.size == 1) "" else "s"} to Trash?",
+                color = fsColors.label,
             )
+        },
+        text = {
+            Column {
+                // What is going
+                Text(
+                    buildString {
+                        append("This removes ")
+                        if (files > 0) append("$files file${if (files == 1) "" else "s"}")
+                        if (files > 0 && folders > 0) append(" and ")
+                        if (folders > 0) append("$folders folder${if (folders == 1) "" else "s"}")
+                        append(", totalling ${Formatters.bytes(bytes)}")
+                        if (counting) append(" so far")
+                        append(".")
+                    },
+                    color = fsColors.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (counting) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Still measuring folder contents…",
+                        color = fsColors.secondaryLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "ITEMS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.secondaryLabel,
+                )
+                Spacer(Modifier.height(4.dp))
+                entries.take(6).forEach { entry ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (entry.isDirectory) Icons.Rounded.Folder else Icons.Rounded.InsertDriveFile,
+                            null,
+                            tint = fsColors.secondaryLabel,
+                            modifier = Modifier.size(13.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            entry.name,
+                            color = fsColors.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (entries.size > 6) {
+                    Text(
+                        "…and ${entries.size - 6} more",
+                        color = fsColors.secondaryLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        Icons.Rounded.RestoreFromTrash, null,
+                        tint = fsColors.green, modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Everything goes to the Trash first, so you can restore it from " +
+                            "there until you empty the Trash.",
+                        color = fsColors.secondaryLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
         },
         confirmButton = {
             TextButton(onClick = onConfirm) { Text("Move to Trash", color = fsColors.red) }

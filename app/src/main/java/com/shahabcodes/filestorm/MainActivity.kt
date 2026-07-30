@@ -151,6 +151,7 @@ private fun AppNav() {
             BrowserScreen(
                 onExit = { nav.popBackStack() },
                 onOpenTransfer = { showTransferSheet = true },
+                onArrange = { p -> nav.navigate("arrange?path=" + Uri.encode(p)) },
             )
         }
         composable("category/{kind}") { backStack ->
@@ -182,6 +183,13 @@ private fun AppNav() {
         }
         composable("verify") {
             com.shahabcodes.filestorm.ui.jobs.VerifyScreen(onBack = { nav.popBackStack() })
+        }
+        composable("arrange?path={path}") { backStack ->
+            val target = Uri.decode(backStack.arguments?.getString("path") ?: FileRepository.rootPath)
+            com.shahabcodes.filestorm.ui.arrange.ArrangeScreen(
+                path = target,
+                onBack = { nav.popBackStack() },
+            )
         }
         composable("duplicates") {
             com.shahabcodes.filestorm.ui.dup.DuplicatesScreen(onBack = { nav.popBackStack() })

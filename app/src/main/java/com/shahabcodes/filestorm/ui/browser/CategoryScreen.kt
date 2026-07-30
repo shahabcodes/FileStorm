@@ -87,6 +87,8 @@ fun CategoryScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
+    val viewKey = "category:" + kind.name
+    val viewMode = com.shahabcodes.filestorm.data.FolderViews.viewFor(viewKey)
     var sortMenuOpen by remember { mutableStateOf(false) }
     var viewMenuOpen by remember { mutableStateOf(false) }
 
@@ -166,7 +168,12 @@ fun CategoryScreen(
                         tint = fsColors.accent,
                         modifier = Modifier.pressScale { viewMenuOpen = true }.padding(8.dp).size(20.dp),
                     )
-                    ViewModeMenu(expanded = viewMenuOpen, onDismiss = { viewMenuOpen = false })
+                    ViewModeMenu(
+                        expanded = viewMenuOpen,
+                        current = viewMode,
+                        onDismiss = { viewMenuOpen = false },
+                        onSelect = { com.shahabcodes.filestorm.data.FolderViews.setView(viewKey, it) },
+                    )
                 }
                 Box {
                     Icon(
@@ -235,6 +242,7 @@ fun CategoryScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         start = 16.dp, end = 16.dp, bottom = 120.dp
                     ),
+                    viewMode = viewMode,
                     onClick = { entry ->
                         if (selectionMode) {
                             selected = if (entry.path in selected) selected - entry.path
@@ -330,7 +338,7 @@ fun CategoryScreen(
 
     if (confirmDelete) {
         ConfirmDeleteDialog(
-            count = selected.size,
+            entries = selectedEntries,
             onDismiss = { confirmDelete = false },
             onConfirm = {
                 confirmDelete = false

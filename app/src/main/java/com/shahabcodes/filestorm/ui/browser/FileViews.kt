@@ -65,10 +65,11 @@ fun FileListView(
     selectionMode: Boolean,
     selected: Set<String>,
     contentPadding: PaddingValues,
+    viewMode: ViewMode,
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
 ) {
-    when (Prefs.viewMode) {
+    when (viewMode) {
         ViewMode.LIST, ViewMode.DETAILED -> LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = contentPadding,
@@ -81,7 +82,7 @@ fun FileListView(
                     else -> RoundedCornerShape(0.dp)
                 }
                 Column(Modifier.clip(shape).background(fsColors.card)) {
-                    if (Prefs.viewMode == ViewMode.DETAILED) {
+                    if (viewMode == ViewMode.DETAILED) {
                         DetailedFileRow(
                             entry = entry,
                             selectionMode = selectionMode,
@@ -99,7 +100,7 @@ fun FileListView(
                         )
                     }
                     if (index != entries.lastIndex) {
-                        RowSeparator(startIndent = if (Prefs.viewMode == ViewMode.DETAILED) 76.dp else 60.dp)
+                        RowSeparator(startIndent = if (viewMode == ViewMode.DETAILED) 76.dp else 60.dp)
                     }
                 }
             }

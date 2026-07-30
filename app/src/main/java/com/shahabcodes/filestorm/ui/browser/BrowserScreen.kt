@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.AutoAwesomeMosaic
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CreateNewFolder
@@ -145,14 +146,19 @@ fun SortMenu(expanded: Boolean, onDismiss: () -> Unit, onChanged: () -> Unit) {
 
 /** Dropdown for switching between list/detailed/grid/gallery. */
 @Composable
-fun ViewModeMenu(expanded: Boolean, onDismiss: () -> Unit) {
+fun ViewModeMenu(
+    expanded: Boolean,
+    current: ViewMode,
+    onDismiss: () -> Unit,
+    onSelect: (ViewMode) -> Unit,
+) {
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
         modifier = Modifier.background(fsColors.cardSecondary),
     ) {
         ViewMode.entries.forEach { mode ->
-            val active = Prefs.viewMode == mode
+            val active = current == mode
             DropdownMenuItem(
                 text = { Text(mode.label, color = if (active) fsColors.accent else fsColors.label) },
                 trailingIcon = {
@@ -164,7 +170,7 @@ fun ViewModeMenu(expanded: Boolean, onDismiss: () -> Unit) {
                     }
                 },
                 onClick = {
-                    Prefs.updateViewMode(mode)
+                    onSelect(mode)
                     onDismiss()
                 },
             )
@@ -177,6 +183,7 @@ fun ViewModeMenu(expanded: Boolean, onDismiss: () -> Unit) {
 fun BrowserScreen(
     onExit: () -> Unit,
     onOpenTransfer: () -> Unit,
+    onArrange: (String) -> Unit,
 ) {
     val tabs = BrowserTabs.tabs
     if (tabs.isEmpty()) {
@@ -192,6 +199,7 @@ fun BrowserScreen(
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
 
+    val viewMode = com.shahabcodes.filestorm.data.FolderViews.viewFor(path)
     var query by remember(path) { mutableStateOf("") }
     var selectionMode by remember(path) { mutableStateOf(false) }
     var selected by remember(path) { mutableStateOf(setOf<String>()) }
@@ -394,7 +402,12 @@ fun BrowserScreen(
                             .padding(8.dp)
                             .size(21.dp),
                     )
-                    ViewModeMenu(expanded = viewMenuOpen, onDismiss = { viewMenuOpen = false })
+                    ViewModeMenu(
+                        expanded = viewMenuOpen,
+                        current = viewMode,
+                        onDismiss = { viewMenuOpen = false },
+                        onSelect = { com.shahabcodes.filestorm.data.FolderViews.setView(path, it) },
+                    )
                 }
                 Box {
                     Icon(
@@ -440,6 +453,14 @@ fun BrowserScreen(
                                 menuOpen = false
                                 selectionMode = true
                                 selected = visibleEntries.map { it.path }.toSet()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Auto arrange into months…", color = fsColors.label) },
+                            leadingIcon = { Icon(Icons.Rounded.AutoAwesomeMosaic, null, tint = fsColors.accent) },
+                            onClick = {
+                                menuOpen = false
+                                onArrange(path)
                             },
                         )
                         DropdownMenuItem(
@@ -557,6 +578,7 @@ fun BrowserScreen(
                     selectionMode = selectionMode,
                     selected = selected,
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
+                    viewMode = viewMode,
                     onClick = { entry ->
                         if (selectionMode) {
                             selected = if (entry.path in selected) selected - entry.path
@@ -683,6 +705,7 @@ fun BrowserScreen(
                     }
                 }
             } else null,
+            onArrange = if (target.isDirectory) ({ onArrange(target.path) }) else null,
             onProperties = { infoTarget = target },
             onRename = { renameTarget = target },
             onEditDate = {
@@ -764,7 +787,7 @@ fun BrowserScreen(
 
     if (confirmDelete) {
         ConfirmDeleteDialog(
-            count = selected.size,
+            entries = selectedEntries,
             onDismiss = { confirmDelete = false },
             onConfirm = {
                 confirmDelete = false

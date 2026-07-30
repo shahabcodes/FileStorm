@@ -124,6 +124,40 @@ object Prefs {
     }
 }
 
+/**
+ * Per-folder view mode. Changing the view inside a folder only affects that
+ * folder; anything never customised falls back to [Prefs.viewMode] as the
+ * app-wide default.
+ */
+object FolderViews {
+    private lateinit var sp: SharedPreferences
+    private val modes = androidx.compose.runtime.mutableStateMapOf<String, ViewMode>()
+
+    fun init(context: Context) {
+        sp = context.getSharedPreferences("filestorm_folder_views", Context.MODE_PRIVATE)
+        sp.all.forEach { (key, value) ->
+            if (value is String) {
+                runCatching { modes[key] = ViewMode.valueOf(value) }
+            }
+        }
+    }
+
+    fun viewFor(key: String): ViewMode = modes[key] ?: Prefs.viewMode
+
+    fun hasOverride(key: String): Boolean = modes.containsKey(key)
+
+    fun setView(key: String, mode: ViewMode) {
+        modes[key] = mode
+        sp.edit().putString(key, mode.name).apply()
+    }
+
+    /** Drops this folder's override so it follows the app default again. */
+    fun clear(key: String) {
+        modes.remove(key)
+        sp.edit().remove(key).apply()
+    }
+}
+
 /** Per-folder visual customisation: icon colour and bold name. Keyed by absolute path. */
 object FolderStyles {
     private lateinit var sp: SharedPreferences
