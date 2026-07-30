@@ -15,6 +15,7 @@ class FileStormApp : Application(), ImageLoaderFactory {
         com.shahabcodes.filestorm.data.Favorites.init(this)
         com.shahabcodes.filestorm.data.FolderLocks.init(this)
         com.shahabcodes.filestorm.data.StorageAnalyzer.init(this)
+        com.shahabcodes.filestorm.data.IconManager.reconcile(this)
     }
 
     override fun newImageLoader(): ImageLoader =

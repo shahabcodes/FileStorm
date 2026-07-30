@@ -29,56 +29,257 @@
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|uiMode" />
 
-        <!-- Switchable launcher icons: exactly one alias is enabled at a time. -->
-        <activity-alias
-            android:name=".IconDefault"
-            android:targetActivity=".MainActivity"
-            android:icon="@mipmap/ic_launcher"
-            android:label="@string/app_name"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-        <activity-alias android:name=".Icon13" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt13" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <!-- Switchable launcher identity: one (icon, name) alias enabled at a time. -->
+        <activity-alias android:name=".L_default_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_storm" android:enabled="true" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon15" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt15" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_default_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon16" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt16" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_default_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon17" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt17" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_default_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon18" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt18" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_default_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon19" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt19" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_default_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon21" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt21" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_opt13_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt13" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon22" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt22" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_opt13_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt13" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon24" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt24" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_opt13_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt13" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon25" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_opt13_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt13" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon27" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt27" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_opt13_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt13" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon28" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt28" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_opt13_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt13" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".Icon29" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt29" android:label="@string/app_name" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_opt15_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt15" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt15_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt15" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt15_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt15" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt15_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt15" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt15_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt15" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt15_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt15" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt16_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt16" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt16_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt16" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt16_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt16" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt16_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt16" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt16_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt16" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt16_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt16" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt17_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt17" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt17_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt17" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt17_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt17" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt17_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt17" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt17_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt17" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt17_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt17" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt18_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt18" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt18_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt18" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt18_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt18" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt18_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt18" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt18_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt18" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt18_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt18" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt19_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt19" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt19_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt19" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt19_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt19" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt19_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt19" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt19_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt19" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt19_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt19" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt21_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt21" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt21_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt21" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt21_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt21" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt21_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt21" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt21_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt21" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt21_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt21" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt22_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt22" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt22_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt22" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt22_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt22" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt22_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt22" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt22_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt22" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt22_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt22" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt24_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt24" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt24_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt24" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt24_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt24" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt24_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt24" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt24_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt24" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt24_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt24" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt25_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt25_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt25_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt25_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt25_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt25_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt27_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt27" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt27_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt27" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt27_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt27" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt27_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt27" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt27_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt27" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt27_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt27" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt28_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt28" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt28_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt28" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt28_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt28" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt28_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt28" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt28_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt28" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt28_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt28" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt29_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt29" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt29_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt29" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt29_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt29" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt29_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt29" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt29_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt29" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt29_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt29" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
 

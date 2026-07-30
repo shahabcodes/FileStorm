@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">FileStorm</string>
+    <string name="app_label_storm">FileStorm</string>
+    <string name="app_label_files">Files</string>
+    <string name="app_label_myfiles">My Files</string>
+    <string name="app_label_storage">Storage</string>
+    <string name="app_label_explorer">Explorer</string>
+    <string name="app_label_vault">Vault</string>
 </resources>

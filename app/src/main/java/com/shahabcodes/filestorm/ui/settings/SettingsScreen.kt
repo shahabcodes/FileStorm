@@ -195,7 +195,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                     ) else Modifier
                                 )
                                 .pressScale {
-                                    com.shahabcodes.filestorm.data.IconManager.apply(context, icon)
+                                    com.shahabcodes.filestorm.data.IconManager.apply(context, iconKey = icon.key)
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
@@ -222,6 +222,46 @@ fun SettingsScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.labelSmall,
                 color = fsColors.secondaryLabel.copy(alpha = 0.7f),
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // ── App name ───────────────────────────────────────────────────
+        SectionHeader("App Name")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            val context = LocalContext.current
+            com.shahabcodes.filestorm.data.IconManager.names.forEachIndexed { i, name ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .pressScale {
+                            com.shahabcodes.filestorm.data.IconManager.apply(context, nameKey = name.key)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        name.label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = fsColors.label,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (Prefs.appName == name.key) {
+                        Icon(
+                            Icons.Rounded.Check, null,
+                            tint = fsColors.accent, modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                if (i != com.shahabcodes.filestorm.data.IconManager.names.lastIndex) {
+                    RowSeparator(startIndent = 16.dp)
+                }
+            }
+            Text(
+                "Changes how the app is named on your home screen.",
+                style = MaterialTheme.typography.labelSmall,
+                color = fsColors.secondaryLabel.copy(alpha = 0.7f),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp, top = 4.dp),
             )
         }
         Spacer(Modifier.height(24.dp))
