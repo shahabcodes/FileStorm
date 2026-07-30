@@ -8,8 +8,19 @@ import androidx.compose.runtime.setValue
 /** MiX-style browser tabs: each tab keeps its own folder history. */
 object BrowserTabs {
 
-    data class Tab(val id: Long, val stack: List<String>) {
+    data class Tab(val id: Long, val stack: List<String>, val name: String? = null) {
         val current: String get() = stack.last()
+    }
+
+    /** Custom name if set, otherwise "Tab 1", "Tab 2", … by position. */
+    fun labelOf(index: Int): String =
+        tabs.getOrNull(index)?.name ?: "Tab ${index + 1}"
+
+    fun rename(index: Int, newName: String) {
+        if (index !in tabs.indices) return
+        tabs = tabs.toMutableList().also {
+            it[index] = it[index].copy(name = newName.trim().ifBlank { null })
+        }
     }
 
     private var nextId = 1L

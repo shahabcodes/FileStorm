@@ -1,6 +1,8 @@
 package com.shahabcodes.filestorm.ui.browser
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -166,6 +168,7 @@ fun ViewModeMenu(expanded: Boolean, onDismiss: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BrowserScreen(
     onExit: () -> Unit,
@@ -228,6 +231,7 @@ fun BrowserScreen(
             .statusBarsPadding(),
     ) {
         // ── Tab bar ─────────────────────────────────────────────────────
+        var renameTabIndex by remember { mutableStateOf(-1) }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -241,27 +245,47 @@ fun BrowserScreen(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (isActive) fsColors.accent else fsColors.card)
-                        .pressScale { BrowserTabs.select(index) }
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (isActive) androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(fsColors.accent, fsColors.accent.copy(alpha = 0.82f))
+                            ) else androidx.compose.ui.graphics.SolidColor(fsColors.card)
+                        )
+                        .combinedClickable(
+                            onClick = { BrowserTabs.select(index) },
+                            onLongClick = { renameTabIndex = index },
+                        )
                         .padding(start = 12.dp, end = if (isActive && tabs.size > 1) 4.dp else 12.dp)
-                        .padding(vertical = 6.dp),
+                        .padding(vertical = 5.dp),
                 ) {
-                    Text(
-                        File(tab.current).name.ifEmpty { "Storage" },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (isActive) androidx.compose.ui.graphics.Color.White else fsColors.label,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 140.dp),
-                    )
+                    Column {
+                        Text(
+                            BrowserTabs.labelOf(index),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isActive) androidx.compose.ui.graphics.Color.White else fsColors.label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 130.dp),
+                        )
+                        Text(
+                            File(tab.current).name.ifEmpty { "Storage" },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isActive)
+                                androidx.compose.ui.graphics.Color.White.copy(alpha = 0.75f)
+                            else fsColors.secondaryLabel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 130.dp),
+                        )
+                    }
                     if (isActive && tabs.size > 1) {
+                        Spacer(Modifier.width(2.dp))
                         Icon(
                             Icons.Rounded.Close, "Close tab",
                             tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
                             modifier = Modifier
                                 .pressScale { BrowserTabs.close(index) }
-                                .padding(4.dp)
+                                .padding(5.dp)
                                 .size(14.dp),
                         )
                     }
@@ -270,12 +294,25 @@ fun BrowserScreen(
             Box(
                 Modifier
                     .clip(CircleShape)
-                    .background(fsColors.card)
+                    .background(fsColors.accent.copy(alpha = 0.14f))
                     .pressScale { BrowserTabs.newTab(FileRepository.rootPath) }
-                    .padding(7.dp),
+                    .padding(8.dp),
             ) {
                 Icon(Icons.Rounded.Add, "New tab", tint = fsColors.accent, modifier = Modifier.size(16.dp))
             }
+        }
+        if (renameTabIndex >= 0) {
+            val idx = renameTabIndex
+            NameDialog(
+                title = "Rename Tab",
+                initial = BrowserTabs.labelOf(idx),
+                confirmLabel = "Rename",
+                onDismiss = { renameTabIndex = -1 },
+                onConfirm = { name ->
+                    renameTabIndex = -1
+                    BrowserTabs.rename(idx, name)
+                },
+            )
         }
 
         // ── Navigation bar ──────────────────────────────────────────────
