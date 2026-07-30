@@ -25,6 +25,9 @@ object MetadataEditor {
         val exifDate: Long?,
         val exifWritable: Boolean,
         val isImage: Boolean,
+        val videoDate: Long? = null,
+        val videoWritable: Boolean = false,
+        val isVideo: Boolean = false,
     )
 
     data class Change(
@@ -37,6 +40,7 @@ object MetadataEditor {
         val succeeded: Int,
         val failed: Int,
         val exifWritten: Int,
+        val videoWritten: Int,
         val errors: List<String>,
     )
 
@@ -53,11 +57,15 @@ object MetadataEditor {
                 if (raw != null) exifDate = exifFormat.parse(raw)?.time
             }
         }
+        val isVideo = Mp4Meta.isSupported(file)
         return Current(
             fileDate = file.lastModified(),
             exifDate = exifDate,
             exifWritable = ext in writableExif,
             isImage = isImage,
+            videoDate = if (isVideo) Mp4Meta.readCreation(file) else null,
+            videoWritable = isVideo,
+            isVideo = isVideo,
         )
     }
 
@@ -70,11 +78,13 @@ object MetadataEditor {
         changes: List<Change>,
         writeExif: Boolean,
         writeFileDate: Boolean,
+        writeVideoMeta: Boolean = false,
         onProgress: (done: Int) -> Unit = {},
     ): Outcome = withContext(Dispatchers.IO) {
         var succeeded = 0
         var failed = 0
         var exifWritten = 0
+        var videoWritten = 0
         val errors = mutableListOf<String>()
         val scanned = mutableListOf<String>()
 
@@ -108,6 +118,16 @@ object MetadataEditor {
                 }
             }
 
+            if (writeVideoMeta && Mp4Meta.isSupported(file)) {
+                if (Mp4Meta.writeCreation(file, change.newMillis)) {
+                    videoWritten++
+                    wroteSomething = true
+                } else {
+                    itemFailed = true
+                    errors.add("${file.name}: could not write video creation time")
+                }
+            }
+
             if (writeFileDate) {
                 if (file.setLastModified(change.newMillis)) {
                     wroteSomething = true
@@ -128,6 +148,6 @@ object MetadataEditor {
                 MediaScannerConnection.scanFile(context, scanned.toTypedArray(), null, null)
             }
         }
-        Outcome(succeeded, failed, exifWritten, errors.take(20))
+        Outcome(succeeded, failed, exifWritten, videoWritten, errors.take(20))
     }
 }

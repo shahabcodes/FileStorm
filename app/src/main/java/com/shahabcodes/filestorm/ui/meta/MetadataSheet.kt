@@ -81,6 +81,7 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
         mutableStateOf(detected?.millis ?: current.exifDate ?: current.fileDate)
     }
     var writeExif by remember { mutableStateOf(current.exifWritable) }
+    var writeVideo by remember { mutableStateOf(current.videoWritable) }
     var writeFileDate by remember { mutableStateOf(true) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -122,12 +123,20 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
 
             // Current values
             GroupedCard {
-                InfoRow(
-                    "Photo taken (EXIF)",
-                    current.exifDate?.let { Formatters.fullDate(it) }
-                        ?: if (current.isImage) "Missing" else "Not applicable",
-                    valueColor = if (current.exifDate == null && current.isImage) fsColors.orange else fsColors.label,
-                )
+                if (current.isVideo) {
+                    InfoRow(
+                        "Video created",
+                        current.videoDate?.let { Formatters.fullDate(it) } ?: "Missing",
+                        valueColor = if (current.videoDate == null) fsColors.orange else fsColors.label,
+                    )
+                } else {
+                    InfoRow(
+                        "Photo taken (EXIF)",
+                        current.exifDate?.let { Formatters.fullDate(it) }
+                            ?: if (current.isImage) "Missing" else "Not applicable",
+                        valueColor = if (current.exifDate == null && current.isImage) fsColors.orange else fsColors.label,
+                    )
+                }
                 RowSeparator(startIndent = 16.dp)
                 InfoRow("File modified", Formatters.fullDate(current.fileDate))
             }
@@ -234,15 +243,20 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
             Spacer(Modifier.height(14.dp))
 
             WriteOptions(
+                isVideo = current.isVideo,
                 writeExif = writeExif,
                 onWriteExifChange = { writeExif = it },
                 exifSupported = current.exifWritable,
+                writeVideo = writeVideo,
+                onWriteVideoChange = { writeVideo = it },
+                videoSupported = current.videoWritable,
                 writeFileDate = writeFileDate,
                 onWriteFileDateChange = { writeFileDate = it },
             )
             Spacer(Modifier.height(18.dp))
 
-            val enabled = writeExif || writeFileDate
+            val enabled = (writeExif && current.exifWritable) ||
+                (writeVideo && current.videoWritable) || writeFileDate
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -299,6 +313,13 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
                             Formatters.fullDate(chosen),
                         )
                     }
+                    if (writeVideo && current.videoWritable) {
+                        ChangeLine(
+                            "Video created",
+                            current.videoDate?.let { Formatters.fullDate(it) } ?: "Missing",
+                            Formatters.fullDate(chosen),
+                        )
+                    }
                     if (writeFileDate) {
                         ChangeLine(
                             "File modified",
@@ -324,6 +345,7 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
                             listOf(MetadataEditor.Change(file, chosen, detected?.source ?: "manual")),
                             writeExif = writeExif,
                             writeFileDate = writeFileDate,
+                            writeVideoMeta = writeVideo,
                         )
                         busy = false
                     }
@@ -353,7 +375,9 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
             text = {
                 Text(
                     if (result.failed == 0)
-                        "Saved successfully." + if (result.exifWritten > 0) " EXIF metadata was rewritten." else ""
+                        "Saved successfully." +
+                            (if (result.exifWritten > 0) " EXIF metadata was rewritten." else "") +
+                            (if (result.videoWritten > 0) " Video creation time was rewritten." else "")
                     else result.errors.firstOrNull() ?: "Unknown error",
                     color = fsColors.secondaryLabel,
                 )
@@ -386,7 +410,13 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
     }
     val unmatched = files.size - matched.size
 
+    val photoCount = remember(matched) {
+        matched.count { !com.shahabcodes.filestorm.data.meta.Mp4Meta.isSupported(it.first.file) }
+    }
+    val videoCount = matched.size - photoCount
+
     var writeExif by remember { mutableStateOf(true) }
+    var writeVideo by remember { mutableStateOf(true) }
     var writeFileDate by remember { mutableStateOf(true) }
     var confirming by remember { mutableStateOf(false) }
     var progress by remember { mutableIntStateOf(-1) }
@@ -415,6 +445,13 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = fsColors.secondaryLabel,
             )
+            if (matched.isNotEmpty()) {
+                Text(
+                    "$photoCount photo(s) · $videoCount video(s)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.secondaryLabel.copy(alpha = 0.8f),
+                )
+            }
             Spacer(Modifier.height(14.dp))
 
             if (matched.isNotEmpty()) {
@@ -456,13 +493,17 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                 WriteOptions(
                     writeExif = writeExif,
                     onWriteExifChange = { writeExif = it },
-                    exifSupported = true,
+                    exifSupported = photoCount > 0,
+                    writeVideo = writeVideo,
+                    onWriteVideoChange = { writeVideo = it },
+                    videoSupported = videoCount > 0,
                     writeFileDate = writeFileDate,
                     onWriteFileDateChange = { writeFileDate = it },
+                    mixed = true,
                 )
                 Spacer(Modifier.height(18.dp))
 
-                val enabled = writeExif || writeFileDate
+                val enabled = writeExif || writeVideo || writeFileDate
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -506,8 +547,13 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                 Column {
                     Text(
                         buildString {
-                            if (writeExif) append("• EXIF photo-taken date will be written\n")
-                            if (writeFileDate) append("• File modified date will be set\n")
+                            if (writeExif && photoCount > 0) {
+                                append("• EXIF taken-date written for $photoCount photo(s)\n")
+                            }
+                            if (writeVideo && videoCount > 0) {
+                                append("• Creation time written for $videoCount video(s)\n")
+                            }
+                            if (writeFileDate) append("• File modified date set for all ${matched.size}\n")
                             if (unmatched > 0) append("• $unmatched file(s) without a date in the name stay untouched\n")
                         }.trim(),
                         color = fsColors.secondaryLabel,
@@ -531,6 +577,7 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                             matched.map { it.first },
                             writeExif = writeExif,
                             writeFileDate = writeFileDate,
+                            writeVideoMeta = writeVideo,
                             onProgress = { done -> progress = done },
                         )
                         progress = -1
@@ -558,6 +605,7 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                     Text(
                         "${result.succeeded} file(s) updated" +
                             (if (result.exifWritten > 0) " · ${result.exifWritten} EXIF rewritten" else "") +
+                            (if (result.videoWritten > 0) " · ${result.videoWritten} video header(s) rewritten" else "") +
                             (if (result.failed > 0) " · ${result.failed} failed" else ""),
                         color = fsColors.label,
                         style = MaterialTheme.typography.bodyMedium,
@@ -587,29 +635,59 @@ private fun WriteOptions(
     exifSupported: Boolean,
     writeFileDate: Boolean,
     onWriteFileDateChange: (Boolean) -> Unit,
+    isVideo: Boolean = false,
+    writeVideo: Boolean = false,
+    onWriteVideoChange: (Boolean) -> Unit = {},
+    videoSupported: Boolean = false,
+    mixed: Boolean = false,
 ) {
     GroupedCard {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Write EXIF date", style = MaterialTheme.typography.bodyLarge, color = fsColors.label)
-                Text(
-                    if (exifSupported) "Sets the photo-taken date galleries read"
-                    else "Not supported for this file type",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = fsColors.secondaryLabel,
+        if (!isVideo || mixed) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Write EXIF date", style = MaterialTheme.typography.bodyLarge, color = fsColors.label)
+                    Text(
+                        if (exifSupported) "Photos: sets the taken date galleries read"
+                        else "Not supported for this file type",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                }
+                Switch(
+                    checked = writeExif && exifSupported,
+                    enabled = exifSupported,
+                    onCheckedChange = onWriteExifChange,
+                    colors = switchColors(),
                 )
             }
-            Switch(
-                checked = writeExif && exifSupported,
-                enabled = exifSupported,
-                onCheckedChange = onWriteExifChange,
-                colors = switchColors(),
-            )
+            RowSeparator(startIndent = 16.dp)
         }
-        RowSeparator(startIndent = 16.dp)
+        if (isVideo || mixed) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Write video creation time", style = MaterialTheme.typography.bodyLarge, color = fsColors.label)
+                    Text(
+                        if (videoSupported) "Videos: patches MP4/MOV headers, no re-encoding"
+                        else "Not supported for this file type",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                }
+                Switch(
+                    checked = writeVideo && videoSupported,
+                    enabled = videoSupported,
+                    onCheckedChange = onWriteVideoChange,
+                    colors = switchColors(),
+                )
+            }
+            RowSeparator(startIndent = 16.dp)
+        }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
