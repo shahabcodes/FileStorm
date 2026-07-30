@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -68,7 +69,7 @@ private fun prettyPath(path: String): String =
     path.replace(FileRepository.rootPath, "Internal storage")
 
 @Composable
-fun JobsScreen(onBack: () -> Unit, onOpenProgress: () -> Unit) {
+fun JobsScreen(onBack: () -> Unit, onOpenProgress: () -> Unit, onOpenVerify: () -> Unit) {
     val context = LocalContext.current
     val jobs = JobStore.jobs.sortedByDescending { it.createdAt }
     val runState by JobRunner.state.collectAsState()
@@ -210,6 +211,19 @@ fun JobsScreen(onBack: () -> Unit, onOpenProgress: () -> Unit) {
                                         .padding(8.dp)
                                         .size(20.dp),
                                 )
+                                Icon(
+                                    Icons.Rounded.VerifiedUser, "Verify transfers",
+                                    tint = fsColors.green,
+                                    modifier = Modifier
+                                        .pressScale {
+                                            if (com.shahabcodes.filestorm.data.jobs.VerifyRunner.start(job)) {
+                                                com.shahabcodes.filestorm.transfer.VerifyService.start(context)
+                                                onOpenVerify()
+                                            } else busyNotice = true
+                                        }
+                                        .padding(8.dp)
+                                        .size(20.dp),
+                                )
                                 Box(
                                     Modifier
                                         .size(38.dp)
@@ -301,8 +315,8 @@ fun JobsScreen(onBack: () -> Unit, onOpenProgress: () -> Unit) {
         AlertDialog(
             onDismissRequest = { busyNotice = false },
             containerColor = fsColors.card,
-            title = { Text("A job is already running", color = fsColors.label) },
-            text = { Text("Wait for it to finish or cancel it before starting another.", color = fsColors.secondaryLabel) },
+            title = { Text("Another task is running", color = fsColors.label) },
+            text = { Text("Wait for the current job or verification to finish, or cancel it first.", color = fsColors.secondaryLabel) },
             confirmButton = {
                 TextButton(onClick = { busyNotice = false }) { Text("OK", color = fsColors.accent) }
             },

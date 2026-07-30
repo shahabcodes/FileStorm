@@ -27,6 +27,13 @@ data class MonthProgress(
     val state: MonthState = MonthState.PENDING,
 )
 
+data class JobFailure(
+    val path: String,
+    val name: String,
+    val month: String,
+    val reason: String,
+)
+
 data class JobRunState(
     val jobId: String = "",
     val jobName: String = "",
@@ -34,6 +41,7 @@ data class JobRunState(
     val destination: String = "",
     val phase: JobPhase = JobPhase.IDLE,
     val error: String? = null,
+    val failures: List<JobFailure> = emptyList(),
     val months: List<MonthProgress> = emptyList(),
     val currentMonthIndex: Int = -1,
     val currentFileName: String = "",
@@ -79,6 +87,8 @@ object JobRunner {
 
     fun start(job: OrganizeJob): Boolean {
         if (_state.value.isActive) return false
+        // Never organize while a verification pass is reading the same trees.
+        if (VerifyRunner.state.value.isActive || VerifyRunner.state.value.cleaning) return false
         cancelled = false
         _state.value = JobRunState(
             jobId = job.id,
@@ -206,21 +216,29 @@ object JobRunner {
             updateMonth(monthIndex) { it.copy(state = MonthState.RUNNING) }
             _state.value = _state.value.copy(currentMonthIndex = monthIndex)
 
+            // Reuse an existing MonthYear folder; only create it when absent.
             val monthDir = File(destDir, label)
             val monthDirOk = monthDir.isDirectory || monthDir.mkdirs()
+
+            fun recordFailure(snap: Snapshot, reason: String) {
+                updateMonth(monthIndex) { it.copy(failedFiles = it.failedFiles + 1) }
+                _state.value = _state.value.copy(
+                    failedFiles = _state.value.failedFiles + 1,
+                    failures = _state.value.failures +
+                        JobFailure(snap.file.absolutePath, snap.file.name, label, reason),
+                )
+            }
 
             for (snap in snaps) {
                 if (cancelled) break
                 _state.value = _state.value.copy(currentFileName = snap.file.name)
 
                 if (!monthDirOk) {
-                    updateMonth(monthIndex) { it.copy(failedFiles = it.failedFiles + 1) }
-                    _state.value = _state.value.copy(failedFiles = _state.value.failedFiles + 1)
+                    recordFailure(snap, "Could not create folder $label in destination")
                     continue
                 }
                 if (!snap.file.exists()) {
-                    updateMonth(monthIndex) { it.copy(failedFiles = it.failedFiles + 1) }
-                    _state.value = _state.value.copy(failedFiles = _state.value.failedFiles + 1)
+                    recordFailure(snap, "Source file no longer exists")
                     continue
                 }
 
@@ -241,7 +259,7 @@ object JobRunner {
                 }
                 val target = uniqueTarget(monthDir, snap.file.name)
 
-                val ok = runCatching {
+                val result = runCatching {
                     var moved = false
                     if (job.move) moved = snap.file.renameTo(target)
                     if (!moved) {
@@ -254,15 +272,17 @@ object JobRunner {
                         _state.value = _state.value.copy(doneBytes = _state.value.doneBytes + snap.size)
                         sampleSpeed(_state.value.doneBytes)
                     }
-                    true
-                }.getOrDefault(false)
+                }
 
-                if (ok) {
+                if (result.isSuccess) {
                     updateMonth(monthIndex) { it.copy(doneFiles = it.doneFiles + 1) }
                     _state.value = _state.value.copy(doneFiles = _state.value.doneFiles + 1)
                 } else if (!cancelled) {
-                    updateMonth(monthIndex) { it.copy(failedFiles = it.failedFiles + 1) }
-                    _state.value = _state.value.copy(failedFiles = _state.value.failedFiles + 1)
+                    recordFailure(
+                        snap,
+                        result.exceptionOrNull()?.message?.takeIf { it.isNotBlank() }
+                            ?: "Could not write file (storage full or permission denied)",
+                    )
                 }
             }
             updateMonth(monthIndex) { it.copy(state = MonthState.DONE) }

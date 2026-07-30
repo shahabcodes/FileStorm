@@ -163,10 +163,14 @@ private fun AppNav() {
             com.shahabcodes.filestorm.ui.jobs.JobsScreen(
                 onBack = { nav.popBackStack() },
                 onOpenProgress = { nav.navigate("jobprogress") },
+                onOpenVerify = { nav.navigate("verify") },
             )
         }
         composable("jobprogress") {
             com.shahabcodes.filestorm.ui.jobs.JobProgressScreen(onBack = { nav.popBackStack() })
+        }
+        composable("verify") {
+            com.shahabcodes.filestorm.ui.jobs.VerifyScreen(onBack = { nav.popBackStack() })
         }
     }
 

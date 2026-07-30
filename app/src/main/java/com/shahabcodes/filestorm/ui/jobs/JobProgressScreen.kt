@@ -235,27 +235,96 @@ fun JobProgressScreen(onBack: () -> Unit) {
             if (!s.isActive) {
                 item {
                     GroupedCard {
-                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                if (s.failedFiles == 0 && s.phase == JobPhase.DONE) Icons.Rounded.CheckCircle
-                                else Icons.Rounded.Error,
-                                null,
-                                tint = if (s.failedFiles == 0 && s.phase == JobPhase.DONE) fsColors.green else fsColors.orange,
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    "${s.doneFiles} organized · ${s.skippedFiles} already in place · ${s.failedFiles} failed",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = fsColors.label,
+                        Column(Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    if (s.failedFiles == 0 && s.phase == JobPhase.DONE) Icons.Rounded.CheckCircle
+                                    else Icons.Rounded.Error,
+                                    null,
+                                    tint = if (s.failedFiles == 0 && s.phase == JobPhase.DONE) fsColors.green else fsColors.orange,
                                 )
-                                val secs = ((s.finishedAt - s.startedAt) / 1000).coerceAtLeast(1)
-                                Text(
-                                    "Took ${Formatters.eta(secs)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = fsColors.secondaryLabel,
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        "${s.doneFiles} organized · ${s.skippedFiles} already in place · ${s.failedFiles} failed",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = fsColors.label,
+                                    )
+                                    val secs = ((s.finishedAt - s.startedAt) / 1000).coerceAtLeast(1)
+                                    Text(
+                                        "Took ${Formatters.eta(secs)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = fsColors.secondaryLabel,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            RowSeparator(startIndent = 0.dp)
+                            Spacer(Modifier.height(10.dp))
+                            ReportLine("Transferred", "${Formatters.bytes(s.doneBytes)} · ${s.doneFiles + s.skippedFiles} of ${s.totalFiles} files")
+                            if (s.bytesLeft > 0 || s.filesLeft > 0 || s.failedFiles > 0) {
+                                ReportLine(
+                                    "Not transferred",
+                                    "${Formatters.bytes(s.bytesLeft)} · ${s.filesLeft + s.failedFiles} files",
+                                    warn = true,
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            // ── Detailed failure report ─────────────────────────────────
+            if (!s.isActive && s.failures.isNotEmpty()) {
+                item {
+                    Text(
+                        "What failed",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = fsColors.label,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                }
+                item {
+                    GroupedCard {
+                        val shown = s.failures.take(100)
+                        shown.forEachIndexed { index, failure ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Error, null,
+                                    tint = fsColors.red, modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        failure.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = fsColors.label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        "${failure.month} · ${failure.reason}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = fsColors.red.copy(alpha = 0.85f),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            if (index != shown.lastIndex) RowSeparator(startIndent = 42.dp)
+                        }
+                        if (s.failures.size > shown.size) {
+                            Text(
+                                "…and ${s.failures.size - shown.size} more",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = fsColors.secondaryLabel,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            )
                         }
                     }
                 }
@@ -331,6 +400,23 @@ fun JobProgressScreen(onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReportLine(label: String, value: String, warn: Boolean = false) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = fsColors.secondaryLabel,
+            modifier = Modifier.width(110.dp),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (warn) fsColors.orange else fsColors.label,
+        )
     }
 }
 
