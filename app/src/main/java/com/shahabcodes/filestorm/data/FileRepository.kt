@@ -9,14 +9,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-enum class SortMode(val label: String) {
-    NAME("Name"),
-    DATE_NEWEST("Newest first"),
-    DATE_OLDEST("Oldest first"),
-    SIZE_LARGEST("Largest first"),
-    TYPE("Type"),
-}
-
 data class StorageStats(val totalBytes: Long, val freeBytes: Long) {
     val usedBytes: Long get() = totalBytes - freeBytes
     val usedFraction: Float get() = if (totalBytes == 0L) 0f else usedBytes.toFloat() / totalBytes
@@ -26,24 +18,32 @@ object FileRepository {
 
     val rootPath: String = Environment.getExternalStorageDirectory().absolutePath
 
-    suspend fun list(path: String, sort: SortMode, showHidden: Boolean = Prefs.showHidden): List<FsEntry> =
-        withContext(Dispatchers.IO) {
-            val dir = File(path)
-            val children = dir.listFiles() ?: return@withContext emptyList()
-            val entries = children
-                .filter { showHidden || !it.name.startsWith(".") }
-                .map { FsEntry.from(it) }
-            sortEntries(entries, sort)
-        }
+    suspend fun list(
+        path: String,
+        field: SortField = Prefs.sortField,
+        ascending: Boolean = Prefs.sortAscending,
+        showHidden: Boolean = Prefs.showHidden,
+    ): List<FsEntry> = withContext(Dispatchers.IO) {
+        val dir = File(path)
+        val children = dir.listFiles() ?: return@withContext emptyList()
+        val entries = children
+            .filter { showHidden || !it.name.startsWith(".") }
+            .map { FsEntry.from(it) }
+        sortEntries(entries, field, ascending)
+    }
 
-    fun sortEntries(entries: List<FsEntry>, sort: SortMode): List<FsEntry> {
+    /** Folders always group first; the chosen order applies within each group. */
+    fun sortEntries(entries: List<FsEntry>, field: SortField, ascending: Boolean): List<FsEntry> {
         val (dirs, files) = entries.partition { it.isDirectory }
-        fun apply(list: List<FsEntry>): List<FsEntry> = when (sort) {
-            SortMode.NAME -> list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-            SortMode.DATE_NEWEST -> list.sortedByDescending { it.lastModified }
-            SortMode.DATE_OLDEST -> list.sortedBy { it.lastModified }
-            SortMode.SIZE_LARGEST -> list.sortedByDescending { it.size }
-            SortMode.TYPE -> list.sortedWith(compareBy({ it.extension }, { it.name.lowercase() }))
+        fun apply(list: List<FsEntry>): List<FsEntry> {
+            val comparator: Comparator<FsEntry> = when (field) {
+                SortField.NAME -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+                SortField.DATE -> compareBy { it.lastModified }
+                SortField.SIZE -> compareBy { it.size }
+                SortField.TYPE -> compareBy<FsEntry, String>(String.CASE_INSENSITIVE_ORDER) { it.extension }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+            }
+            return list.sortedWith(if (ascending) comparator else comparator.reversed())
         }
         return apply(dirs) + apply(files)
     }

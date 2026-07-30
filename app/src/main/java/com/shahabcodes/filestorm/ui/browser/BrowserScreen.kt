@@ -1,6 +1,5 @@
 package com.shahabcodes.filestorm.ui.browser
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -9,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,20 +18,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
-import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.FolderOff
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.SortByAlpha
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.DropdownMenu
@@ -49,9 +49,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -60,16 +60,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.FsEntry
 import com.shahabcodes.filestorm.data.Prefs
-import com.shahabcodes.filestorm.data.SortMode
+import com.shahabcodes.filestorm.data.SortField
+import com.shahabcodes.filestorm.data.ViewMode
 import com.shahabcodes.filestorm.transfer.TransferManager
 import com.shahabcodes.filestorm.transfer.TransferOp
 import com.shahabcodes.filestorm.transfer.TransferService
-import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.IosSearchField
-import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
-import com.shahabcodes.filestorm.util.Formatters
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
@@ -77,7 +75,6 @@ import java.io.File
 class BrowserViewModel(val path: String) : ViewModel() {
     val entries = MutableStateFlow<List<FsEntry>>(emptyList())
     val loading = MutableStateFlow(true)
-    val sort = MutableStateFlow(SortMode.NAME)
 
     init {
         refresh()
@@ -86,14 +83,72 @@ class BrowserViewModel(val path: String) : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             loading.value = true
-            entries.value = FileRepository.list(path, sort.value)
+            entries.value = FileRepository.list(path)
             loading.value = false
         }
     }
 
-    fun setSort(mode: SortMode) {
-        sort.value = mode
-        entries.value = FileRepository.sortEntries(entries.value, mode)
+    fun resort() {
+        entries.value = FileRepository.sortEntries(entries.value, Prefs.sortField, Prefs.sortAscending)
+    }
+}
+
+/** Dropdown listing sort fields; tapping the active field flips direction. */
+@Composable
+fun SortMenu(expanded: Boolean, onDismiss: () -> Unit, onChanged: () -> Unit) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = Modifier.background(fsColors.cardSecondary),
+    ) {
+        SortField.entries.forEach { field ->
+            val active = Prefs.sortField == field
+            DropdownMenuItem(
+                text = { Text(field.label, color = if (active) fsColors.accent else fsColors.label) },
+                trailingIcon = {
+                    if (active) {
+                        Icon(
+                            if (Prefs.sortAscending) Icons.Rounded.ArrowUpward else Icons.Rounded.ArrowDownward,
+                            null, tint = fsColors.accent, modifier = Modifier.size(16.dp),
+                        )
+                    }
+                },
+                onClick = {
+                    if (active) Prefs.updateSort(field, !Prefs.sortAscending)
+                    else Prefs.updateSort(field, field.defaultAscending)
+                    onChanged()
+                },
+            )
+        }
+    }
+}
+
+/** Dropdown for switching between list/detailed/grid/gallery. */
+@Composable
+fun ViewModeMenu(expanded: Boolean, onDismiss: () -> Unit) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = Modifier.background(fsColors.cardSecondary),
+    ) {
+        ViewMode.entries.forEach { mode ->
+            val active = Prefs.viewMode == mode
+            DropdownMenuItem(
+                text = { Text(mode.label, color = if (active) fsColors.accent else fsColors.label) },
+                trailingIcon = {
+                    if (active) {
+                        Icon(
+                            Icons.Rounded.CheckCircle, null,
+                            tint = fsColors.accent, modifier = Modifier.size(16.dp),
+                        )
+                    }
+                },
+                onClick = {
+                    Prefs.updateViewMode(mode)
+                    onDismiss()
+                },
+            )
+        }
     }
 }
 
@@ -106,7 +161,6 @@ fun BrowserScreen(
 ) {
     val vm: BrowserViewModel = viewModel(key = path) { BrowserViewModel(path) }
     val entries by vm.entries.collectAsState()
-    val sort by vm.sort.collectAsState()
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
 
@@ -115,6 +169,7 @@ fun BrowserScreen(
     var selected by remember { mutableStateOf(setOf<String>()) }
     var menuOpen by remember { mutableStateOf(false) }
     var sortMenuOpen by remember { mutableStateOf(false) }
+    var viewMenuOpen by remember { mutableStateOf(false) }
     var showDateSheet by remember { mutableStateOf(false) }
     var showPicker by remember { mutableStateOf<TransferOp?>(null) }
     var showNewFolder by remember { mutableStateOf(false) }
@@ -191,37 +246,33 @@ fun BrowserScreen(
                 Spacer(Modifier.weight(1f))
                 Box {
                     Icon(
-                        Icons.Rounded.SortByAlpha, null,
+                        Icons.Rounded.GridView, "View",
+                        tint = fsColors.accent,
+                        modifier = Modifier
+                            .pressScale { viewMenuOpen = true }
+                            .padding(8.dp)
+                            .size(21.dp),
+                    )
+                    ViewModeMenu(expanded = viewMenuOpen, onDismiss = { viewMenuOpen = false })
+                }
+                Box {
+                    Icon(
+                        Icons.Rounded.SwapVert, "Sort",
                         tint = fsColors.accent,
                         modifier = Modifier
                             .pressScale { sortMenuOpen = true }
                             .padding(8.dp)
                             .size(22.dp),
                     )
-                    DropdownMenu(
+                    SortMenu(
                         expanded = sortMenuOpen,
-                        onDismissRequest = { sortMenuOpen = false },
-                        modifier = Modifier.background(fsColors.cardSecondary),
-                    ) {
-                        SortMode.entries.forEach { mode ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        mode.label,
-                                        color = if (mode == sort) fsColors.accent else fsColors.label,
-                                    )
-                                },
-                                onClick = {
-                                    vm.setSort(mode)
-                                    sortMenuOpen = false
-                                },
-                            )
-                        }
-                    }
+                        onDismiss = { sortMenuOpen = false },
+                        onChanged = { vm.resort() },
+                    )
                 }
                 Box {
                     Icon(
-                        Icons.Rounded.MoreHoriz, null,
+                        Icons.Rounded.MoreHoriz, "More",
                         tint = fsColors.accent,
                         modifier = Modifier
                             .pressScale { menuOpen = true }
@@ -319,46 +370,29 @@ fun BrowserScreen(
                     )
                 }
             } else {
-                LazyColumn(
-                    Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        start = 16.dp, end = 16.dp, bottom = 120.dp
-                    ),
-                ) {
-                    itemsIndexed(visibleEntries, key = { _, e -> e.path }) { index, entry ->
-                        val shape = when {
-                            visibleEntries.size == 1 -> RoundedCornerShape(16.dp)
-                            index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                            index == visibleEntries.lastIndex -> RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
-                            else -> RoundedCornerShape(0.dp)
+                FileListView(
+                    entries = visibleEntries,
+                    selectionMode = selectionMode,
+                    selected = selected,
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
+                    onClick = { entry ->
+                        if (selectionMode) {
+                            selected = if (entry.path in selected) selected - entry.path
+                            else selected + entry.path
+                        } else if (entry.isDirectory) {
+                            onOpenFolder(entry.path)
+                        } else {
+                            openFile(context, entry)
                         }
-                        Column(Modifier.clip(shape).background(fsColors.card)) {
-                            FileRow(
-                                entry = entry,
-                                selectionMode = selectionMode,
-                                selected = entry.path in selected,
-                                onClick = {
-                                    if (selectionMode) {
-                                        selected = if (entry.path in selected) selected - entry.path
-                                        else selected + entry.path
-                                    } else if (entry.isDirectory) {
-                                        onOpenFolder(entry.path)
-                                    } else {
-                                        openFile(context, entry)
-                                    }
-                                },
-                                onLongClick = {
-                                    if (!selectionMode) {
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        selectionMode = true
-                                        selected = setOf(entry.path)
-                                    }
-                                },
-                            )
-                            if (index != visibleEntries.lastIndex) RowSeparator()
+                    },
+                    onLongClick = { entry ->
+                        if (!selectionMode) {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            selectionMode = true
+                            selected = setOf(entry.path)
                         }
-                    }
-                }
+                    },
+                )
             }
 
             // ── Selection action bar ────────────────────────────────────

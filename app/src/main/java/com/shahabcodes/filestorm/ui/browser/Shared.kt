@@ -57,7 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.FsEntry
-import com.shahabcodes.filestorm.data.SortMode
+import com.shahabcodes.filestorm.data.SortField
 import com.shahabcodes.filestorm.ui.components.ActionPill
 import com.shahabcodes.filestorm.ui.components.FileIconView
 import com.shahabcodes.filestorm.ui.components.SelectionCircle
@@ -215,9 +215,13 @@ fun FolderPickerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var currentPath by rememberSaveable { mutableStateOf(FileRepository.rootPath) }
     var folders by remember { mutableStateOf<List<FsEntry>>(emptyList()) }
+    var refreshTick by remember { mutableStateOf(0) }
+    var showNewFolder by remember { mutableStateOf(false) }
+    var renameFolder by remember { mutableStateOf<FsEntry?>(null) }
 
-    LaunchedEffect(currentPath) {
-        folders = FileRepository.list(currentPath, SortMode.NAME).filter { it.isDirectory }
+    LaunchedEffect(currentPath, refreshTick) {
+        folders = FileRepository.list(currentPath, SortField.NAME, ascending = true)
+            .filter { it.isDirectory }
     }
 
     ModalBottomSheet(
@@ -243,8 +247,23 @@ fun FolderPickerSheet(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Icon(
+                    Icons.Rounded.CreateNewFolder, "New folder",
+                    tint = fsColors.accent,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .combinedClickable(onClick = { showNewFolder = true }, onLongClick = null)
+                        .padding(8.dp)
+                        .size(24.dp),
+                )
                 TextButton(onClick = onDismiss) { Text("Cancel", color = fsColors.secondaryLabel) }
             }
+            Text(
+                "Tip: long-press a folder to rename it",
+                style = MaterialTheme.typography.labelSmall,
+                color = fsColors.secondaryLabel.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
             Spacer(Modifier.height(6.dp))
 
             LazyColumn(
@@ -282,7 +301,7 @@ fun FolderPickerSheet(
                             .combinedClickable(
                                 enabled = !excluded,
                                 onClick = { currentPath = folder.path },
-                                onLongClick = null,
+                                onLongClick = { renameFolder = folder },
                             )
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -324,6 +343,34 @@ fun FolderPickerSheet(
                 Text(confirmLabel, color = Color.White, style = MaterialTheme.typography.titleMedium)
             }
         }
+    }
+
+    if (showNewFolder) {
+        NameDialog(
+            title = "New Folder",
+            initial = "",
+            confirmLabel = "Create",
+            onDismiss = { showNewFolder = false },
+            onConfirm = { name ->
+                showNewFolder = false
+                FileRepository.createFolder(currentPath, name)
+                refreshTick++
+            },
+        )
+    }
+
+    renameFolder?.let { folder ->
+        NameDialog(
+            title = "Rename Folder",
+            initial = folder.name,
+            confirmLabel = "Rename",
+            onDismiss = { renameFolder = null },
+            onConfirm = { name ->
+                renameFolder = null
+                FileRepository.rename(folder, name)
+                refreshTick++
+            },
+        )
     }
 }
 

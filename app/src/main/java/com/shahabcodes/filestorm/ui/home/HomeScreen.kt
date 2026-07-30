@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PlayCircleFilled
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +71,7 @@ fun HomeScreen(
     onOpenFolder: (String) -> Unit,
     onOpenCategory: (FileKind) -> Unit,
     onOpenTransfer: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val stats = remember { FileRepository.storageStats() }
     val transfer by TransferManager.state.collectAsState()
@@ -102,12 +104,25 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item {
-            Text(
-                "FileStorm",
-                style = MaterialTheme.typography.headlineLarge,
-                color = fsColors.label,
-                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "FileStorm",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = fsColors.label,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Rounded.Settings, "Settings",
+                    tint = fsColors.accent,
+                    modifier = Modifier
+                        .pressScale(onOpenSettings)
+                        .padding(6.dp)
+                        .size(24.dp),
+                )
+            }
         }
 
         // Active transfer banner

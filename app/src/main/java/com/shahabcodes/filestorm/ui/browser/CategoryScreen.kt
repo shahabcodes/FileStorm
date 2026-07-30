@@ -23,8 +23,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.rounded.DateRange
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.FsEntry
+import com.shahabcodes.filestorm.data.Prefs
 import com.shahabcodes.filestorm.transfer.TransferManager
 import com.shahabcodes.filestorm.transfer.TransferOp
 import com.shahabcodes.filestorm.transfer.TransferService
@@ -82,11 +85,20 @@ fun CategoryScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
+    var sortMenuOpen by remember { mutableStateOf(false) }
+    var viewMenuOpen by remember { mutableStateOf(false) }
+
+    var sortTick by remember { mutableStateOf(0) }
 
     LaunchedEffect(kind, reloadKey) {
         loading = true
-        files = FileRepository.filesByKind(kind)
+        files = FileRepository.sortEntries(
+            FileRepository.filesByKind(kind), Prefs.sortField, Prefs.sortAscending
+        )
         loading = false
+    }
+    LaunchedEffect(sortTick) {
+        if (sortTick > 0) files = FileRepository.sortEntries(files, Prefs.sortField, Prefs.sortAscending)
     }
 
     val visible = remember(files, query) {
@@ -146,17 +158,34 @@ fun CategoryScreen(
                     Text("Back", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge)
                 }
                 Spacer(Modifier.weight(1f))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.pressScale { showDateSheet = true }.padding(horizontal = 10.dp, vertical = 6.dp),
-                ) {
-                    Icon(Icons.Rounded.DateRange, null, tint = fsColors.accent, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(5.dp))
-                    Text("By date", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge)
+                Box {
+                    Icon(
+                        Icons.Rounded.GridView, "View",
+                        tint = fsColors.accent,
+                        modifier = Modifier.pressScale { viewMenuOpen = true }.padding(8.dp).size(20.dp),
+                    )
+                    ViewModeMenu(expanded = viewMenuOpen, onDismiss = { viewMenuOpen = false })
                 }
+                Box {
+                    Icon(
+                        Icons.Rounded.SwapVert, "Sort",
+                        tint = fsColors.accent,
+                        modifier = Modifier.pressScale { sortMenuOpen = true }.padding(8.dp).size(21.dp),
+                    )
+                    SortMenu(
+                        expanded = sortMenuOpen,
+                        onDismiss = { sortMenuOpen = false },
+                        onChanged = { sortTick++ },
+                    )
+                }
+                Icon(
+                    Icons.Rounded.DateRange, "Select by date",
+                    tint = fsColors.accent,
+                    modifier = Modifier.pressScale { showDateSheet = true }.padding(8.dp).size(20.dp),
+                )
                 Text(
                     "Select", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.pressScale { selectionMode = true }.padding(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.pressScale { selectionMode = true }.padding(horizontal = 8.dp, vertical = 6.dp),
                 )
             }
         }
@@ -197,44 +226,29 @@ fun CategoryScreen(
                     Spacer(Modifier.height(10.dp))
                     Text("Nothing found", color = fsColors.secondaryLabel, style = MaterialTheme.typography.bodyMedium)
                 }
-                else -> LazyColumn(
-                    Modifier.fillMaxSize(),
+                else -> FileListView(
+                    entries = visible,
+                    selectionMode = selectionMode,
+                    selected = selected,
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         start = 16.dp, end = 16.dp, bottom = 120.dp
                     ),
-                ) {
-                    itemsIndexed(visible, key = { _, e -> e.path }) { index, entry ->
-                        val shape = when {
-                            visible.size == 1 -> RoundedCornerShape(16.dp)
-                            index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                            index == visible.lastIndex -> RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
-                            else -> RoundedCornerShape(0.dp)
+                    onClick = { entry ->
+                        if (selectionMode) {
+                            selected = if (entry.path in selected) selected - entry.path
+                            else selected + entry.path
+                        } else {
+                            openFile(context, entry)
                         }
-                        Column(Modifier.clip(shape).background(fsColors.card)) {
-                            FileRow(
-                                entry = entry,
-                                selectionMode = selectionMode,
-                                selected = entry.path in selected,
-                                onClick = {
-                                    if (selectionMode) {
-                                        selected = if (entry.path in selected) selected - entry.path
-                                        else selected + entry.path
-                                    } else {
-                                        openFile(context, entry)
-                                    }
-                                },
-                                onLongClick = {
-                                    if (!selectionMode) {
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        selectionMode = true
-                                        selected = setOf(entry.path)
-                                    }
-                                },
-                            )
-                            if (index != visible.lastIndex) RowSeparator()
+                    },
+                    onLongClick = { entry ->
+                        if (!selectionMode) {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            selectionMode = true
+                            selected = setOf(entry.path)
                         }
-                    }
-                }
+                    },
+                )
             }
 
             androidx.compose.animation.AnimatedVisibility(

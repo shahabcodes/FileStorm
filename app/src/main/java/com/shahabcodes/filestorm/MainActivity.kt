@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,30 +16,39 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentActivity
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
+import com.shahabcodes.filestorm.data.Prefs
+import com.shahabcodes.filestorm.ui.Biometrics
+import com.shahabcodes.filestorm.ui.LockScreen
 import com.shahabcodes.filestorm.ui.PermissionScreen
 import com.shahabcodes.filestorm.ui.browser.BrowserScreen
 import com.shahabcodes.filestorm.ui.browser.CategoryScreen
 import com.shahabcodes.filestorm.ui.home.HomeScreen
+import com.shahabcodes.filestorm.ui.settings.SettingsScreen
 import com.shahabcodes.filestorm.ui.theme.FileStormTheme
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.ui.transfer.TransferScreen
+import com.shahabcodes.filestorm.ui.transfer.TransferSheet
 import java.io.File
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private var hasAccess by mutableStateOf(false)
+    private var locked by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         hasAccess = checkAccess()
+        locked = Prefs.biometricLock
 
         if (Build.VERSION.SDK_INT >= 33) {
             registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -55,7 +63,11 @@ class MainActivity : ComponentActivity() {
                         .background(fsColors.groupedBackground),
                     color = fsColors.groupedBackground,
                 ) {
-                    if (hasAccess) AppNav() else PermissionScreen(onGrantClick = { requestAccess() })
+                    when {
+                        locked -> LockScreen(onRequestUnlock = { promptUnlock() })
+                        hasAccess -> AppNav()
+                        else -> PermissionScreen(onGrantClick = { requestAccess() })
+                    }
                 }
             }
         }
@@ -64,6 +76,27 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         hasAccess = checkAccess()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Re-lock whenever the app leaves the foreground.
+        if (Prefs.biometricLock) locked = true
+    }
+
+    private fun promptUnlock() {
+        if (!Biometrics.available(this)) {
+            // Screen lock was removed since enabling; don't lock the user out forever.
+            locked = false
+            Prefs.updateBiometricLock(false)
+            return
+        }
+        Biometrics.prompt(
+            this,
+            title = "Unlock FileStorm",
+            subtitle = "Use your fingerprint, face or device PIN",
+            onSuccess = { locked = false },
+        )
     }
 
     private fun checkAccess(): Boolean =
@@ -87,12 +120,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppNav() {
     val nav = rememberNavController()
+    var showTransferSheet by remember { mutableStateOf(false) }
+
     NavHost(navController = nav, startDestination = "home") {
         composable("home") {
             HomeScreen(
                 onOpenFolder = { path -> nav.navigate("browse?path=${Uri.encode(path)}") },
                 onOpenCategory = { kind -> nav.navigate("category/${kind.name}") },
-                onOpenTransfer = { nav.navigate("transfer") },
+                onOpenTransfer = { showTransferSheet = true },
+                onOpenSettings = { nav.navigate("settings") },
             )
         }
         composable("browse?path={path}") { backStack ->
@@ -101,7 +137,7 @@ private fun AppNav() {
                 path = if (File(path).exists()) path else FileRepository.rootPath,
                 onOpenFolder = { p -> nav.navigate("browse?path=${Uri.encode(p)}") },
                 onBack = { nav.popBackStack() },
-                onOpenTransfer = { nav.navigate("transfer") },
+                onOpenTransfer = { showTransferSheet = true },
             )
         }
         composable("category/{kind}") { backStack ->
@@ -109,11 +145,24 @@ private fun AppNav() {
             CategoryScreen(
                 kind = kind,
                 onBack = { nav.popBackStack() },
-                onOpenTransfer = { nav.navigate("transfer") },
+                onOpenTransfer = { showTransferSheet = true },
             )
         }
         composable("transfer") {
             TransferScreen(onBack = { nav.popBackStack() })
         }
+        composable("settings") {
+            SettingsScreen(onBack = { nav.popBackStack() })
+        }
+    }
+
+    if (showTransferSheet) {
+        TransferSheet(
+            onDismiss = { showTransferSheet = false },
+            onExpand = {
+                showTransferSheet = false
+                nav.navigate("transfer")
+            },
+        )
     }
 }

@@ -107,9 +107,15 @@ private val iosShapes = Shapes(
 
 @Composable
 fun FileStormTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val dark = when (com.shahabcodes.filestorm.data.Prefs.appearance) {
+        com.shahabcodes.filestorm.data.Appearance.SYSTEM -> isSystemInDarkTheme()
+        com.shahabcodes.filestorm.data.Appearance.LIGHT -> false
+        com.shahabcodes.filestorm.data.Appearance.DARK -> true
+    }
+    val accentChoice = com.shahabcodes.filestorm.data.Prefs.accent
+    val accentColor = Color(if (dark) accentChoice.dark else accentChoice.light)
     val fs = if (dark) FsColors(
-        accent = Ios.BlueDark,
+        accent = accentColor,
         groupedBackground = Ios.GroupedBgDark,
         card = Ios.CardDark,
         cardSecondary = Ios.Card2Dark,
@@ -122,7 +128,7 @@ fun FileStormTheme(content: @Composable () -> Unit) {
         orange = Ios.OrangeDark,
         isDark = true,
     ) else FsColors(
-        accent = Ios.Blue,
+        accent = accentColor,
         groupedBackground = Ios.GroupedBgLight,
         card = Ios.CardLight,
         cardSecondary = Ios.CardLight,
@@ -155,6 +161,15 @@ fun FileStormTheme(content: @Composable () -> Unit) {
         onSurface = fs.label,
         error = fs.red,
     )
+
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        androidx.compose.runtime.SideEffect {
+            val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+            androidx.core.view.WindowCompat.getInsetsController(window, view)
+                .isAppearanceLightStatusBars = !dark
+        }
+    }
 
     androidx.compose.runtime.CompositionLocalProvider(LocalFsColors provides fs) {
         MaterialTheme(colorScheme = scheme, typography = iosTypography, shapes = iosShapes, content = content)
