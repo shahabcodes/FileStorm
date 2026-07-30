@@ -144,6 +144,7 @@ private fun AppNav() {
                 onOpenSettings = { nav.navigate("settings") },
                 onOpenTrash = { nav.navigate("trash") },
                 onOpenJobs = { nav.navigate("jobs") },
+                onOpenDuplicates = { nav.navigate("duplicates") },
             )
         }
         composable("browse") {
@@ -181,6 +182,9 @@ private fun AppNav() {
         }
         composable("verify") {
             com.shahabcodes.filestorm.ui.jobs.VerifyScreen(onBack = { nav.popBackStack() })
+        }
+        composable("duplicates") {
+            com.shahabcodes.filestorm.ui.dup.DuplicatesScreen(onBack = { nav.popBackStack() })
         }
     }
 

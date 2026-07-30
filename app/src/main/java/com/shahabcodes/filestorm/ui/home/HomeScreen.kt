@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Lock
 import com.shahabcodes.filestorm.data.Favorites
@@ -81,6 +82,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenJobs: () -> Unit,
+    onOpenDuplicates: () -> Unit,
 ) {
     LaunchedEffect(Unit) { TrashManager.refresh() }
     val stats = remember { FileRepository.storageStats() }
@@ -364,6 +366,47 @@ fun HomeScreen(
                         Text(
                             if (jobCount == 0) "Organize files into month folders"
                             else "$jobCount saved job${if (jobCount == 1) "" else "s"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                        )
+                    }
+                    Icon(
+                        Icons.Rounded.ChevronRight, null,
+                        tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+        }
+
+        // Duplicate finder
+        item {
+            GroupedCard(Modifier.pressScale(onOpenDuplicates)) {
+                Row(
+                    Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Ios.Teal.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Rounded.ContentCopy, null,
+                            tint = Ios.Teal, modifier = Modifier.size(17.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Duplicate Finder",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        Text(
+                            "Match two folders and reclaim space",
                             style = MaterialTheme.typography.bodySmall,
                             color = fsColors.secondaryLabel,
                         )
