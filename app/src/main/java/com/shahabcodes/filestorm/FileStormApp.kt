@@ -11,6 +11,7 @@ class FileStormApp : Application(), ImageLoaderFactory {
         super.onCreate()
         Prefs.init(this)
         com.shahabcodes.filestorm.data.FolderStyles.init(this)
+        com.shahabcodes.filestorm.data.jobs.JobStore.init(this)
     }
 
     override fun newImageLoader(): ImageLoader =

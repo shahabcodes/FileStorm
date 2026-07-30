@@ -53,7 +53,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.DeleteOutline
+import com.shahabcodes.filestorm.data.jobs.JobStore
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.TrashManager
@@ -76,6 +78,7 @@ fun HomeScreen(
     onOpenTransfer: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTrash: () -> Unit,
+    onOpenJobs: () -> Unit,
 ) {
     LaunchedEffect(Unit) { TrashManager.refresh() }
     val stats = remember { FileRepository.storageStats() }
@@ -281,6 +284,49 @@ fun HomeScreen(
                         }
                         if (i != shortcuts.lastIndex) RowSeparator(startIndent = 62.dp)
                     }
+                }
+            }
+        }
+
+        // Jobs
+        item {
+            GroupedCard(Modifier.pressScale(onOpenJobs)) {
+                Row(
+                    Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Ios.Indigo.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Rounded.CalendarMonth, null,
+                            tint = Ios.Indigo, modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Jobs",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        val jobCount = JobStore.jobs.size
+                        Text(
+                            if (jobCount == 0) "Organize files into month folders"
+                            else "$jobCount saved job${if (jobCount == 1) "" else "s"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                        )
+                    }
+                    Icon(
+                        Icons.Rounded.ChevronRight, null,
+                        tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
         }

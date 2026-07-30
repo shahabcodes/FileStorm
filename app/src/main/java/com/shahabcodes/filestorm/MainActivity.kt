@@ -130,6 +130,7 @@ private fun AppNav() {
                 onOpenTransfer = { showTransferSheet = true },
                 onOpenSettings = { nav.navigate("settings") },
                 onOpenTrash = { nav.navigate("trash") },
+                onOpenJobs = { nav.navigate("jobs") },
             )
         }
         composable("browse?path={path}") { backStack ->
@@ -157,6 +158,15 @@ private fun AppNav() {
         }
         composable("trash") {
             com.shahabcodes.filestorm.ui.trash.TrashScreen(onBack = { nav.popBackStack() })
+        }
+        composable("jobs") {
+            com.shahabcodes.filestorm.ui.jobs.JobsScreen(
+                onBack = { nav.popBackStack() },
+                onOpenProgress = { nav.navigate("jobprogress") },
+            )
+        }
+        composable("jobprogress") {
+            com.shahabcodes.filestorm.ui.jobs.JobProgressScreen(onBack = { nav.popBackStack() })
         }
     }
 
