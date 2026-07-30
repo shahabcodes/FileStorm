@@ -55,6 +55,8 @@ object Prefs {
         private set
     var sortAscending by mutableStateOf(true)
         private set
+    var appIcon by mutableStateOf("default")
+        private set
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm", Context.MODE_PRIVATE)
@@ -67,6 +69,7 @@ object Prefs {
             SortField.valueOf(sp.getString("sort_field", SortField.NAME.name)!!)
         }.getOrDefault(SortField.NAME)
         sortAscending = sp.getBoolean("sort_ascending", true)
+        appIcon = sp.getString("app_icon", "default") ?: "default"
         appearance = runCatching {
             Appearance.valueOf(sp.getString("appearance", Appearance.SYSTEM.name)!!)
         }.getOrDefault(Appearance.SYSTEM)
@@ -98,6 +101,11 @@ object Prefs {
     fun updateViewMode(value: ViewMode) {
         viewMode = value
         sp.edit().putString("view_mode", value.name).apply()
+    }
+
+    fun updateAppIcon(key: String) {
+        appIcon = key
+        sp.edit().putString("app_icon", key).apply()
     }
 
     fun updateSort(field: SortField, ascending: Boolean) {

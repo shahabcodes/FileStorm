@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <group android:pivotX="54" android:pivotY="56" android:scaleX="0.62" android:scaleY="0.62">
+    <path android:fillColor="#FF0040DD" android:pathData="M18,34 q0,-5 5,-5 h14 q3.5,0 5.5,2.5 l3,4 q1.5,2 4.5,2 h35 q5,0 5,5 v40 q0,5 -5,5 h-62 q-5,0 -5,-5 Z"/>
+    <group android:rotation="-6" android:pivotX="50" android:pivotY="47">
+      <path android:fillColor="#FFFFFFFF" android:pathData="M30,30 h40 a3,3 0 0 1 3,3 v28 a3,3 0 0 1 -3,3 h-40 a3,3 0 0 1 -3,-3 v-28 a3,3 0 0 1 3,-3 Z"/>
+    </group>
+    <group android:rotation="5" android:pivotX="60" android:pivotY="43">
+      <path android:fillColor="#FFDCE8FF" android:pathData="M40,26 h40 a3,3 0 0 1 3,3 v28 a3,3 0 0 1 -3,3 h-40 a3,3 0 0 1 -3,-3 v-28 a3,3 0 0 1 3,-3 Z"/>
+    </group>
+    <path android:pathData="M14,52 h80 l-9,34 q-1,4 -5,4 h-61 q-4,0 -4.8,-4 Z">
+      <aapt:attr name="android:fillColor">
+        <gradient android:startX="54" android:startY="52" android:endX="54" android:endY="90" android:type="linear">
+        <item android:offset="0" android:color="#FF4DA3FF"/>
+        <item android:offset="1" android:color="#FF0A84FF"/>
+        </gradient>
+      </aapt:attr>
+    </path>
+    <path android:fillColor="#FFFFD60A" android:pathData="M58,56 L45,73 L54,73 L50,86 L64,68 L55,68 Z"/>
+  </group>
+</vector>

@@ -1,6 +1,7 @@
 package com.shahabcodes.filestorm.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
@@ -157,6 +160,69 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
             }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // ── App icon ───────────────────────────────────────────────────
+        SectionHeader("App Icon")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            val context = LocalContext.current
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                com.shahabcodes.filestorm.data.IconManager.icons.forEach { icon ->
+                    val selectedIcon = Prefs.appIcon == icon.key
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val bitmap = androidx.compose.runtime.remember(icon.mipmap) {
+                            androidx.core.content.res.ResourcesCompat
+                                .getDrawable(context.resources, icon.mipmap, context.theme)
+                                ?.toBitmap(132, 132)
+                                ?.asImageBitmap()
+                        }
+                        Box(
+                            Modifier
+                                .size(58.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                                .background(fsColors.fill)
+                                .then(
+                                    if (selectedIcon) Modifier.border(
+                                        2.5.dp, fsColors.accent,
+                                        androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                                    ) else Modifier
+                                )
+                                .pressScale {
+                                    com.shahabcodes.filestorm.data.IconManager.apply(context, icon)
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            bitmap?.let {
+                                androidx.compose.foundation.Image(
+                                    bitmap = it,
+                                    contentDescription = icon.label,
+                                    modifier = Modifier.size(58.dp),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(5.dp))
+                        Text(
+                            icon.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selectedIcon) fsColors.accent else fsColors.secondaryLabel,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+            Text(
+                "Your launcher may take a moment to show the new icon.",
+                style = MaterialTheme.typography.labelSmall,
+                color = fsColors.secondaryLabel.copy(alpha = 0.7f),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+            )
         }
         Spacer(Modifier.height(24.dp))
 

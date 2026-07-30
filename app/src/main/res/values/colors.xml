@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="icon_bg_dark_violet">#141417</color>
+    <color name="icon_bg_blue">#007AFF</color>
+    <color name="icon_bg_navy">#0B1026</color>
+    <color name="icon_bg_black_gold">#101013</color>
+    <color name="icon_bg_github_dark">#0D1117</color>
+    <color name="icon_bg_carbon">#101014</color>
+    <color name="icon_bg_open_navy">#0E1B33</color>
+    <color name="icon_bg_pixel">#12121A</color>
+    <color name="icon_bg_origami">#101725</color>
+</resources>
