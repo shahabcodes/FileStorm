@@ -162,7 +162,57 @@ fun FolderStyleSheet(entry: FsEntry, onDismiss: () -> Unit) {
                             }
                         }
                     }
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(18.dp))
+
+                    // Folder glyph picker
+                    Text(
+                        "ICON",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = fsColors.secondaryLabel,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    val currentIcon = FolderStyles.iconOf(entry.path)
+                    val glyphColor = currentColor?.let { Color(it) } ?: fsColors.accent
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        com.shahabcodes.filestorm.ui.components.FolderIcons.all.forEach { choice ->
+                            val selected = (currentIcon ?: "folder") == choice.key
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (selected) glyphColor else fsColors.fill
+                                        )
+                                        .pressScale {
+                                            FolderStyles.setIcon(
+                                                entry.path,
+                                                if (choice.key == "folder") null else choice.key,
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        choice.icon, choice.label,
+                                        tint = if (selected) Color.White else fsColors.secondaryLabel,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    choice.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (selected) fsColors.accent else fsColors.secondaryLabel,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(18.dp))
 
                     // Custom picker toggle row
                     Row(

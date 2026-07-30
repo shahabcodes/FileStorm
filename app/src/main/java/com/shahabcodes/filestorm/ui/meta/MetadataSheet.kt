@@ -66,6 +66,7 @@ import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.util.Formatters
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 /** Single-file date editor: shows what is there now, what the filename says, and what will be written. */
@@ -394,24 +395,68 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
     }
 }
 
-/** Batch editor: recovers dates from filenames for every selected file. */
+/**
+ * Batch editor. Either fixes the given [entries], or every file under
+ * [folderRoot] including subfolders. Files whose dates already match their
+ * filename are detected up front and left alone.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
+fun BatchDateSheet(
+    entries: List<FsEntry> = emptyList(),
+    folderRoot: String? = null,
+    onDismiss: () -> Unit,
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val files = remember(entries) { entries.filter { !it.isDirectory } }
-    val matched = remember(files) {
-        files.mapNotNull { entry ->
-            FilenameDate.parse(entry.name)?.let { parsed ->
-                MetadataEditor.Change(entry.toFile(), parsed.millis, parsed.source) to parsed.hasTime
+    var analysis by remember { mutableStateOf<DateAnalysis?>(null) }
+    var scanCount by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(folderRoot, entries) {
+        analysis = withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val files = if (folderRoot != null) {
+                val out = mutableListOf<java.io.File>()
+                val queue = ArrayDeque<java.io.File>()
+                queue.add(java.io.File(folderRoot))
+                while (queue.isNotEmpty()) {
+                    val dir = queue.removeFirst()
+                    val children = dir.listFiles() ?: continue
+                    for (child in children) {
+                        if (child.name == ".FileStorm" || child.name.startsWith(".")) continue
+                        if (child.isDirectory) queue.add(child) else {
+                            out.add(child)
+                            scanCount = out.size
+                        }
+                    }
+                }
+                out
+            } else {
+                entries.filter { !it.isDirectory }.map { it.toFile() }
             }
+
+            val needs = mutableListOf<Pair<MetadataEditor.Change, Boolean>>()
+            val skipped = mutableListOf<SkippedFile>()
+            var noDate = 0
+            files.forEach { file ->
+                val parsed = FilenameDate.parse(file.name)
+                if (parsed == null) {
+                    noDate++
+                } else if (MetadataEditor.alreadyCorrect(file, parsed.millis, parsed.hasTime)) {
+                    skipped.add(SkippedFile(file.name, file.lastModified()))
+                } else {
+                    needs.add(
+                        MetadataEditor.Change(file, parsed.millis, parsed.source) to parsed.hasTime
+                    )
+                }
+            }
+            DateAnalysis(needs, skipped, files.size, noDate)
         }
     }
-    val unmatched = files.size - matched.size
 
+    val result = analysis
+    val matched = result?.needsFix ?: emptyList()
     val photoCount = remember(matched) {
         matched.count { !com.shahabcodes.filestorm.data.meta.Mp4Meta.isSupported(it.first.file) }
     }
@@ -423,6 +468,7 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
     var confirming by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<MetadataEditor.Progress?>(null) }
     var outcome by remember { mutableStateOf<MetadataEditor.Outcome?>(null) }
+    var showSkipped by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -442,23 +488,118 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                 color = fsColors.label,
             )
             Text(
-                "${matched.size} of ${files.size} selected file(s) have a date in their name" +
-                    if (unmatched > 0) " · $unmatched will be skipped" else "",
+                if (folderRoot != null)
+                    java.io.File(folderRoot).name.ifEmpty { "Internal storage" } + " · including subfolders"
+                else "${entries.count { !it.isDirectory }} selected file(s)",
                 style = MaterialTheme.typography.bodySmall,
                 color = fsColors.secondaryLabel,
             )
-            if (matched.isNotEmpty()) {
-                Text(
-                    "$photoCount photo(s) · $videoCount video(s)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = fsColors.secondaryLabel.copy(alpha = 0.8f),
-                )
+            Spacer(Modifier.height(14.dp))
+
+            if (result == null) {
+                GroupedCard {
+                    Row(
+                        Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = fsColors.accent,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            if (folderRoot != null) "Scanning folder… $scanCount file(s)"
+                            else "Checking existing metadata…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = fsColors.label,
+                        )
+                    }
+                }
+                return@Column
+            }
+
+            GroupedCard {
+                SummaryRow("Need fixing", "${matched.size}", fsColors.accent)
+                RowSeparator(startIndent = 16.dp)
+                SummaryRow("Already correct", "${result.skipped.size}", fsColors.green)
+                RowSeparator(startIndent = 16.dp)
+                SummaryRow("No date in filename", "${result.noDate}", fsColors.secondaryLabel)
+                if (matched.isNotEmpty()) {
+                    RowSeparator(startIndent = 16.dp)
+                    SummaryRow("Photos / videos to fix", "$photoCount / $videoCount")
+                }
             }
             Spacer(Modifier.height(14.dp))
 
-            if (matched.isNotEmpty()) {
+            if (result.skipped.isNotEmpty()) {
                 GroupedCard {
-                    matched.take(40).forEachIndexed { index, (change, hasTime) ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .pressScale { showSkipped = !showSkipped }
+                            .padding(horizontal = 16.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Rounded.CheckCircle, null,
+                            tint = fsColors.green, modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "${result.skipped.size} file(s) already match their filename",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = fsColors.label,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            if (showSkipped) "Hide" else "Show",
+                            color = fsColors.accent,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                    if (showSkipped) {
+                        result.skipped.take(40).forEach { item ->
+                            RowSeparator(startIndent = 16.dp)
+                            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                Text(
+                                    item.name,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = fsColors.label,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    Formatters.fullDate(item.current),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = fsColors.green,
+                                )
+                            }
+                        }
+                        if (result.skipped.size > 40) {
+                            RowSeparator(startIndent = 16.dp)
+                            Text(
+                                "…and ${result.skipped.size - 40} more",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = fsColors.secondaryLabel,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+
+            if (matched.isNotEmpty()) {
+                Text(
+                    "TO BE UPDATED",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = fsColors.secondaryLabel,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                )
+                GroupedCard {
+                    matched.take(40).forEachIndexed { index, pair ->
+                        val change = pair.first
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -473,9 +614,9 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                                 )
                                 Text(
                                     Formatters.fullDate(change.newMillis) +
-                                        if (!hasTime) " (noon)" else "",
+                                        if (!pair.second) " (noon)" else "",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = fsColors.green,
+                                    color = fsColors.accent,
                                 )
                             }
                         }
@@ -527,10 +668,12 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                         Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.Error, null, tint = fsColors.orange)
+                        Icon(Icons.Rounded.CheckCircle, null, tint = fsColors.green)
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            "None of the selected files have a recognisable date in their filename.",
+                            if (result.skipped.isNotEmpty())
+                                "Nothing to do — every dated file already has the right date."
+                            else "No files here have a recognisable date in their filename.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = fsColors.label,
                         )
@@ -550,13 +693,18 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                     Text(
                         buildString {
                             if (writeExif && photoCount > 0) {
-                                append("• EXIF taken-date written for $photoCount photo(s)\n")
+                                append("- EXIF taken-date written for $photoCount photo(s)\n")
                             }
                             if (writeVideo && videoCount > 0) {
-                                append("• Creation time written for $videoCount video(s)\n")
+                                append("- Creation time written for $videoCount video(s)\n")
                             }
-                            if (writeFileDate) append("• File modified date set for all ${matched.size}\n")
-                            if (unmatched > 0) append("• $unmatched file(s) without a date in the name stay untouched\n")
+                            if (writeFileDate) append("- File modified date set for all ${matched.size}\n")
+                            if (result != null && result.skipped.isNotEmpty()) {
+                                append("- ${result.skipped.size} already-correct file(s) stay untouched\n")
+                            }
+                            if (result != null && result.noDate > 0) {
+                                append("- ${result.noDate} file(s) without a date in the name stay untouched\n")
+                            }
                         }.trim(),
                         color = fsColors.secondaryLabel,
                         style = MaterialTheme.typography.bodyMedium,
@@ -593,7 +741,7 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
 
     progress?.let { DetailedProgressDialog(it) }
 
-    outcome?.let { result ->
+    outcome?.let { finished ->
         AlertDialog(
             onDismissRequest = {
                 outcome = null
@@ -604,16 +752,24 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
             text = {
                 Column {
                     Text(
-                        "${result.succeeded} file(s) updated" +
-                            (if (result.exifWritten > 0) " · ${result.exifWritten} EXIF rewritten" else "") +
-                            (if (result.videoWritten > 0) " · ${result.videoWritten} video header(s) rewritten" else "") +
-                            (if (result.failed > 0) " · ${result.failed} failed" else ""),
+                        "${finished.succeeded} file(s) updated" +
+                            (if (finished.exifWritten > 0) " · ${finished.exifWritten} EXIF rewritten" else "") +
+                            (if (finished.videoWritten > 0) " · ${finished.videoWritten} video header(s) rewritten" else "") +
+                            (if (finished.failed > 0) " · ${finished.failed} failed" else ""),
                         color = fsColors.label,
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    if (result.errors.isNotEmpty()) {
+                    if (result != null && result.skipped.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
-                        result.errors.take(5).forEach {
+                        Text(
+                            "${result.skipped.size} file(s) were already correct and were skipped.",
+                            color = fsColors.green,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    if (finished.errors.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        finished.errors.take(5).forEach {
                             Text(it, color = fsColors.red, style = MaterialTheme.typography.labelSmall)
                         }
                     }
@@ -626,6 +782,31 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                 }) { Text("Done", color = fsColors.accent) }
             },
         )
+    }
+}
+
+private data class SkippedFile(val name: String, val current: Long)
+
+private data class DateAnalysis(
+    val needsFix: List<Pair<MetadataEditor.Change, Boolean>>,
+    val skipped: List<SkippedFile>,
+    val scanned: Int,
+    val noDate: Int,
+)
+
+@Composable
+private fun SummaryRow(label: String, value: String, valueColor: Color = fsColors.label) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = fsColors.secondaryLabel,
+            modifier = Modifier.weight(1f),
+        )
+        Text(value, style = MaterialTheme.typography.titleMedium, color = valueColor)
     }
 }
 

@@ -159,7 +159,9 @@ fun FileIconView(entry: FsEntry, size: Dp = 40.dp, cornerRadius: Dp = 10.dp) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                kindIcon(entry.kind), null,
+                if (entry.isDirectory) FolderIcons.iconFor(FolderStyles.iconOf(entry.path))
+                else kindIcon(entry.kind),
+                null,
                 tint = Color.White,
                 modifier = Modifier.size(size * 0.55f),
             )

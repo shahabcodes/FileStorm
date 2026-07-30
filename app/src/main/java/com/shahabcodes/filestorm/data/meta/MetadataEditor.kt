@@ -68,6 +68,31 @@ object MetadataEditor {
         val errors: List<String>,
     )
 
+    /**
+     * True when the file's dates already agree with [target], so there is
+     * nothing to rewrite. Filename dates without a time only need the same day.
+     */
+    fun alreadyCorrect(file: File, target: Long, hasTime: Boolean): Boolean {
+        val current = read(file)
+        val primary = when {
+            current.isVideo -> current.videoDate
+            current.isImage -> current.exifDate
+            else -> null
+        }
+        // A missing primary date is exactly what we are here to repair.
+        if ((current.isVideo || current.isImage) && primary == null) return false
+        val close = { value: Long -> if (hasTime) kotlin.math.abs(value - target) <= 120_000L else sameDay(value, target) }
+        if (primary != null && !close(primary)) return false
+        return close(current.fileDate)
+    }
+
+    private fun sameDay(a: Long, b: Long): Boolean {
+        val ca = java.util.Calendar.getInstance().apply { timeInMillis = a }
+        val cb = java.util.Calendar.getInstance().apply { timeInMillis = b }
+        return ca.get(java.util.Calendar.YEAR) == cb.get(java.util.Calendar.YEAR) &&
+            ca.get(java.util.Calendar.DAY_OF_YEAR) == cb.get(java.util.Calendar.DAY_OF_YEAR)
+    }
+
     fun read(file: File): Current {
         val ext = file.extension.lowercase()
         val isImage = ext in readableExif

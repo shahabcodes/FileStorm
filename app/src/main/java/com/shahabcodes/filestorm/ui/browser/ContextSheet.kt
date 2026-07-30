@@ -132,9 +132,12 @@ fun EntryContextSheet(
 
             GroupedCard {
                 ContextRow(Icons.Rounded.DriveFileRenameOutline, "Rename") { onDismiss(); onRename() }
-                if (!isFolder && onEditDate != null) {
+                if (onEditDate != null) {
                     RowSeparator(startIndent = 54.dp)
-                    ContextRow(Icons.Rounded.Schedule, "Edit date & metadata") { onDismiss(); onEditDate() }
+                    ContextRow(
+                        Icons.Rounded.Schedule,
+                        if (isFolder) "Fix dates in folder…" else "Edit date & metadata",
+                    ) { onDismiss(); onEditDate() }
                 }
                 if (isFolder && onStyle != null) {
                     RowSeparator(startIndent = 54.dp)

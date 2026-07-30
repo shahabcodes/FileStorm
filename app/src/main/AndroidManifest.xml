@@ -17,7 +17,7 @@
     <application
         android:name=".FileStormApp"
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/ic_launcher_opt25"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.FileStorm"
@@ -30,7 +30,7 @@
             android:configChanges="orientation|screenSize|uiMode" />
 
         <!-- Switchable launcher identity: one (icon, name) alias enabled at a time. -->
-        <activity-alias android:name=".L_default_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_storm" android:enabled="true" android:exported="true">
+        <activity-alias android:name=".L_default_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
         <activity-alias android:name=".L_default_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
@@ -210,7 +210,7 @@
         <activity-alias android:name=".L_opt24_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt24" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".L_opt25_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+        <activity-alias android:name=".L_opt25_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_label_storm" android:enabled="true" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
         <activity-alias android:name=".L_opt25_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt25" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
@@ -280,6 +280,24 @@
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
         <activity-alias android:name=".L_opt29_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt29" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt30_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt30" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt30_files" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt30" android:label="@string/app_label_files" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt30_myfiles" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt30" android:label="@string/app_label_myfiles" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt30_storage" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt30" android:label="@string/app_label_storage" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt30_explorer" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt30" android:label="@string/app_label_explorer" android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".L_opt30_vault" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher_opt30" android:label="@string/app_label_vault" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity-alias>
 

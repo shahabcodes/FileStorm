@@ -9,4 +9,5 @@
     <color name="icon_bg_open_navy">#0E1B33</color>
     <color name="icon_bg_pixel">#12121A</color>
     <color name="icon_bg_origami">#101725</color>
+    <color name="icon_bg_nothing">#FF000000</color>
 </resources>

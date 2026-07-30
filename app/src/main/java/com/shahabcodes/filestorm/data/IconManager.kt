@@ -12,6 +12,7 @@ object IconManager {
     data class AppName(val key: String, val label: String)
 
     val icons = listOf(
+        AppIcon("opt25", "Glass", R.mipmap.ic_launcher_opt25),
         AppIcon("default", "Ocean Bolt", R.mipmap.ic_launcher),
         AppIcon("opt13", "Classic Max", R.mipmap.ic_launcher_opt13),
         AppIcon("opt15", "Violet Velvet", R.mipmap.ic_launcher_opt15),
@@ -22,10 +23,10 @@ object IconManager {
         AppIcon("opt21", "Twin Stack", R.mipmap.ic_launcher_opt21),
         AppIcon("opt22", "Carbon", R.mipmap.ic_launcher_opt22),
         AppIcon("opt24", "Bold Outline", R.mipmap.ic_launcher_opt24),
-        AppIcon("opt25", "Glass", R.mipmap.ic_launcher_opt25),
         AppIcon("opt27", "Open Folder", R.mipmap.ic_launcher_opt27),
         AppIcon("opt28", "Pixel Storm", R.mipmap.ic_launcher_opt28),
         AppIcon("opt29", "Origami", R.mipmap.ic_launcher_opt29),
+        AppIcon("opt30", "Nothing", R.mipmap.ic_launcher_opt30),
     )
 
     val names = listOf(
@@ -36,6 +37,10 @@ object IconManager {
         AppName("explorer", "Explorer"),
         AppName("vault", "Vault"),
     )
+
+    /** Must match the single alias marked enabled="true" in the manifest. */
+    private const val MANIFEST_DEFAULT_ICON = "opt25"
+    private const val MANIFEST_DEFAULT_NAME = "storm"
 
     private fun aliasFor(iconKey: String, nameKey: String) = ".L_${iconKey}_${nameKey}"
 
@@ -64,7 +69,7 @@ object IconManager {
             )
         }
         // The manifest-default alias must never linger alongside a custom one.
-        val manifestDefault = aliasFor("default", "storm")
+        val manifestDefault = aliasFor(MANIFEST_DEFAULT_ICON, MANIFEST_DEFAULT_NAME)
         if (next != manifestDefault && previous != manifestDefault) {
             pm.setComponentEnabledSetting(
                 component(context, manifestDefault),
@@ -86,7 +91,7 @@ object IconManager {
         val state = pm.getComponentEnabledSetting(desired)
         val enabled = state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED ||
             (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT &&
-                Prefs.appIcon == "default" && Prefs.appName == "storm")
+                Prefs.appIcon == MANIFEST_DEFAULT_ICON && Prefs.appName == MANIFEST_DEFAULT_NAME)
         if (!enabled) apply(context)
     }
 }

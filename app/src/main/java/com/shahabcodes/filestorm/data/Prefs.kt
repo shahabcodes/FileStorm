@@ -56,7 +56,7 @@ object Prefs {
         private set
     var sortAscending by mutableStateOf(true)
         private set
-    var appIcon by mutableStateOf("default")
+    var appIcon by mutableStateOf("opt25")
         private set
     var appName by mutableStateOf("storm")
         private set
@@ -72,7 +72,7 @@ object Prefs {
             SortField.valueOf(sp.getString("sort_field", SortField.NAME.name)!!)
         }.getOrDefault(SortField.NAME)
         sortAscending = sp.getBoolean("sort_ascending", true)
-        appIcon = sp.getString("app_icon", "default") ?: "default"
+        appIcon = sp.getString("app_icon", "opt25") ?: "opt25"
         appName = sp.getString("app_name", "storm") ?: "storm"
         appearance = runCatching {
             Appearance.valueOf(sp.getString("appearance", Appearance.SYSTEM.name)!!)
@@ -129,6 +129,7 @@ object FolderStyles {
     private lateinit var sp: SharedPreferences
     private val colors = androidx.compose.runtime.mutableStateMapOf<String, Int>()
     private val boldPaths = androidx.compose.runtime.mutableStateMapOf<String, Boolean>()
+    private val icons = androidx.compose.runtime.mutableStateMapOf<String, String>()
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm_folder_styles", Context.MODE_PRIVATE)
@@ -136,7 +137,21 @@ object FolderStyles {
             when {
                 key.startsWith("color:") && value is Int -> colors[key.removePrefix("color:")] = value
                 key.startsWith("bold:") && value == true -> boldPaths[key.removePrefix("bold:")] = true
+                key.startsWith("icon:") && value is String -> icons[key.removePrefix("icon:")] = value
             }
+        }
+    }
+
+    /** Key from [FolderIcons], or null for the default folder glyph. */
+    fun iconOf(path: String): String? = icons[path]
+
+    fun setIcon(path: String, key: String?) {
+        if (key == null) {
+            icons.remove(path)
+            sp.edit().remove("icon:$path").apply()
+        } else {
+            icons[path] = key
+            sp.edit().putString("icon:$path", key).apply()
         }
     }
 

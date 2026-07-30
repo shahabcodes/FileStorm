@@ -35,7 +35,9 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.DateRange
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.RemoveDone
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FolderOff
@@ -64,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -204,6 +207,7 @@ fun BrowserScreen(
     var contextTarget by remember { mutableStateOf<FsEntry?>(null) }
     var metaTarget by remember { mutableStateOf<FsEntry?>(null) }
     var batchMetaOpen by remember { mutableStateOf(false) }
+    var folderMetaRoot by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Prefs.showHidden) { vm.refresh() }
@@ -342,17 +346,31 @@ fun BrowserScreen(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    if (selected.size == visibleEntries.size) "Deselect All" else "Select All",
-                    color = fsColors.accent,
-                    style = MaterialTheme.typography.bodyLarge,
+                val allSelected = selected.size == visibleEntries.size && visibleEntries.isNotEmpty()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(if (allSelected) fsColors.accent else fsColors.accent.copy(alpha = 0.14f))
                         .pressScale {
-                            selected = if (selected.size == visibleEntries.size) emptySet()
+                            selected = if (allSelected) emptySet()
                             else visibleEntries.map { it.path }.toSet()
                         }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                )
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Icon(
+                        if (allSelected) Icons.Rounded.RemoveDone else Icons.Rounded.DoneAll,
+                        null,
+                        tint = if (allSelected) Color.White else fsColors.accent,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (allSelected) "Deselect" else "All",
+                        color = if (allSelected) Color.White else fsColors.accent,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
             } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -413,6 +431,23 @@ fun BrowserScreen(
                             onClick = {
                                 selectionMode = true
                                 menuOpen = false
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Select all", color = fsColors.label) },
+                            leadingIcon = { Icon(Icons.Rounded.DoneAll, null, tint = fsColors.accent) },
+                            onClick = {
+                                menuOpen = false
+                                selectionMode = true
+                                selected = visibleEntries.map { it.path }.toSet()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Fix dates in this folder…", color = fsColors.label) },
+                            leadingIcon = { Icon(Icons.Rounded.Schedule, null, tint = fsColors.accent) },
+                            onClick = {
+                                menuOpen = false
+                                folderMetaRoot = path
                             },
                         )
                         DropdownMenuItem(
@@ -650,7 +685,9 @@ fun BrowserScreen(
             } else null,
             onProperties = { infoTarget = target },
             onRename = { renameTarget = target },
-            onEditDate = if (!target.isDirectory) ({ metaTarget = target }) else null,
+            onEditDate = {
+                if (target.isDirectory) folderMetaRoot = target.path else metaTarget = target
+            },
             onStyle = if (target.isDirectory) ({ styleTarget = target }) else null,
             onCopy = {
                 selected = setOf(target.path)
@@ -691,6 +728,16 @@ fun BrowserScreen(
             onDismiss = {
                 batchMetaOpen = false
                 exitSelection()
+                vm.refresh()
+            },
+        )
+    }
+
+    folderMetaRoot?.let { root ->
+        com.shahabcodes.filestorm.ui.meta.BatchDateSheet(
+            folderRoot = root,
+            onDismiss = {
+                folderMetaRoot = null
                 vm.refresh()
             },
         )
