@@ -36,6 +36,30 @@ object MetadataEditor {
         val source: String,
     )
 
+    /** Live detail for the progress dialog. */
+    data class Progress(
+        val done: Int,
+        val total: Int,
+        val currentName: String,
+        val currentIsVideo: Boolean,
+        val exifWritten: Int,
+        val videoWritten: Int,
+        val fileDatesSet: Int,
+        val failed: Int,
+        val bytesDone: Long,
+        val bytesTotal: Long,
+        val startedAt: Long,
+    ) {
+        val fraction: Float get() = if (total == 0) 0f else done.toFloat() / total
+        val elapsedSeconds: Long get() = (System.currentTimeMillis() - startedAt) / 1000
+        val etaSeconds: Long
+            get() {
+                if (done == 0) return -1
+                val perItem = (System.currentTimeMillis() - startedAt).toDouble() / done
+                return ((total - done) * perItem / 1000).toLong()
+            }
+    }
+
     data class Outcome(
         val succeeded: Int,
         val failed: Int,
@@ -79,23 +103,49 @@ object MetadataEditor {
         writeExif: Boolean,
         writeFileDate: Boolean,
         writeVideoMeta: Boolean = false,
-        onProgress: (done: Int) -> Unit = {},
+        onProgress: (Progress) -> Unit = {},
     ): Outcome = withContext(Dispatchers.IO) {
         var succeeded = 0
         var failed = 0
         var exifWritten = 0
         var videoWritten = 0
+        var fileDatesSet = 0
+        var bytesDone = 0L
         val errors = mutableListOf<String>()
         val scanned = mutableListOf<String>()
 
+        val startedAt = System.currentTimeMillis()
+        val bytesTotal = changes.sumOf { runCatching { it.file.length() }.getOrDefault(0L) }
+
+        fun report(done: Int, name: String, isVideo: Boolean) {
+            onProgress(
+                Progress(
+                    done = done,
+                    total = changes.size,
+                    currentName = name,
+                    currentIsVideo = isVideo,
+                    exifWritten = exifWritten,
+                    videoWritten = videoWritten,
+                    fileDatesSet = fileDatesSet,
+                    failed = failed,
+                    bytesDone = bytesDone,
+                    bytesTotal = bytesTotal,
+                    startedAt = startedAt,
+                )
+            )
+        }
+
         changes.forEachIndexed { index, change ->
             val file = change.file
+            val isVideo = Mp4Meta.isSupported(file)
+            report(index, file.name, isVideo)
             if (!file.isFile) {
                 failed++
                 errors.add("${file.name}: file no longer exists")
-                onProgress(index + 1)
+                report(index + 1, file.name, isVideo)
                 return@forEachIndexed
             }
+            val size = runCatching { file.length() }.getOrDefault(0L)
 
             var wroteSomething = false
             var itemFailed = false
@@ -118,7 +168,7 @@ object MetadataEditor {
                 }
             }
 
-            if (writeVideoMeta && Mp4Meta.isSupported(file)) {
+            if (writeVideoMeta && isVideo) {
                 if (Mp4Meta.writeCreation(file, change.newMillis)) {
                     videoWritten++
                     wroteSomething = true
@@ -130,6 +180,7 @@ object MetadataEditor {
 
             if (writeFileDate) {
                 if (file.setLastModified(change.newMillis)) {
+                    fileDatesSet++
                     wroteSomething = true
                 } else {
                     itemFailed = true
@@ -139,7 +190,8 @@ object MetadataEditor {
 
             if (wroteSomething && !itemFailed) succeeded++ else failed++
             if (wroteSomething) scanned.add(file.absolutePath)
-            onProgress(index + 1)
+            bytesDone += size
+            report(index + 1, file.name, isVideo)
         }
 
         // Let the gallery pick the new dates up.

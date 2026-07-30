@@ -20,6 +20,8 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -419,7 +421,7 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
     var writeVideo by remember { mutableStateOf(true) }
     var writeFileDate by remember { mutableStateOf(true) }
     var confirming by remember { mutableStateOf(false) }
-    var progress by remember { mutableIntStateOf(-1) }
+    var progress by remember { mutableStateOf<MetadataEditor.Progress?>(null) }
     var outcome by remember { mutableStateOf<MetadataEditor.Outcome?>(null) }
 
     ModalBottomSheet(
@@ -571,16 +573,15 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
                 TextButton(onClick = {
                     confirming = false
                     scope.launch {
-                        progress = 0
                         outcome = MetadataEditor.apply(
                             context,
                             matched.map { it.first },
                             writeExif = writeExif,
                             writeFileDate = writeFileDate,
                             writeVideoMeta = writeVideo,
-                            onProgress = { done -> progress = done },
+                            onProgress = { p -> progress = p },
                         )
-                        progress = -1
+                        progress = null
                     }
                 }) { Text("Update", color = fsColors.accent) }
             },
@@ -590,7 +591,7 @@ fun BatchDateSheet(entries: List<FsEntry>, onDismiss: () -> Unit) {
         )
     }
 
-    if (progress >= 0) BusyDialog("Updating ${progress}/${matched.size}…")
+    progress?.let { DetailedProgressDialog(it) }
 
     outcome?.let { result ->
         AlertDialog(
@@ -740,6 +741,88 @@ private fun ChangeLine(label: String, from: String, to: String) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = fsColors.secondaryLabel)
         Text(from, style = MaterialTheme.typography.bodySmall, color = fsColors.secondaryLabel)
         Text("→ $to", style = MaterialTheme.typography.bodySmall, color = fsColors.green)
+    }
+}
+
+/** Rich progress: percent, bar, current file, per-type counters, elapsed and ETA. */
+@Composable
+private fun DetailedProgressDialog(p: MetadataEditor.Progress) {
+    Dialog(onDismissRequest = {}) {
+        Column(
+            Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(fsColors.card)
+                .padding(20.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Updating dates",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = fsColors.label,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "${(p.fraction * 100).toInt()}%",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = fsColors.accent,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { p.fraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = fsColors.accent,
+                trackColor = fsColors.fill,
+                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (p.currentIsVideo) Icons.Rounded.Movie else Icons.Rounded.Image,
+                    null,
+                    tint = fsColors.secondaryLabel,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    p.currentName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fsColors.label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+
+            ProgressStat("Files", "${p.done} of ${p.total}")
+            ProgressStat("Data processed", "${Formatters.bytes(p.bytesDone)} of ${Formatters.bytes(p.bytesTotal)}")
+            if (p.exifWritten > 0) ProgressStat("EXIF written", "${p.exifWritten}", fsColors.green)
+            if (p.videoWritten > 0) ProgressStat("Video headers written", "${p.videoWritten}", fsColors.green)
+            if (p.fileDatesSet > 0) ProgressStat("File dates set", "${p.fileDatesSet}", fsColors.green)
+            if (p.failed > 0) ProgressStat("Failed", "${p.failed}", fsColors.red)
+            ProgressStat("Elapsed", Formatters.eta(p.elapsedSeconds))
+            ProgressStat(
+                "Time left",
+                if (p.etaSeconds >= 0) Formatters.eta(p.etaSeconds) else "calculating…",
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressStat(label: String, value: String, valueColor: Color = fsColors.label) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = fsColors.secondaryLabel,
+            modifier = Modifier.weight(1f),
+        )
+        Text(value, style = MaterialTheme.typography.labelSmall, color = valueColor)
     }
 }
 

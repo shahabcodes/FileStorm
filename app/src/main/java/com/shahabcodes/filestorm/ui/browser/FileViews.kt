@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -30,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +58,7 @@ import com.shahabcodes.filestorm.util.Formatters
 import java.io.File
 
 /** Renders entries in the user's chosen view mode with shared selection behavior. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileListView(
     entries: List<FsEntry>,
@@ -120,6 +123,44 @@ fun FileListView(
             }
         }
 
+        ViewMode.TIMELINE -> {
+            val groups = remember(entries, Prefs.sortAscending) {
+                val ordered = if (Prefs.sortAscending) entries.sortedBy { it.lastModified }
+                else entries.sortedByDescending { it.lastModified }
+                ordered.groupBy { monthLabel(it.lastModified) }
+            }
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = contentPadding,
+            ) {
+                groups.forEach { (label, groupEntries) ->
+                    stickyHeader(key = "hdr_$label") {
+                        TimelineHeader(label, groupEntries)
+                    }
+                    itemsIndexed(groupEntries, key = { _, e -> e.path }) { index, entry ->
+                        val shape = when {
+                            groupEntries.size == 1 -> RoundedCornerShape(16.dp)
+                            index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                            index == groupEntries.lastIndex ->
+                                RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+                            else -> RoundedCornerShape(0.dp)
+                        }
+                        Column(Modifier.clip(shape).background(fsColors.card)) {
+                            FileRow(
+                                entry = entry,
+                                selectionMode = selectionMode,
+                                selected = entry.path in selected,
+                                onClick = { onClick(entry) },
+                                onLongClick = { onLongClick(entry) },
+                            )
+                            if (index != groupEntries.lastIndex) RowSeparator()
+                        }
+                    }
+                    item(key = "gap_$label") { Spacer(Modifier.height(18.dp)) }
+                }
+            }
+        }
+
         ViewMode.GALLERY -> LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier.fillMaxSize(),
@@ -136,6 +177,51 @@ fun FileListView(
                     onLongClick = { onLongClick(entry) },
                 )
             }
+        }
+    }
+}
+
+private val monthFormat = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault())
+
+private fun monthLabel(millis: Long): String =
+    if (millis <= 0) "Unknown date" else monthFormat.format(java.util.Date(millis))
+
+/** Sticky month heading with the group's item count and total size. */
+@Composable
+private fun TimelineHeader(label: String, entries: List<FsEntry>) {
+    val files = entries.count { !it.isDirectory }
+    val folders = entries.size - files
+    val bytes = entries.sumOf { if (it.isDirectory) 0L else it.size }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(fsColors.groupedBackground)
+            .padding(top = 6.dp, bottom = 8.dp, start = 4.dp, end = 4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(width = 4.dp, height = 18.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(fsColors.accent),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.titleMedium,
+                color = fsColors.label,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                buildString {
+                    if (folders > 0) append("$folders folder${if (folders == 1) "" else "s"}")
+                    if (folders > 0 && files > 0) append(" · ")
+                    if (files > 0) append("$files file${if (files == 1) "" else "s"}")
+                    if (bytes > 0) append(" · ${Formatters.bytes(bytes)}")
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = fsColors.secondaryLabel,
+            )
         }
     }
 }

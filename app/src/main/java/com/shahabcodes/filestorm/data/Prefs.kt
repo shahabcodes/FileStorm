@@ -11,6 +11,7 @@ enum class ViewMode(val label: String) {
     DETAILED("Detailed"),
     GRID("Grid"),
     GALLERY("Gallery"),
+    TIMELINE("Timeline"),
 }
 
 enum class SortField(val label: String, val defaultAscending: Boolean) {
