@@ -25,6 +25,7 @@ data class DupState(
     val folder1: String = "",
     val folder2: String = "",
     val deepCompare: Boolean = false,
+    val includeHidden: Boolean = true,
     val phase: DupPhase = DupPhase.IDLE,
     val error: String? = null,
     val scannedFiles: Int = 0,
@@ -70,7 +71,12 @@ object DuplicateFinder {
     @Volatile
     private var cancelled = false
 
-    fun start(folder1: String, folder2: String, deepCompare: Boolean): Boolean {
+    fun start(
+        folder1: String,
+        folder2: String,
+        deepCompare: Boolean,
+        includeHidden: Boolean = true,
+    ): Boolean {
         if (_state.value.isActive || _state.value.cleaning) return false
         val f1 = File(folder1)
         val f2 = File(folder2)
@@ -79,6 +85,7 @@ object DuplicateFinder {
             folder1 = folder1,
             folder2 = folder2,
             deepCompare = deepCompare,
+            includeHidden = includeHidden,
             phase = DupPhase.SCANNING,
             startedAt = System.currentTimeMillis(),
         )
@@ -99,7 +106,7 @@ object DuplicateFinder {
             )
             return true
         }
-        scope.launch { run(f1, f2, deepCompare) }
+        scope.launch { run(f1, f2, deepCompare, includeHidden) }
         return true
     }
 
@@ -137,7 +144,7 @@ object DuplicateFinder {
         }
     }
 
-    private fun scanFiles(root: File): List<File>? {
+    private fun scanFiles(root: File, includeHidden: Boolean): List<File>? {
         val out = mutableListOf<File>()
         val queue = ArrayDeque<File>()
         queue.add(root)
@@ -146,8 +153,9 @@ object DuplicateFinder {
             val dir = queue.removeFirst()
             val children = dir.listFiles() ?: continue
             for (child in children) {
+                // The app's own trash is never a duplicate candidate.
                 if (child.name == ".FileStorm") continue
-                if (child.name.startsWith(".")) continue
+                if (!includeHidden && child.name.startsWith(".")) continue
                 if (child.isDirectory) queue.add(child)
                 else {
                     out.add(child)
@@ -160,9 +168,9 @@ object DuplicateFinder {
         return out
     }
 
-    private suspend fun run(f1: File, f2: File, deepCompare: Boolean) {
-        val files1 = scanFiles(f1)
-        val files2 = if (files1 != null) scanFiles(f2) else null
+    private suspend fun run(f1: File, f2: File, deepCompare: Boolean, includeHidden: Boolean) {
+        val files1 = scanFiles(f1, includeHidden)
+        val files2 = if (files1 != null) scanFiles(f2, includeHidden) else null
         if (cancelled || files1 == null || files2 == null) {
             _state.value = _state.value.copy(phase = DupPhase.CANCELLED, finishedAt = System.currentTimeMillis())
             return

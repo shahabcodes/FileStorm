@@ -72,6 +72,7 @@ fun DuplicatesScreen(onBack: () -> Unit) {
     var folder1 by remember { mutableStateOf("") }
     var folder2 by remember { mutableStateOf("") }
     var deep by remember { mutableStateOf(false) }
+    var hidden by remember { mutableStateOf(true) }
     var picking by remember { mutableStateOf(0) } // 0 none, 1 folder1, 2 folder2
     var selected by remember(s.pairs) { mutableStateOf(s.pairs.map { it.id }.toSet()) }
     var confirmSide by remember { mutableStateOf(0) }
@@ -133,10 +134,11 @@ fun DuplicatesScreen(onBack: () -> Unit) {
 
         when (s.phase) {
             DupPhase.IDLE -> SetupView(
-                folder1 = folder1, folder2 = folder2, deep = deep,
+                folder1 = folder1, folder2 = folder2, deep = deep, hidden = hidden,
                 onPick1 = { picking = 1 }, onPick2 = { picking = 2 },
                 onDeepChange = { deep = it },
-                onStart = { DuplicateFinder.start(folder1, folder2, deep) },
+                onHiddenChange = { hidden = it },
+                onStart = { DuplicateFinder.start(folder1, folder2, deep, hidden) },
             )
 
             DupPhase.SCANNING -> Centered {
@@ -292,9 +294,11 @@ private fun SetupView(
     folder1: String,
     folder2: String,
     deep: Boolean,
+    hidden: Boolean,
     onPick1: () -> Unit,
     onPick2: () -> Unit,
     onDeepChange: (Boolean) -> Unit,
+    onHiddenChange: (Boolean) -> Unit,
     onStart: () -> Unit,
 ) {
     Column(Modifier.padding(horizontal = 16.dp)) {
@@ -329,6 +333,31 @@ private fun SetupView(
                     ),
                 )
             }
+            RowSeparator(startIndent = 14.dp)
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Include hidden files", style = MaterialTheme.typography.bodyLarge, color = fsColors.label)
+                    Text(
+                        "Search hidden files and folders too (names starting with a dot).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                }
+                Switch(
+                    checked = hidden,
+                    onCheckedChange = onHiddenChange,
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = fsColors.green,
+                        checkedThumbColor = Color.White,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = fsColors.fill,
+                        uncheckedBorderColor = Color.Transparent,
+                    ),
+                )
+            }
         }
         Spacer(Modifier.height(18.dp))
         val ready = folder1.isNotEmpty() && folder2.isNotEmpty()
@@ -349,7 +378,8 @@ private fun SetupView(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "Files match when their name, type and size are identical — nested folders are searched too.",
+            "Files match when their name, type and size are identical. Nested folders are always " +
+                "searched; File Storm's own trash is never touched.",
             style = MaterialTheme.typography.labelSmall,
             color = fsColors.secondaryLabel,
             modifier = Modifier.padding(horizontal = 4.dp),
@@ -418,7 +448,8 @@ private fun ResultsView(
                                     if (s.pairs.isNotEmpty()) {
                                         Text(
                                             "Up to ${Formatters.bytes(s.wastedBytes)} reclaimable" +
-                                                if (s.deepCompare) " · contents verified" else "",
+                                                (if (s.deepCompare) " · contents verified" else "") +
+                                                (if (s.includeHidden) " · hidden included" else ""),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = fsColors.secondaryLabel,
                                         )
