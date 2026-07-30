@@ -10,6 +10,7 @@ class FileStormApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
+        com.shahabcodes.filestorm.data.FolderStyles.init(this)
     }
 
     override fun newImageLoader(): ImageLoader =

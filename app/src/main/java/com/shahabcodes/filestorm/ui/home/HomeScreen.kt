@@ -52,8 +52,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.rounded.DeleteOutline
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
+import com.shahabcodes.filestorm.data.TrashManager
 import com.shahabcodes.filestorm.transfer.TransferManager
 import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.RowSeparator
@@ -72,7 +75,9 @@ fun HomeScreen(
     onOpenCategory: (FileKind) -> Unit,
     onOpenTransfer: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTrash: () -> Unit,
 ) {
+    LaunchedEffect(Unit) { TrashManager.refresh() }
     val stats = remember { FileRepository.storageStats() }
     val transfer by TransferManager.state.collectAsState()
 
@@ -276,6 +281,49 @@ fun HomeScreen(
                         }
                         if (i != shortcuts.lastIndex) RowSeparator(startIndent = 62.dp)
                     }
+                }
+            }
+        }
+
+        // Trash
+        item {
+            GroupedCard(Modifier.pressScale(onOpenTrash)) {
+                Row(
+                    Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(fsColors.red.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Rounded.DeleteOutline, null,
+                            tint = fsColors.red, modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Trash",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        val trashCount = TrashManager.items.size
+                        Text(
+                            if (trashCount == 0) "Empty"
+                            else "$trashCount item${if (trashCount == 1) "" else "s"} · recoverable",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                        )
+                    }
+                    Icon(
+                        Icons.Rounded.ChevronRight, null,
+                        tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
         }

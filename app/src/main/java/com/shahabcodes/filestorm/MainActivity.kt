@@ -129,6 +129,7 @@ private fun AppNav() {
                 onOpenCategory = { kind -> nav.navigate("category/${kind.name}") },
                 onOpenTransfer = { showTransferSheet = true },
                 onOpenSettings = { nav.navigate("settings") },
+                onOpenTrash = { nav.navigate("trash") },
             )
         }
         composable("browse?path={path}") { backStack ->
@@ -153,6 +154,9 @@ private fun AppNav() {
         }
         composable("settings") {
             SettingsScreen(onBack = { nav.popBackStack() })
+        }
+        composable("trash") {
+            com.shahabcodes.filestorm.ui.trash.TrashScreen(onBack = { nav.popBackStack() })
         }
     }
 

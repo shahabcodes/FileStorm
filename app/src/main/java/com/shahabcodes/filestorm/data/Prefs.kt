@@ -106,3 +106,44 @@ object Prefs {
         sp.edit().putString("sort_field", field.name).putBoolean("sort_ascending", ascending).apply()
     }
 }
+
+/** Per-folder visual customisation: icon colour and bold name. Keyed by absolute path. */
+object FolderStyles {
+    private lateinit var sp: SharedPreferences
+    private val colors = androidx.compose.runtime.mutableStateMapOf<String, Int>()
+    private val boldPaths = androidx.compose.runtime.mutableStateMapOf<String, Boolean>()
+
+    fun init(context: Context) {
+        sp = context.getSharedPreferences("filestorm_folder_styles", Context.MODE_PRIVATE)
+        sp.all.forEach { (key, value) ->
+            when {
+                key.startsWith("color:") && value is Int -> colors[key.removePrefix("color:")] = value
+                key.startsWith("bold:") && value == true -> boldPaths[key.removePrefix("bold:")] = true
+            }
+        }
+    }
+
+    fun colorOf(path: String): Int? = colors[path]
+
+    fun isBold(path: String): Boolean = boldPaths[path] == true
+
+    fun setColor(path: String, argb: Int?) {
+        if (argb == null) {
+            colors.remove(path)
+            sp.edit().remove("color:$path").apply()
+        } else {
+            colors[path] = argb
+            sp.edit().putInt("color:$path", argb).apply()
+        }
+    }
+
+    fun setBold(path: String, bold: Boolean) {
+        if (bold) {
+            boldPaths[path] = true
+            sp.edit().putBoolean("bold:$path", true).apply()
+        } else {
+            boldPaths.remove(path)
+            sp.edit().remove("bold:$path").apply()
+        }
+    }
+}

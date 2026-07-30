@@ -27,6 +27,7 @@ object FileRepository {
         val dir = File(path)
         val children = dir.listFiles() ?: return@withContext emptyList()
         val entries = children
+            .filter { it.name != ".FileStorm" }
             .filter { showHidden || !it.name.startsWith(".") }
             .map { FsEntry.from(it) }
         sortEntries(entries, field, ascending)
@@ -60,6 +61,7 @@ object FileRepository {
                 val dir = queue.removeFirst()
                 val children = dir.listFiles() ?: continue
                 for (child in children) {
+                    if (child.name == ".FileStorm") continue
                     if (!showHidden && child.name.startsWith(".")) continue
                     if (child.name.lowercase().contains(q)) {
                         results.add(FsEntry.from(child))
@@ -82,6 +84,7 @@ object FileRepository {
                 if (!showHidden && dir.name.startsWith(".")) continue
                 val children = dir.listFiles() ?: continue
                 for (child in children) {
+                    if (child.name == ".FileStorm") continue
                     if (!showHidden && child.name.startsWith(".")) continue
                     if (child.isDirectory) {
                         if (child.name != "Android") queue.add(child)

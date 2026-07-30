@@ -92,6 +92,7 @@ fun FileRow(
             Text(
                 entry.name,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = com.shahabcodes.filestorm.ui.components.entryNameWeight(entry),
                 color = fsColors.label,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -423,15 +424,15 @@ fun ConfirmDeleteDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = fsColors.card,
-        title = { Text("Delete $count item${if (count == 1) "" else "s"}?", color = fsColors.label) },
+        title = { Text("Move $count item${if (count == 1) "" else "s"} to Trash?", color = fsColors.label) },
         text = {
             Text(
-                "This permanently deletes the selected items from your device. This cannot be undone.",
+                "Items go to FileStorm's Trash, where you can restore them later or delete them forever.",
                 color = fsColors.secondaryLabel,
             )
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Delete", color = fsColors.red) }
+            TextButton(onClick = onConfirm) { Text("Move to Trash", color = fsColors.red) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel", color = fsColors.secondaryLabel) }

@@ -56,6 +56,7 @@ import com.shahabcodes.filestorm.ui.components.IosSearchField
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
+import kotlinx.coroutines.launch
 
 private val kindTitles = mapOf(
     FileKind.IMAGE to "Images",
@@ -74,6 +75,7 @@ fun CategoryScreen(
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     var files by remember { mutableStateOf<List<FsEntry>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -335,7 +337,7 @@ fun CategoryScreen(
                 val toDelete = selectedEntries
                 val deletedPaths = toDelete.map { it.path }.toSet()
                 exitSelection()
-                FileRepository.deleteAsync(toDelete)
+                scope.launch { com.shahabcodes.filestorm.data.TrashManager.moveToTrash(toDelete) }
                 files = files.filterNot { it.path in deletedPaths }
             },
         )

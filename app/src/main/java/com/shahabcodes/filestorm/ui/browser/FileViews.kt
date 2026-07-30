@@ -178,6 +178,7 @@ private fun DetailedFileRow(
             Text(
                 entry.name,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = com.shahabcodes.filestorm.ui.components.entryNameWeight(entry),
                 color = fsColors.label,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -234,6 +235,7 @@ private fun GridTile(
             Text(
                 entry.name,
                 style = MaterialTheme.typography.labelMedium,
+                fontWeight = com.shahabcodes.filestorm.ui.components.entryNameWeight(entry),
                 color = fsColors.label,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -331,6 +333,7 @@ private fun GalleryTile(
                 Text(
                     entry.name,
                     style = MaterialTheme.typography.labelMedium,
+                    fontWeight = com.shahabcodes.filestorm.ui.components.entryNameWeight(entry),
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

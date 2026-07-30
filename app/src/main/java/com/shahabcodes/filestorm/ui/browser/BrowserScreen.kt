@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.FolderOff
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -175,6 +176,7 @@ fun BrowserScreen(
     var showNewFolder by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<FsEntry?>(null) }
     var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
+    var styleTarget by remember { mutableStateOf<FsEntry?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Prefs.showHidden) { vm.refresh() }
@@ -442,6 +444,24 @@ fun BrowserScreen(
                                 Spacer(Modifier.width(6.dp))
                                 Text("Rename", color = fsColors.accent, style = MaterialTheme.typography.labelLarge)
                             }
+                            val single = entries.firstOrNull { it.path == selected.first() }
+                            if (single?.isDirectory == true) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(fsColors.card)
+                                        .pressScale { styleTarget = single }
+                                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Palette, null,
+                                        tint = fsColors.accent, modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Style", color = fsColors.accent, style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
                         }
                     }
                     SelectionActionBar(
@@ -504,6 +524,10 @@ fun BrowserScreen(
         InfoSheet(entry = target, onDismiss = { infoTarget = null })
     }
 
+    styleTarget?.let { target ->
+        FolderStyleSheet(entry = target, onDismiss = { styleTarget = null })
+    }
+
     renameTarget?.let { target ->
         NameDialog(
             title = "Rename",
@@ -528,7 +552,7 @@ fun BrowserScreen(
                 val toDelete = selectedEntries
                 exitSelection()
                 vm.viewModelScope.launch {
-                    FileRepository.delete(toDelete)
+                    com.shahabcodes.filestorm.data.TrashManager.moveToTrash(toDelete)
                     vm.refresh()
                 }
             },

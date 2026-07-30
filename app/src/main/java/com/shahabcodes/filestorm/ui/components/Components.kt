@@ -50,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import com.shahabcodes.filestorm.data.FileKind
+import com.shahabcodes.filestorm.data.FolderStyles
 import com.shahabcodes.filestorm.data.FsEntry
 import com.shahabcodes.filestorm.ui.theme.Ios
 import com.shahabcodes.filestorm.ui.theme.fsColors
@@ -121,7 +123,10 @@ fun kindIcon(kind: FileKind): ImageVector = when (kind) {
 /** Rounded-square colored icon, with live thumbnails for images and videos. */
 @Composable
 fun FileIconView(entry: FsEntry, size: Dp = 40.dp, cornerRadius: Dp = 10.dp) {
-    val color = kindColor(entry.kind, fsColors.isDark)
+    val color = if (entry.isDirectory) {
+        com.shahabcodes.filestorm.data.FolderStyles.colorOf(entry.path)?.let { Color(it) }
+            ?: kindColor(entry.kind, fsColors.isDark)
+    } else kindColor(entry.kind, fsColors.isDark)
     if (!entry.isDirectory && (entry.kind == FileKind.IMAGE || entry.kind == FileKind.VIDEO)) {
         Box(Modifier.size(size).clip(RoundedCornerShape(cornerRadius)).background(fsColors.fill)) {
             AsyncImage(
@@ -161,6 +166,10 @@ fun FileIconView(entry: FsEntry, size: Dp = 40.dp, cornerRadius: Dp = 10.dp) {
         }
     }
 }
+
+/** Bold weight for folders the user marked bold, normal otherwise. */
+fun entryNameWeight(entry: FsEntry): FontWeight =
+    if (entry.isDirectory && FolderStyles.isBold(entry.path)) FontWeight.Bold else FontWeight.Normal
 
 /** iOS-style round selection checkmark. */
 @Composable
