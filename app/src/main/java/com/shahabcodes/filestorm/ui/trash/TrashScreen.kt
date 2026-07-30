@@ -60,6 +60,7 @@ fun TrashScreen(onBack: () -> Unit) {
     var selected by remember { mutableStateOf(setOf<String>()) }
     var confirmForever by remember { mutableStateOf(false) }
     var confirmEmpty by remember { mutableStateOf(false) }
+    var busyLabel by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { TrashManager.refresh() }
 
@@ -227,20 +228,40 @@ fun TrashScreen(onBack: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ActionPill(
                             Icons.Rounded.RestoreFromTrash, "Restore",
+                            enabled = busyLabel == null,
                             onClick = {
                                 scope.launch {
+                                    busyLabel = "Restoring ${selectedItems.size} item(s)…"
                                     TrashManager.restore(selectedItems)
                                     selected = emptySet()
+                                    busyLabel = null
                                 }
                             },
                         )
                         ActionPill(
                             Icons.Rounded.DeleteForever, "Delete Forever",
+                            enabled = busyLabel == null,
                             tint = fsColors.red,
                             onClick = { confirmForever = true },
                         )
                     }
                 }
+            }
+        }
+    }
+
+    busyLabel?.let { label ->
+        androidx.compose.ui.window.Dialog(onDismissRequest = {}) {
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(fsColors.card)
+                    .padding(horizontal = 28.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                androidx.compose.material3.CircularProgressIndicator(color = fsColors.accent)
+                Spacer(Modifier.height(14.dp))
+                Text(label, color = fsColors.label, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -255,8 +276,10 @@ fun TrashScreen(onBack: () -> Unit) {
                 TextButton(onClick = {
                     confirmForever = false
                     scope.launch {
+                        busyLabel = "Deleting ${selectedItems.size} item(s)…"
                         TrashManager.deleteForever(selectedItems)
                         selected = emptySet()
+                        busyLabel = null
                     }
                 }) { Text("Delete Forever", color = fsColors.red) }
             },
@@ -281,8 +304,10 @@ fun TrashScreen(onBack: () -> Unit) {
                 TextButton(onClick = {
                     confirmEmpty = false
                     scope.launch {
+                        busyLabel = "Emptying trash…"
                         TrashManager.emptyTrash()
                         selected = emptySet()
+                        busyLabel = null
                     }
                 }) { Text("Empty Trash", color = fsColors.red) }
             },

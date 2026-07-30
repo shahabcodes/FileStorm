@@ -1,10 +1,12 @@
 package com.shahabcodes.filestorm.ui.browser
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,23 +20,32 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FolderOff
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -58,6 +69,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shahabcodes.filestorm.data.BrowserTabs
+import com.shahabcodes.filestorm.data.Favorites
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.FsEntry
 import com.shahabcodes.filestorm.data.Prefs
@@ -155,19 +168,26 @@ fun ViewModeMenu(expanded: Boolean, onDismiss: () -> Unit) {
 
 @Composable
 fun BrowserScreen(
-    path: String,
-    onOpenFolder: (String) -> Unit,
-    onBack: () -> Unit,
+    onExit: () -> Unit,
     onOpenTransfer: () -> Unit,
 ) {
+    val tabs = BrowserTabs.tabs
+    if (tabs.isEmpty()) {
+        // Should not happen (home always opens a path first), but never crash.
+        LaunchedEffect(Unit) { BrowserTabs.open(FileRepository.rootPath) }
+        return
+    }
+    val path = BrowserTabs.active.current
+
     val vm: BrowserViewModel = viewModel(key = path) { BrowserViewModel(path) }
     val entries by vm.entries.collectAsState()
+    val loading by vm.loading.collectAsState()
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
 
-    var query by remember { mutableStateOf("") }
-    var selectionMode by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf(setOf<String>()) }
+    var query by remember(path) { mutableStateOf("") }
+    var selectionMode by remember(path) { mutableStateOf(false) }
+    var selected by remember(path) { mutableStateOf(setOf<String>()) }
     var menuOpen by remember { mutableStateOf(false) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var viewMenuOpen by remember { mutableStateOf(false) }
@@ -181,6 +201,11 @@ fun BrowserScreen(
 
     LaunchedEffect(Prefs.showHidden) { vm.refresh() }
 
+    fun goBack() {
+        if (!BrowserTabs.pop()) onExit()
+    }
+    BackHandler { goBack() }
+
     val visibleEntries = remember(entries, query) {
         if (query.isBlank()) entries
         else entries.filter { it.name.contains(query.trim(), ignoreCase = true) }
@@ -192,17 +217,72 @@ fun BrowserScreen(
         selected = emptySet()
     }
 
+    fun openEntryFolder(entry: FsEntry) {
+        openFolderGated(context, entry.path, entry.name) { BrowserTabs.push(entry.path) }
+    }
+
     Column(
         Modifier
             .fillMaxSize()
             .background(fsColors.groupedBackground)
             .statusBarsPadding(),
     ) {
+        // ── Tab bar ─────────────────────────────────────────────────────
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                val isActive = index == BrowserTabs.activeIndex
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isActive) fsColors.accent else fsColors.card)
+                        .pressScale { BrowserTabs.select(index) }
+                        .padding(start = 12.dp, end = if (isActive && tabs.size > 1) 4.dp else 12.dp)
+                        .padding(vertical = 6.dp),
+                ) {
+                    Text(
+                        File(tab.current).name.ifEmpty { "Storage" },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (isActive) androidx.compose.ui.graphics.Color.White else fsColors.label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 140.dp),
+                    )
+                    if (isActive && tabs.size > 1) {
+                        Icon(
+                            Icons.Rounded.Close, "Close tab",
+                            tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier
+                                .pressScale { BrowserTabs.close(index) }
+                                .padding(4.dp)
+                                .size(14.dp),
+                        )
+                    }
+                }
+            }
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .background(fsColors.card)
+                    .pressScale { BrowserTabs.newTab(FileRepository.rootPath) }
+                    .padding(7.dp),
+            ) {
+                Icon(Icons.Rounded.Add, "New tab", tint = fsColors.accent, modifier = Modifier.size(16.dp))
+            }
+        }
+
         // ── Navigation bar ──────────────────────────────────────────────
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selectionMode) {
@@ -236,7 +316,7 @@ fun BrowserScreen(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .pressScale(onBack)
+                        .pressScale { goBack() }
                         .padding(horizontal = 6.dp, vertical = 6.dp),
                 ) {
                     Icon(
@@ -334,14 +414,26 @@ fun BrowserScreen(
         }
 
         // ── Title + search ──────────────────────────────────────────────
-        Text(
-            if (path == FileRepository.rootPath) "Internal Storage" else File(path).name,
-            style = MaterialTheme.typography.headlineLarge,
-            color = fsColors.label,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 16.dp),
-        )
+        ) {
+            Text(
+                if (path == FileRepository.rootPath) "Internal Storage" else File(path).name,
+                style = MaterialTheme.typography.headlineLarge,
+                color = fsColors.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (com.shahabcodes.filestorm.data.FolderLocks.isLocked(path)) {
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    Icons.Rounded.Lock, "Locked folder",
+                    tint = fsColors.orange, modifier = Modifier.size(18.dp),
+                )
+            }
+        }
         Spacer(Modifier.height(10.dp))
         IosSearchField(
             value = query,
@@ -353,8 +445,21 @@ fun BrowserScreen(
 
         // ── File list ───────────────────────────────────────────────────
         Box(Modifier.weight(1f)) {
-            if (visibleEntries.isEmpty()) {
-                Column(
+            when {
+                loading -> Column(
+                    Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    CircularProgressIndicator(color = fsColors.accent)
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Loading folder…",
+                        color = fsColors.secondaryLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                visibleEntries.isEmpty() -> Column(
                     Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
@@ -371,8 +476,7 @@ fun BrowserScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-            } else {
-                FileListView(
+                else -> FileListView(
                     entries = visibleEntries,
                     selectionMode = selectionMode,
                     selected = selected,
@@ -382,7 +486,7 @@ fun BrowserScreen(
                             selected = if (entry.path in selected) selected - entry.path
                             else selected + entry.path
                         } else if (entry.isDirectory) {
-                            onOpenFolder(entry.path)
+                            openEntryFolder(entry)
                         } else {
                             openFile(context, entry)
                         }
@@ -406,61 +510,23 @@ fun BrowserScreen(
             ) {
                 Column {
                     if (selected.size == 1) {
+                        val single = entries.firstOrNull { it.path == selected.first() }
                         Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(fsColors.card)
-                                    .pressScale {
-                                        infoTarget = entries.firstOrNull { it.path == selected.first() }
-                                    }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                            ) {
-                                Icon(
-                                    Icons.Rounded.Info, null,
-                                    tint = fsColors.accent, modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text("Info", color = fsColors.accent, style = MaterialTheme.typography.labelLarge)
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(fsColors.card)
-                                    .pressScale {
-                                        renameTarget = entries.firstOrNull { it.path == selected.first() }
-                                    }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                            ) {
-                                Icon(
-                                    Icons.Rounded.DriveFileRenameOutline, null,
-                                    tint = fsColors.accent, modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text("Rename", color = fsColors.accent, style = MaterialTheme.typography.labelLarge)
-                            }
-                            val single = entries.firstOrNull { it.path == selected.first() }
+                            SelectionPill(Icons.Rounded.Info, "Info") { infoTarget = single }
+                            SelectionPill(Icons.Rounded.DriveFileRenameOutline, "Rename") { renameTarget = single }
                             if (single?.isDirectory == true) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .background(fsColors.card)
-                                        .pressScale { styleTarget = single }
-                                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Palette, null,
-                                        tint = fsColors.accent, modifier = Modifier.size(18.dp),
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Style", color = fsColors.accent, style = MaterialTheme.typography.labelLarge)
-                                }
+                                SelectionPill(Icons.Rounded.Palette, "Style") { styleTarget = single }
+                                val fav = Favorites.isFavorite(single.path)
+                                SelectionPill(
+                                    if (fav) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                    if (fav) "Unfavorite" else "Favorite",
+                                ) { Favorites.toggle(single.path) }
                             }
                         }
                     }
@@ -563,5 +629,25 @@ fun BrowserScreen(
     val transfer by TransferManager.state.collectAsState()
     LaunchedEffect(transfer.state) {
         if (!transfer.isActive) vm.refresh()
+    }
+}
+
+@Composable
+private fun SelectionPill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(fsColors.card)
+            .pressScale(onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Icon(icon, null, tint = fsColors.accent, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = fsColors.accent, style = MaterialTheme.typography.labelLarge)
     }
 }

@@ -63,10 +63,13 @@ class MainActivity : FragmentActivity() {
                         .background(fsColors.groupedBackground),
                     color = fsColors.groupedBackground,
                 ) {
-                    when {
-                        locked -> LockScreen(onRequestUnlock = { promptUnlock() })
-                        hasAccess -> AppNav()
-                        else -> PermissionScreen(onGrantClick = { requestAccess() })
+                    // The lock screen OVERLAYS the app instead of replacing it, so
+                    // navigation, tabs, sheets and progress views all survive a
+                    // lock/unlock cycle (transfers/jobs never stop — they run in
+                    // services — but now the UI comes back exactly where it was).
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                        if (hasAccess) AppNav() else PermissionScreen(onGrantClick = { requestAccess() })
+                        if (locked) LockScreen(onRequestUnlock = { promptUnlock() })
                     }
                 }
             }
@@ -82,6 +85,7 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         // Re-lock whenever the app leaves the foreground.
         if (Prefs.biometricLock) locked = true
+        com.shahabcodes.filestorm.data.FolderLocks.clearSession()
     }
 
     private fun promptUnlock() {
@@ -120,12 +124,21 @@ class MainActivity : FragmentActivity() {
 @Composable
 private fun AppNav() {
     val nav = rememberNavController()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var showTransferSheet by remember { mutableStateOf(false) }
+
+    fun openBrowser(path: String) {
+        val safe = if (File(path).exists()) path else FileRepository.rootPath
+        com.shahabcodes.filestorm.ui.browser.openFolderGated(context, safe, File(safe).name) {
+            com.shahabcodes.filestorm.data.BrowserTabs.open(safe)
+            nav.navigate("browse") { launchSingleTop = true }
+        }
+    }
 
     NavHost(navController = nav, startDestination = "home") {
         composable("home") {
             HomeScreen(
-                onOpenFolder = { path -> nav.navigate("browse?path=${Uri.encode(path)}") },
+                onOpenFolder = { path -> openBrowser(path) },
                 onOpenCategory = { kind -> nav.navigate("category/${kind.name}") },
                 onOpenTransfer = { showTransferSheet = true },
                 onOpenSettings = { nav.navigate("settings") },
@@ -133,12 +146,9 @@ private fun AppNav() {
                 onOpenJobs = { nav.navigate("jobs") },
             )
         }
-        composable("browse?path={path}") { backStack ->
-            val path = Uri.decode(backStack.arguments?.getString("path") ?: FileRepository.rootPath)
+        composable("browse") {
             BrowserScreen(
-                path = if (File(path).exists()) path else FileRepository.rootPath,
-                onOpenFolder = { p -> nav.navigate("browse?path=${Uri.encode(p)}") },
-                onBack = { nav.popBackStack() },
+                onExit = { nav.popBackStack() },
                 onOpenTransfer = { showTransferSheet = true },
             )
         }

@@ -55,6 +55,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Lock
+import com.shahabcodes.filestorm.data.Favorites
 import com.shahabcodes.filestorm.data.jobs.JobStore
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
@@ -161,33 +163,77 @@ fun HomeScreen(
             }
         }
 
-        // Storage card
-        item {
-            GroupedCard(Modifier.pressScale { onOpenFolder(root) }) {
-                Row(
-                    Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    StorageRing(fraction = stats.usedFraction, size = 74.dp)
-                    Spacer(Modifier.width(18.dp))
-                    Column {
-                        Text(
-                            "Internal Storage",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = fsColors.label,
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "${Formatters.bytes(stats.usedBytes)} of ${Formatters.bytes(stats.totalBytes)} used",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = fsColors.secondaryLabel,
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "${Formatters.bytes(stats.freeBytes)} free",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = fsColors.green,
-                        )
+        // Storage dashboard
+        item { DashboardCard() }
+
+        // Favorites
+        if (Favorites.paths.isNotEmpty()) {
+            item {
+                Column {
+                    Text(
+                        "Favourites",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = fsColors.label,
+                        modifier = Modifier.padding(bottom = 12.dp, start = 4.dp),
+                    )
+                    GroupedCard {
+                        val favs = Favorites.paths
+                        favs.forEachIndexed { i, favPath ->
+                            Row(
+                                Modifier
+                                    .pressScale { onOpenFolder(favPath) }
+                                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            (com.shahabcodes.filestorm.data.FolderStyles
+                                                .colorOf(favPath)?.let { Color(it) } ?: fsColors.accent)
+                                                .copy(alpha = 0.18f)
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Folder, null,
+                                        tint = com.shahabcodes.filestorm.data.FolderStyles
+                                            .colorOf(favPath)?.let { Color(it) } ?: fsColors.accent,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                                Spacer(Modifier.width(14.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        java.io.File(favPath).name.ifEmpty { "Storage" },
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = fsColors.label,
+                                        maxLines = 1,
+                                    )
+                                    Text(
+                                        favPath.replace(root, "Internal storage"),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = fsColors.secondaryLabel,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    )
+                                }
+                                if (com.shahabcodes.filestorm.data.FolderLocks.isLocked(favPath)) {
+                                    Icon(
+                                        Icons.Rounded.Lock, null,
+                                        tint = fsColors.orange, modifier = Modifier.size(16.dp),
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                }
+                                Icon(
+                                    Icons.Rounded.ChevronRight, null,
+                                    tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            if (i != favs.lastIndex) RowSeparator(startIndent = 62.dp)
+                        }
                     }
                 }
             }

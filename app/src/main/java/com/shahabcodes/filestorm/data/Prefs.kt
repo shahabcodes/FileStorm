@@ -147,3 +147,65 @@ object FolderStyles {
         }
     }
 }
+
+/** Favorite folders shown on the home screen, in the order they were added. */
+object Favorites {
+    private lateinit var sp: SharedPreferences
+    var paths by mutableStateOf<List<String>>(emptyList())
+        private set
+
+    fun init(context: Context) {
+        sp = context.getSharedPreferences("filestorm_favorites", Context.MODE_PRIVATE)
+        paths = runCatching {
+            val array = org.json.JSONArray(sp.getString("paths", "[]")!!)
+            buildList { for (i in 0 until array.length()) add(array.getString(i)) }
+        }.getOrDefault(emptyList())
+    }
+
+    fun isFavorite(path: String): Boolean = path in paths
+
+    fun toggle(path: String) {
+        paths = if (path in paths) paths - path else paths + path
+        sp.edit().putString("paths", org.json.JSONArray(paths).toString()).apply()
+    }
+}
+
+/**
+ * Per-folder biometric locks. A locked folder needs one successful unlock per
+ * foreground session; leaving the app clears the session unlocks.
+ */
+object FolderLocks {
+    private lateinit var sp: SharedPreferences
+    private val locked = androidx.compose.runtime.mutableStateMapOf<String, Boolean>()
+    private val sessionUnlocked = mutableSetOf<String>()
+
+    fun init(context: Context) {
+        sp = context.getSharedPreferences("filestorm_folder_locks", Context.MODE_PRIVATE)
+        sp.all.forEach { (key, value) -> if (value == true) locked[key] = true }
+    }
+
+    fun isLocked(path: String): Boolean = locked[path] == true
+
+    /** True when opening this folder must first pass biometric auth. */
+    fun requiresAuth(path: String): Boolean = isLocked(path) && path !in sessionUnlocked
+
+    fun markUnlocked(path: String) {
+        sessionUnlocked.add(path)
+    }
+
+    fun setLocked(path: String, value: Boolean) {
+        if (value) {
+            locked[path] = true
+            sp.edit().putBoolean(path, true).apply()
+        } else {
+            locked.remove(path)
+            sessionUnlocked.remove(path)
+            sp.edit().remove(path).apply()
+        }
+    }
+
+    /** Called when the app leaves the foreground: everything re-locks. */
+    fun clearSession() {
+        sessionUnlocked.clear()
+    }
+}

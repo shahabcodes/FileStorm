@@ -214,6 +214,7 @@ fun FolderPickerSheet(
     onConfirm: (String) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val pickerContext = androidx.compose.ui.platform.LocalContext.current
     var currentPath by rememberSaveable { mutableStateOf(FileRepository.rootPath) }
     var folders by remember { mutableStateOf<List<FsEntry>>(emptyList()) }
     var refreshTick by remember { mutableStateOf(0) }
@@ -301,7 +302,11 @@ fun FolderPickerSheet(
                             .background(fsColors.card)
                             .combinedClickable(
                                 enabled = !excluded,
-                                onClick = { currentPath = folder.path },
+                                onClick = {
+                                    openFolderGated(pickerContext, folder.path, folder.name) {
+                                        currentPath = folder.path
+                                    }
+                                },
                                 onLongClick = { renameFolder = folder },
                             )
                             .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -438,6 +443,29 @@ fun ConfirmDeleteDialog(
             TextButton(onClick = onDismiss) { Text("Cancel", color = fsColors.secondaryLabel) }
         },
     )
+}
+
+/** Opens a folder, first passing biometric auth when the folder is locked. */
+fun openFolderGated(
+    context: android.content.Context,
+    path: String,
+    name: String,
+    onOpen: () -> Unit,
+) {
+    if (com.shahabcodes.filestorm.data.FolderLocks.requiresAuth(path)) {
+        val activity = context as? androidx.fragment.app.FragmentActivity ?: return
+        com.shahabcodes.filestorm.ui.Biometrics.prompt(
+            activity,
+            title = "Unlock \"$name\"",
+            subtitle = "This folder is protected",
+            onSuccess = {
+                com.shahabcodes.filestorm.data.FolderLocks.markUnlocked(path)
+                onOpen()
+            },
+        )
+    } else {
+        onOpen()
+    }
 }
 
 fun openFile(context: android.content.Context, entry: FsEntry) {

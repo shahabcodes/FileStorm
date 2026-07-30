@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.FormatBold
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -245,7 +246,7 @@ fun FolderStyleSheet(entry: FsEntry, onDismiss: () -> Unit) {
             }
             Spacer(Modifier.height(14.dp))
 
-            // ── Bold name ──────────────────────────────────────────────
+            // ── Bold name + lock ───────────────────────────────────────
             GroupedCard {
                 Row(
                     Modifier
@@ -269,6 +270,58 @@ fun FolderStyleSheet(entry: FsEntry, onDismiss: () -> Unit) {
                         onCheckedChange = { FolderStyles.setBold(entry.path, it) },
                         colors = SwitchDefaults.colors(
                             checkedTrackColor = fsColors.green,
+                            checkedThumbColor = Color.White,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = fsColors.fill,
+                            uncheckedBorderColor = Color.Transparent,
+                        ),
+                    )
+                }
+                RowSeparator(startIndent = 16.dp)
+                val activity = androidx.compose.ui.platform.LocalContext.current
+                    as? androidx.fragment.app.FragmentActivity
+                val biometricsOk = activity != null &&
+                    com.shahabcodes.filestorm.ui.Biometrics.available(activity)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Rounded.Lock, null,
+                        tint = fsColors.orange, modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Lock this folder",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        Text(
+                            if (biometricsOk) "Opening it requires fingerprint, face or PIN"
+                            else "Set up a device screen lock first",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                        )
+                    }
+                    Switch(
+                        checked = com.shahabcodes.filestorm.data.FolderLocks.isLocked(entry.path),
+                        enabled = biometricsOk,
+                        onCheckedChange = { enable ->
+                            val act = activity ?: return@Switch
+                            com.shahabcodes.filestorm.ui.Biometrics.prompt(
+                                act,
+                                title = if (enable) "Lock \"${entry.name}\"" else "Unlock \"${entry.name}\"",
+                                subtitle = "Confirm it's you",
+                                onSuccess = {
+                                    com.shahabcodes.filestorm.data.FolderLocks.setLocked(entry.path, enable)
+                                },
+                            )
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = fsColors.orange,
                             checkedThumbColor = Color.White,
                             uncheckedThumbColor = Color.White,
                             uncheckedTrackColor = fsColors.fill,
