@@ -432,7 +432,7 @@ fun ConfirmDeleteDialog(
         title = { Text("Move $count item${if (count == 1) "" else "s"} to Trash?", color = fsColors.label) },
         text = {
             Text(
-                "Items go to FileStorm's Trash, where you can restore them later or delete them forever.",
+                "Items go to File Storm's Trash, where you can restore them later or delete them forever.",
                 color = fsColors.secondaryLabel,
             )
         },

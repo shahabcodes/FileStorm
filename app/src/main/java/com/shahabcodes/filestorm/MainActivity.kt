@@ -97,7 +97,7 @@ class MainActivity : FragmentActivity() {
         }
         Biometrics.prompt(
             this,
-            title = "Unlock FileStorm",
+            title = "Unlock File Storm",
             subtitle = "Use your fingerprint, face or device PIN",
             onSuccess = { locked = false },
         )

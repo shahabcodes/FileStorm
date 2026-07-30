@@ -62,7 +62,7 @@ fun LockScreen(onRequestUnlock: () -> Unit) {
         }
         Spacer(Modifier.height(28.dp))
         Text(
-            "FileStorm is Locked",
+            "File Storm is Locked",
             style = MaterialTheme.typography.headlineMedium,
             color = fsColors.label,
             textAlign = TextAlign.Center,

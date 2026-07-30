@@ -121,7 +121,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "FileStorm",
+                    "File Storm",
                     style = MaterialTheme.typography.headlineLarge,
                     color = fsColors.label,
                     modifier = Modifier.weight(1f),

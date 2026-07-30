@@ -77,7 +77,7 @@ class JobService : Service() {
                             DONE_NOTIFICATION_ID,
                             NotificationCompat.Builder(this@JobService, CHANNEL_ID)
                                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                                .setContentTitle("FileStorm · ${s.jobName}")
+                                .setContentTitle("File Storm · ${s.jobName}")
                                 .setContentText(text)
                                 .setContentIntent(contentIntent())
                                 .setAutoCancel(true)

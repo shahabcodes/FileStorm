@@ -284,7 +284,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Biometric lock", style = MaterialTheme.typography.bodyLarge, color = fsColors.label)
                     Text(
-                        if (biometricsAvailable) "Require fingerprint, face or PIN to open FileStorm"
+                        if (biometricsAvailable) "Require fingerprint, face or PIN to open File Storm"
                         else "Set up a screen lock on this device first",
                         style = MaterialTheme.typography.bodySmall,
                         color = fsColors.secondaryLabel,
@@ -354,7 +354,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         Text(
-            "FileStorm v${BuildConfig.VERSION_NAME}",
+            "File Storm v${BuildConfig.VERSION_NAME}",
             style = MaterialTheme.typography.bodySmall,
             color = fsColors.secondaryLabel.copy(alpha = 0.6f),
             modifier = Modifier

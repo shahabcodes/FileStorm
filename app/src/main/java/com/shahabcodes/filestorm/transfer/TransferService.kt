@@ -77,7 +77,7 @@ class TransferService : Service() {
             DONE_NOTIFICATION_ID,
             NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setContentTitle("FileStorm")
+                .setContentTitle("File Storm")
                 .setContentText(summary)
                 .setContentIntent(contentIntent())
                 .setAutoCancel(true)

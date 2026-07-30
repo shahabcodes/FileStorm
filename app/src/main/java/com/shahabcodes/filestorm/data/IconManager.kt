@@ -29,7 +29,7 @@ object IconManager {
     )
 
     val names = listOf(
-        AppName("storm", "FileStorm"),
+        AppName("storm", "File Storm"),
         AppName("files", "Files"),
         AppName("myfiles", "My Files"),
         AppName("storage", "Storage"),

@@ -54,14 +54,14 @@ fun PermissionScreen(onGrantClick: () -> Unit) {
         }
         Spacer(Modifier.height(28.dp))
         Text(
-            "Welcome to FileStorm",
+            "Welcome to File Storm",
             style = MaterialTheme.typography.headlineMedium,
             color = fsColors.label,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "To browse, organize and move your files, FileStorm needs access to your device storage. Nothing ever leaves your phone.",
+            "To browse, organize and move your files, File Storm needs access to your device storage. Nothing ever leaves your phone.",
             style = MaterialTheme.typography.bodyMedium,
             color = fsColors.secondaryLabel,
             textAlign = TextAlign.Center,
