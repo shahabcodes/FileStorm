@@ -101,14 +101,6 @@ fun TrashScreen(onBack: () -> Unit) {
                         }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 )
-                Text(
-                    "Empty",
-                    color = fsColors.red,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier
-                        .pressScale { confirmEmpty = true }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                )
             }
         }
 
@@ -125,7 +117,70 @@ fun TrashScreen(onBack: () -> Unit) {
             color = fsColors.secondaryLabel,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
+
+        if (items.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(fsColors.accent)
+                        .pressScale {
+                            if (busyLabel == null) {
+                                scope.launch {
+                                    busyLabel = "Restoring all ${items.size} item(s)…"
+                                    TrashManager.restore(items)
+                                    selected = emptySet()
+                                    busyLabel = null
+                                }
+                            }
+                        }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Rounded.RestoreFromTrash, null,
+                            tint = androidx.compose.ui.graphics.Color.White,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Restore All",
+                            color = androidx.compose.ui.graphics.Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(fsColors.red.copy(alpha = 0.12f))
+                        .pressScale { if (busyLabel == null) confirmEmpty = true }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Rounded.DeleteForever, null,
+                            tint = fsColors.red, modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Empty Trash",
+                            color = fsColors.red,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
 
         Box(Modifier.weight(1f)) {
             if (items.isEmpty()) {
@@ -189,22 +244,29 @@ fun TrashScreen(onBack: () -> Unit) {
                                         item.name,
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = fsColors.label,
-                                        maxLines = 1,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
-                                        "Deleted ${Formatters.fileDate(item.deletedAt)}",
+                                        (if (item.isDirectory) "Folder" else Formatters.bytes(item.size)) +
+                                            " · deleted ${Formatters.fullDate(item.deletedAt)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = fsColors.secondaryLabel,
                                         maxLines = 1,
                                     )
+                                    Spacer(Modifier.height(2.dp))
                                     Text(
-                                        "From " + (java.io.File(item.originalPath).parent
-                                            ?.replace(FileRepository.rootPath, "Internal storage")
-                                            ?: "Internal storage"),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = fsColors.secondaryLabel,
-                                        maxLines = 1,
+                                        "Restores to",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = fsColors.secondaryLabel.copy(alpha = 0.75f),
+                                    )
+                                    Text(
+                                        item.originalPath.replace(
+                                            FileRepository.rootPath, "Internal storage"
+                                        ),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = fsColors.accent,
+                                        maxLines = 3,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }

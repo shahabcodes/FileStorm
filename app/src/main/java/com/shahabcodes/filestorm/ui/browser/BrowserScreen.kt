@@ -200,6 +200,7 @@ fun BrowserScreen(
     var renameTarget by remember { mutableStateOf<FsEntry?>(null) }
     var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
     var styleTarget by remember { mutableStateOf<FsEntry?>(null) }
+    var contextTarget by remember { mutableStateOf<FsEntry?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Prefs.showHidden) { vm.refresh() }
@@ -531,8 +532,7 @@ fun BrowserScreen(
                     onLongClick = { entry ->
                         if (!selectionMode) {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            selectionMode = true
-                            selected = setOf(entry.path)
+                            contextTarget = entry
                         }
                     },
                 )
@@ -619,6 +619,42 @@ fun BrowserScreen(
                 showNewFolder = false
                 FileRepository.createFolder(path, name)
                 vm.refresh()
+            },
+        )
+    }
+
+    contextTarget?.let { target ->
+        EntryContextSheet(
+            entry = target,
+            onDismiss = { contextTarget = null },
+            onOpen = {
+                if (target.isDirectory) openEntryFolder(target) else openFile(context, target)
+            },
+            onOpenInNewTab = if (target.isDirectory) {
+                {
+                    openFolderGated(context, target.path, target.name) {
+                        BrowserTabs.newTab(target.path)
+                    }
+                }
+            } else null,
+            onProperties = { infoTarget = target },
+            onRename = { renameTarget = target },
+            onStyle = if (target.isDirectory) ({ styleTarget = target }) else null,
+            onCopy = {
+                selected = setOf(target.path)
+                showPicker = TransferOp.COPY
+            },
+            onMove = {
+                selected = setOf(target.path)
+                showPicker = TransferOp.MOVE
+            },
+            onDelete = {
+                selected = setOf(target.path)
+                confirmDelete = true
+            },
+            onSelect = {
+                selectionMode = true
+                selected = setOf(target.path)
             },
         )
     }

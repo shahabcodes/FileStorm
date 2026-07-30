@@ -75,6 +75,7 @@ fun DuplicatesScreen(onBack: () -> Unit) {
     var picking by remember { mutableStateOf(0) } // 0 none, 1 folder1, 2 folder2
     var selected by remember(s.pairs) { mutableStateOf(s.pairs.map { it.id }.toSet()) }
     var confirmSide by remember { mutableStateOf(0) }
+    var comparePair by remember { mutableStateOf<com.shahabcodes.filestorm.data.dup.DupPair?>(null) }
 
     Column(
         Modifier
@@ -202,8 +203,21 @@ fun DuplicatesScreen(onBack: () -> Unit) {
                     else s.pairs.map { it.id }.toSet()
                 },
                 onDelete = { side -> confirmSide = side },
+                onCompare = { pair -> comparePair = pair },
             )
         }
+    }
+
+    comparePair?.let { pair ->
+        DupCompareSheet(
+            pair = pair,
+            deepCompared = s.deepCompare,
+            onDismiss = { comparePair = null },
+            onDeleteSide = { side ->
+                comparePair = null
+                DuplicateFinder.deleteSide(side, setOf(pair.id))
+            },
+        )
     }
 
     if (picking != 0) {
@@ -373,6 +387,7 @@ private fun ResultsView(
     onToggle: (Int) -> Unit,
     onToggleAll: () -> Unit,
     onDelete: (Int) -> Unit,
+    onCompare: (com.shahabcodes.filestorm.data.dup.DupPair) -> Unit,
 ) {
     val s by DuplicateFinder.state.collectAsState()
     Column(Modifier.fillMaxSize()) {
@@ -448,11 +463,13 @@ private fun ResultsView(
                                 Row(
                                     Modifier
                                         .fillMaxWidth()
-                                        .pressScale { onToggle(pair.id) }
+                                        .pressScale { onCompare(pair) }
                                         .padding(horizontal = 14.dp, vertical = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    SelectionCircle(selected = pair.id in selected)
+                                    Box(Modifier.pressScale { onToggle(pair.id) }.padding(2.dp)) {
+                                        SelectionCircle(selected = pair.id in selected)
+                                    }
                                     Spacer(Modifier.width(12.dp))
                                     FileIconView(
                                         FsEntry(
@@ -488,11 +505,18 @@ private fun ResultsView(
                                         )
                                     }
                                     Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        Formatters.bytes(pair.size),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = fsColors.secondaryLabel,
-                                    )
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            Formatters.bytes(pair.size),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = fsColors.secondaryLabel,
+                                        )
+                                        Text(
+                                            "Compare",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = fsColors.accent,
+                                        )
+                                    }
                                 }
                                 if (index != s.pairs.lastIndex) RowSeparator(startIndent = 64.dp)
                             }
