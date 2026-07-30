@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -201,6 +202,8 @@ fun BrowserScreen(
     var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
     var styleTarget by remember { mutableStateOf<FsEntry?>(null) }
     var contextTarget by remember { mutableStateOf<FsEntry?>(null) }
+    var metaTarget by remember { mutableStateOf<FsEntry?>(null) }
+    var batchMetaOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Prefs.showHidden) { vm.refresh() }
@@ -546,8 +549,10 @@ fun BrowserScreen(
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
                 Column {
-                    if (selected.size == 1) {
-                        val single = entries.firstOrNull { it.path == selected.first() }
+                    if (selected.isNotEmpty()) {
+                        val single = if (selected.size == 1) {
+                            entries.firstOrNull { it.path == selected.first() }
+                        } else null
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -555,15 +560,21 @@ fun BrowserScreen(
                                 .padding(horizontal = 16.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                         ) {
-                            SelectionPill(Icons.Rounded.Info, "Info") { infoTarget = single }
-                            SelectionPill(Icons.Rounded.DriveFileRenameOutline, "Rename") { renameTarget = single }
-                            if (single?.isDirectory == true) {
-                                SelectionPill(Icons.Rounded.Palette, "Style") { styleTarget = single }
-                                val fav = Favorites.isFavorite(single.path)
-                                SelectionPill(
-                                    if (fav) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                                    if (fav) "Unfavorite" else "Favorite",
-                                ) { Favorites.toggle(single.path) }
+                            if (single != null) {
+                                SelectionPill(Icons.Rounded.Info, "Info") { infoTarget = single }
+                                SelectionPill(Icons.Rounded.DriveFileRenameOutline, "Rename") { renameTarget = single }
+                                if (single.isDirectory) {
+                                    SelectionPill(Icons.Rounded.Palette, "Style") { styleTarget = single }
+                                    val fav = Favorites.isFavorite(single.path)
+                                    SelectionPill(
+                                        if (fav) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                        if (fav) "Unfavorite" else "Favorite",
+                                    ) { Favorites.toggle(single.path) }
+                                } else {
+                                    SelectionPill(Icons.Rounded.Schedule, "Edit date") { metaTarget = single }
+                                }
+                            } else if (selectedEntries.any { !it.isDirectory }) {
+                                SelectionPill(Icons.Rounded.Schedule, "Fix dates") { batchMetaOpen = true }
                             }
                         }
                     }
@@ -639,6 +650,7 @@ fun BrowserScreen(
             } else null,
             onProperties = { infoTarget = target },
             onRename = { renameTarget = target },
+            onEditDate = if (!target.isDirectory) ({ metaTarget = target }) else null,
             onStyle = if (target.isDirectory) ({ styleTarget = target }) else null,
             onCopy = {
                 selected = setOf(target.path)
@@ -661,6 +673,27 @@ fun BrowserScreen(
 
     infoTarget?.let { target ->
         InfoSheet(entry = target, onDismiss = { infoTarget = null })
+    }
+
+    metaTarget?.let { target ->
+        com.shahabcodes.filestorm.ui.meta.MetadataSheet(
+            entry = target,
+            onDismiss = {
+                metaTarget = null
+                vm.refresh()
+            },
+        )
+    }
+
+    if (batchMetaOpen) {
+        com.shahabcodes.filestorm.ui.meta.BatchDateSheet(
+            entries = selectedEntries,
+            onDismiss = {
+                batchMetaOpen = false
+                exitSelection()
+                vm.refresh()
+            },
+        )
     }
 
     styleTarget?.let { target ->

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Tab
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -66,6 +67,7 @@ fun EntryContextSheet(
     onOpenInNewTab: (() -> Unit)? = null,
     onProperties: () -> Unit,
     onRename: () -> Unit,
+    onEditDate: (() -> Unit)? = null,
     onStyle: (() -> Unit)? = null,
     onCopy: () -> Unit,
     onMove: () -> Unit,
@@ -130,6 +132,10 @@ fun EntryContextSheet(
 
             GroupedCard {
                 ContextRow(Icons.Rounded.DriveFileRenameOutline, "Rename") { onDismiss(); onRename() }
+                if (!isFolder && onEditDate != null) {
+                    RowSeparator(startIndent = 54.dp)
+                    ContextRow(Icons.Rounded.Schedule, "Edit date & metadata") { onDismiss(); onEditDate() }
+                }
                 if (isFolder && onStyle != null) {
                     RowSeparator(startIndent = 54.dp)
                     ContextRow(Icons.Rounded.Palette, "Colour & style") { onDismiss(); onStyle() }

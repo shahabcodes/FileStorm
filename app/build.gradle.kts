@@ -11,8 +11,8 @@ android {
         applicationId = "com.shahabcodes.filestorm"
         minSdk = 26
         targetSdk = 34
-        versionCode = 14
-        versionName = "1.13"
+        versionCode = 15
+        versionName = "1.14"
     }
 
     // CI signs every build with the same keystore (from GitHub secrets) so updates
@@ -70,6 +70,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("io.coil-kt:coil-video:2.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
