@@ -29,8 +29,11 @@ import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.FolderOff
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.SortByAlpha
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -56,6 +59,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.FsEntry
+import com.shahabcodes.filestorm.data.Prefs
 import com.shahabcodes.filestorm.data.SortMode
 import com.shahabcodes.filestorm.transfer.TransferManager
 import com.shahabcodes.filestorm.transfer.TransferOp
@@ -115,7 +119,10 @@ fun BrowserScreen(
     var showPicker by remember { mutableStateOf<TransferOp?>(null) }
     var showNewFolder by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<FsEntry?>(null) }
+    var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Prefs.showHidden) { vm.refresh() }
 
     val visibleEntries = remember(entries, query) {
         if (query.isBlank()) entries
@@ -250,6 +257,24 @@ fun BrowserScreen(
                                 showNewFolder = true
                             },
                         )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (Prefs.showHidden) "Hide hidden files" else "Show hidden files",
+                                    color = fsColors.label,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    if (Prefs.showHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                    null, tint = fsColors.accent,
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                Prefs.updateShowHidden(!Prefs.showHidden)
+                            },
+                        )
                     }
                 }
             }
@@ -347,8 +372,25 @@ fun BrowserScreen(
                     if (selected.size == 1) {
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.Center,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                         ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(fsColors.card)
+                                    .pressScale {
+                                        infoTarget = entries.firstOrNull { it.path == selected.first() }
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Info, null,
+                                    tint = fsColors.accent, modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Info", color = fsColors.accent, style = MaterialTheme.typography.labelLarge)
+                            }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
@@ -422,6 +464,10 @@ fun BrowserScreen(
                 vm.refresh()
             },
         )
+    }
+
+    infoTarget?.let { target ->
+        InfoSheet(entry = target, onDismiss = { infoTarget = null })
     }
 
     renameTarget?.let { target ->

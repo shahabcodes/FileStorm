@@ -4,8 +4,14 @@ import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
+import com.shahabcodes.filestorm.data.Prefs
 
 class FileStormApp : Application(), ImageLoaderFactory {
+    override fun onCreate() {
+        super.onCreate()
+        Prefs.init(this)
+    }
+
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
             .components { add(VideoFrameDecoder.Factory()) }

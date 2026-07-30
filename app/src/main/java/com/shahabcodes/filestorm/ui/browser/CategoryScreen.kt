@@ -16,12 +16,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.rounded.DateRange
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -78,6 +80,7 @@ fun CategoryScreen(
     var showDateSheet by remember { mutableStateOf(false) }
     var showPicker by remember { mutableStateOf<TransferOp?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
 
     LaunchedEffect(kind, reloadKey) {
@@ -240,14 +243,44 @@ fun CategoryScreen(
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
-                SelectionActionBar(
-                    selectedCount = selected.size,
-                    onCopy = { showPicker = TransferOp.COPY },
-                    onMove = { showPicker = TransferOp.MOVE },
-                    onDelete = { confirmDelete = true },
-                )
+                Column {
+                    if (selected.size == 1) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(fsColors.card)
+                                    .pressScale {
+                                        infoTarget = files.firstOrNull { it.path == selected.first() }
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Info, null,
+                                    tint = fsColors.accent, modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Info", color = fsColors.accent, style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                    }
+                    SelectionActionBar(
+                        selectedCount = selected.size,
+                        onCopy = { showPicker = TransferOp.COPY },
+                        onMove = { showPicker = TransferOp.MOVE },
+                        onDelete = { confirmDelete = true },
+                    )
+                }
             }
         }
+    }
+
+    infoTarget?.let { target ->
+        InfoSheet(entry = target, onDismiss = { infoTarget = null })
     }
 
     if (showDateSheet) {
