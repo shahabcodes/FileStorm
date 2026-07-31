@@ -26,6 +26,8 @@ import androidx.navigation.compose.rememberNavController
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.Prefs
+import androidx.lifecycle.Lifecycle
+import androidx.navigation.NavBackStackEntry
 import com.shahabcodes.filestorm.ui.components.DiagnosticsOverlay
 import com.shahabcodes.filestorm.ui.Biometrics
 import com.shahabcodes.filestorm.ui.LockScreen
@@ -168,6 +170,27 @@ private fun AppNav() {
         viewerItems = paths
     }
 
+    /**
+     * A screen that is being navigated away from is still composed and still
+     * hit-testable while the transition runs, so a tap aimed at the incoming
+     * screen can be delivered to the outgoing one instead. That is how tapping
+     * Videos on the home screen could open a file from the Images list: the
+     * touch landed on the Images grid that had not been torn down yet.
+     *
+     * Only the settled destination is RESUMED, so every navigation and every
+     * viewer open is routed through this gate.
+     */
+    fun NavBackStackEntry.ifCurrent(action: () -> Unit) {
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            action()
+        } else {
+            com.shahabcodes.filestorm.data.Diagnostics.log(
+                "BLOCKED",
+                "stale tap on ${destination.route} state=${lifecycle.currentState}",
+            )
+        }
+    }
+
     fun openBrowser(path: String) {
         val safe = if (File(path).exists()) path else FileRepository.rootPath
         com.shahabcodes.filestorm.ui.browser.openFolderGated(context, safe, File(safe).name) {
@@ -177,28 +200,32 @@ private fun AppNav() {
     }
 
     NavHost(navController = nav, startDestination = "home") {
-        composable("home") {
+        composable("home") { entry ->
             HomeScreen(
-                onOpenFolder = { path -> openBrowser(path) },
+                onOpenFolder = { path -> entry.ifCurrent { openBrowser(path) } },
                 onOpenCategory = { kind ->
-                    com.shahabcodes.filestorm.data.Diagnostics.log("NAV", "open category ${kind.name}")
-                    nav.navigate("category/${kind.name}")
+                    entry.ifCurrent {
+                        com.shahabcodes.filestorm.data.Diagnostics.log("NAV", "open category ${kind.name}")
+                        nav.navigate("category/${kind.name}")
+                    }
                 },
-                onOpenTransfer = { showTransferSheet = true },
-                onOpenSettings = { nav.navigate("settings") },
-                onOpenTrash = { nav.navigate("trash") },
-                onOpenJobs = { nav.navigate("jobs") },
-                onOpenDuplicates = { nav.navigate("duplicates") },
+                onOpenTransfer = { entry.ifCurrent { showTransferSheet = true } },
+                onOpenSettings = { entry.ifCurrent { nav.navigate("settings") } },
+                onOpenTrash = { entry.ifCurrent { nav.navigate("trash") } },
+                onOpenJobs = { entry.ifCurrent { nav.navigate("jobs") } },
+                onOpenDuplicates = { entry.ifCurrent { nav.navigate("duplicates") } },
             )
         }
-        composable("browse") {
+        composable("browse") { entry ->
             BrowserScreen(
-                onExit = { goBack() },
-                onOpenTransfer = { showTransferSheet = true },
+                onExit = { entry.ifCurrent { goBack() } },
+                onOpenTransfer = { entry.ifCurrent { showTransferSheet = true } },
                 onArrange = { p, mode ->
-                    nav.navigate("arrange?path=" + Uri.encode(p) + "&mode=" + mode.name)
+                    entry.ifCurrent {
+                        nav.navigate("arrange?path=" + Uri.encode(p) + "&mode=" + mode.name)
+                    }
                 },
-                onOpenViewer = { paths, index -> openViewer(paths, index) },
+                onOpenViewer = { paths, index -> entry.ifCurrent { openViewer(paths, index) } },
             )
         }
         composable("category/{kind}") { backStack ->
@@ -215,9 +242,11 @@ private fun AppNav() {
             androidx.compose.runtime.key(backStack.id, kind) {
                 CategoryScreen(
                     kind = kind,
-                    onBack = { goBack() },
-                    onOpenTransfer = { showTransferSheet = true },
-                    onOpenViewer = { paths, index -> openViewer(paths, index) },
+                    onBack = { backStack.ifCurrent { goBack() } },
+                    onOpenTransfer = { backStack.ifCurrent { showTransferSheet = true } },
+                    onOpenViewer = { paths, index ->
+                        backStack.ifCurrent { openViewer(paths, index) }
+                    },
                 )
             }
         }
@@ -230,11 +259,11 @@ private fun AppNav() {
         composable("trash") {
             com.shahabcodes.filestorm.ui.trash.TrashScreen(onBack = { goBack() })
         }
-        composable("jobs") {
+        composable("jobs") { entry ->
             com.shahabcodes.filestorm.ui.jobs.JobsScreen(
-                onBack = { goBack() },
-                onOpenProgress = { nav.navigate("jobprogress") },
-                onOpenVerify = { nav.navigate("verify") },
+                onBack = { entry.ifCurrent { goBack() } },
+                onOpenProgress = { entry.ifCurrent { nav.navigate("jobprogress") } },
+                onOpenVerify = { entry.ifCurrent { nav.navigate("verify") } },
             )
         }
         composable("jobprogress") {
