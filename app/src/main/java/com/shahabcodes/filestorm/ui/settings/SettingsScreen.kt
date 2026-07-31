@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
@@ -97,15 +98,39 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Modifier
                         .fillMaxWidth()
                         .pressScale { Prefs.updateAppearance(mode) }
-                        .padding(horizontal = 16.dp, vertical = 13.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        mode.label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = fsColors.label,
-                        modifier = Modifier.weight(1f),
-                    )
+                    if (mode == Appearance.BLOSSOM) {
+                        // A little of the theme itself, so the name is not the
+                        // only clue to what it looks like.
+                        Box(
+                            Modifier
+                                .size(26.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            com.shahabcodes.filestorm.ui.theme.Blossom.Violet,
+                                            com.shahabcodes.filestorm.ui.theme.Blossom.Rose,
+                                        )
+                                    )
+                                )
+                        )
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            mode.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        Text(
+                            mode.blurb,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                        )
+                    }
                     if (Prefs.appearance == mode) {
                         Icon(
                             Icons.Rounded.Check, null,

@@ -23,7 +23,12 @@ data class DupPair(
     val pathB: String,
     val name: String,
     val size: Long,
-)
+    val modified: Long = 0L,
+) {
+    /** The folder holding the copy that would be deleted. */
+    val folder: String get() = pathB.substringBeforeLast(java.io.File.separatorChar, "")
+    val folderName: String get() = folder.substringAfterLast(java.io.File.separatorChar)
+}
 
 data class DupState(
     val searchScope: DupScope = DupScope.TWO_FOLDERS,
@@ -34,6 +39,13 @@ data class DupState(
     val phase: DupPhase = DupPhase.IDLE,
     val error: String? = null,
     val scannedFiles: Int = 0,
+    /** 1 while indexing every file, 2 while collecting the repeats. */
+    val pass: Int = 0,
+    /** Files counted by pass 1, which gives pass 2 a real percentage. */
+    val passTotal: Int = 0,
+    val scannedBytes: Long = 0L,
+    val currentFolder: String = "",
+    val groupsFound: Int = 0,
     val pairs: List<DupPair> = emptyList(),
     val candidateCount: Int = 0,
     val comparedCount: Int = 0,
@@ -64,6 +76,13 @@ data class DupState(
     val etaSeconds: Long
         get() = if (phase == DupPhase.COMPARING && speedBps > 1.0)
             ((totalBytes - doneBytes).coerceAtLeast(0) / speedBps).toLong() else -1
+
+    /** Pass 2 knows its target, so it can show a real bar; pass 1 cannot. */
+    val scanProgress: Float
+        get() = if (pass == 2 && passTotal > 0)
+            (scannedFiles.toFloat() / passTotal).coerceIn(0f, 1f) else 0f
+    val scanElapsedSeconds: Long
+        get() = if (startedAt > 0) (System.currentTimeMillis() - startedAt) / 1000 else 0
 }
 
 /**
@@ -194,13 +213,26 @@ object DuplicateFinder {
         val seen = LongSet()
         val repeated = LongSet()
         var total = 0
-        val counted = walk(root, includeHidden) { file, size ->
+        var bytes = 0L
+        var repeats = 0
+        _state.value = _state.value.copy(pass = 1)
+        val counted = walk(root, includeHidden, onFolder = { folder ->
+            _state.value = _state.value.copy(currentFolder = folder)
+        }) { file, size ->
             total++
-            if (total % 500 == 0) {
-                _state.value = _state.value.copy(scannedFiles = total)
-            }
+            bytes += size
             val fingerprint = fingerprint(file.name, size)
-            if (!seen.add(fingerprint)) repeated.add(fingerprint)
+            if (!seen.add(fingerprint)) {
+                repeated.add(fingerprint)
+                repeats++
+            }
+            if (total % 400 == 0) {
+                _state.value = _state.value.copy(
+                    scannedFiles = total,
+                    scannedBytes = bytes,
+                    groupsFound = repeats,
+                )
+            }
         }
         if (cancelled || !counted) {
             _state.value = _state.value.copy(
@@ -209,14 +241,32 @@ object DuplicateFinder {
             )
             return
         }
-        _state.value = _state.value.copy(scannedFiles = total, phase = DupPhase.SCANNING)
+        _state.value = _state.value.copy(
+            scannedFiles = total,
+            scannedBytes = bytes,
+            passTotal = total,
+            groupsFound = repeats,
+        )
         seen.clear()
 
         // Second pass. Grouping by the real key resolves any fingerprint collision.
         val groups = HashMap<String, MutableList<File>>()
-        val kept = walk(root, includeHidden) { file, size ->
+        var seenInPass2 = 0
+        var collected = 0
+        _state.value = _state.value.copy(pass = 2, scannedFiles = 0, currentFolder = "")
+        val kept = walk(root, includeHidden, onFolder = { folder ->
+            _state.value = _state.value.copy(currentFolder = folder)
+        }) { file, size ->
+            seenInPass2++
             if (repeated.contains(fingerprint(file.name, size))) {
                 groups.getOrPut(file.name.lowercase() + "|" + size) { mutableListOf() }.add(file)
+                collected++
+            }
+            if (seenInPass2 % 400 == 0) {
+                _state.value = _state.value.copy(
+                    scannedFiles = seenInPass2,
+                    groupsFound = collected,
+                )
             }
         }
         if (cancelled || !kept) {
@@ -243,7 +293,14 @@ object DuplicateFinder {
                     continue
                 }
                 candidates.add(
-                    DupPair(id++, keeper.absolutePath, extra.absolutePath, extra.name, extra.length())
+                    DupPair(
+                        id = id++,
+                        pathA = keeper.absolutePath,
+                        pathB = extra.absolutePath,
+                        name = extra.name,
+                        size = extra.length(),
+                        modified = extra.lastModified(),
+                    )
                 )
             }
         }
@@ -258,6 +315,7 @@ object DuplicateFinder {
     private inline fun walk(
         root: File,
         includeHidden: Boolean,
+        onFolder: (String) -> Unit = {},
         onFile: (File, Long) -> Unit,
     ): Boolean {
         val queue = ArrayDeque<File>()
@@ -266,6 +324,7 @@ object DuplicateFinder {
         while (queue.isNotEmpty()) {
             if (cancelled) return false
             val dir = queue.removeFirst()
+            onFolder(dir.absolutePath)
             val children = dir.listFiles() ?: continue
             for (child in children) {
                 if (child.name == ".FileStorm") continue
@@ -402,7 +461,16 @@ object DuplicateFinder {
             // Pair with the first unclaimed copy on side 1 so one original
             // never "covers" for two different side-2 files.
             val partner = matches.removeAt(0)
-            candidates.add(DupPair(id++, partner.absolutePath, f.absolutePath, f.name, f.length()))
+            candidates.add(
+                DupPair(
+                    id = id++,
+                    pathA = partner.absolutePath,
+                    pathB = f.absolutePath,
+                    name = f.name,
+                    size = f.length(),
+                    modified = f.lastModified(),
+                )
+            )
         }
         if (cancelled) {
             _state.value = _state.value.copy(phase = DupPhase.CANCELLED, finishedAt = System.currentTimeMillis())
@@ -426,6 +494,7 @@ object DuplicateFinder {
                 phase = DupPhase.DONE,
                 pairs = candidates,
                 candidateCount = candidates.size,
+                currentFolder = "",
                 finishedAt = System.currentTimeMillis(),
             )
             return

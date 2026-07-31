@@ -27,6 +27,12 @@ object Formatters {
         return bytes(bytesPerSecond.toLong()) + "/s"
     }
 
+    /** Thousands separators for counts that can run into six figures. */
+    fun compactCount(value: Int): String {
+        if (value < 1000) return value.toString()
+        return String.format(Locale.US, "%,d", value)
+    }
+
     fun eta(seconds: Long): String {
         if (seconds < 0) return "—"
         if (seconds < 60) return "${seconds}s"

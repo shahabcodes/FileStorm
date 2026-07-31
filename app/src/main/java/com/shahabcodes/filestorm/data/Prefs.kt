@@ -22,10 +22,11 @@ enum class SortField(val label: String, val defaultAscending: Boolean) {
     TYPE("Type", true),
 }
 
-enum class Appearance(val label: String) {
-    SYSTEM("Automatic"),
-    LIGHT("Light"),
-    DARK("Dark"),
+enum class Appearance(val label: String, val blurb: String) {
+    SYSTEM("Automatic", "Follows the system light/dark setting"),
+    LIGHT("Light", "Classic bright surfaces"),
+    DARK("Dark", "True black, easy at night"),
+    BLOSSOM("Blossom", "Frosted rose and violet, drawn from the Glass icon"),
 }
 
 enum class Accent(val label: String, val light: Long, val dark: Long) {

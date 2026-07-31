@@ -47,6 +47,27 @@ object Ios {
     val FillDark = Color(0xFF2C2C2E)
 }
 
+/**
+ * Blossom: a soft, frosted theme built from the Glass app icon, whose
+ * background runs indigo (#5856D6) to rose (#FF375F) under translucent white
+ * orbs. Surfaces are barely-there blush rather than white, text is deep plum
+ * instead of black, and the dividers are warm — so nothing in it is pure grey.
+ */
+object Blossom {
+    val Rose = Color(0xFFDB3E90)
+    val Violet = Color(0xFF7A5AF0)
+    val Background = Color(0xFFFBF2F9)
+    val Card = Color(0xFFFFFBFE)
+    val CardSecondary = Color(0xFFFAEFF7)
+    val Label = Color(0xFF3B2445)
+    val SecondaryLabel = Color(0xFF9C82AC)
+    val Separator = Color(0xFFF1DFEE)
+    val Fill = Color(0xFFF4E4F1)
+    val Green = Color(0xFF34BE9B)
+    val Red = Color(0xFFF2416B)
+    val Orange = Color(0xFFFF9A76)
+}
+
 data class FsColors(
     val accent: Color,
     val groupedBackground: Color,
@@ -107,14 +128,36 @@ private val iosShapes = Shapes(
 
 @Composable
 fun FileStormTheme(content: @Composable () -> Unit) {
-    val dark = when (com.shahabcodes.filestorm.data.Prefs.appearance) {
+    val appearance = com.shahabcodes.filestorm.data.Prefs.appearance
+    val blossom = appearance == com.shahabcodes.filestorm.data.Appearance.BLOSSOM
+    val dark = when (appearance) {
         com.shahabcodes.filestorm.data.Appearance.SYSTEM -> isSystemInDarkTheme()
         com.shahabcodes.filestorm.data.Appearance.LIGHT -> false
         com.shahabcodes.filestorm.data.Appearance.DARK -> true
+        com.shahabcodes.filestorm.data.Appearance.BLOSSOM -> false
     }
     val accentChoice = com.shahabcodes.filestorm.data.Prefs.accent
-    val accentColor = Color(if (dark) accentChoice.dark else accentChoice.light)
-    val fs = if (dark) FsColors(
+    // Blossom ships with its own rose, but a deliberate accent choice still
+    // wins — only the untouched default gets replaced.
+    val accentColor = when {
+        blossom && accentChoice == com.shahabcodes.filestorm.data.Accent.BLUE -> Blossom.Rose
+        dark -> Color(accentChoice.dark)
+        else -> Color(accentChoice.light)
+    }
+    val fs = if (blossom) FsColors(
+        accent = accentColor,
+        groupedBackground = Blossom.Background,
+        card = Blossom.Card,
+        cardSecondary = Blossom.CardSecondary,
+        label = Blossom.Label,
+        secondaryLabel = Blossom.SecondaryLabel,
+        separator = Blossom.Separator,
+        fill = Blossom.Fill,
+        green = Blossom.Green,
+        red = Blossom.Red,
+        orange = Blossom.Orange,
+        isDark = false,
+    ) else if (dark) FsColors(
         accent = accentColor,
         groupedBackground = Ios.GroupedBgDark,
         card = Ios.CardDark,
