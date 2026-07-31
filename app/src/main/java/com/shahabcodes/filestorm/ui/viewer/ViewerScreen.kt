@@ -87,44 +87,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** Holds what the viewer should show; avoids passing long lists through navigation. */
-object ViewerState {
-    var paths by mutableStateOf<List<String>>(emptyList())
-        private set
-    var startIndex: Int = 0
-        private set
-
-    /** The exact file that was tapped, so the pager cannot land somewhere else. */
-    var startPath: String = ""
-        private set
-
-    fun open(items: List<String>, index: Int) {
-        paths = items
-        startIndex = index.coerceIn(0, (items.size - 1).coerceAtLeast(0))
-        startPath = items.getOrNull(startIndex).orEmpty()
-    }
-
-    fun remove(path: String) {
-        paths = paths.filterNot { it == path }
-    }
-
-    fun clear() {
-        paths = emptyList()
-        startIndex = 0
-        startPath = ""
-    }
-}
-
+/**
+ * Shows [items], starting on [startPath]. The list is passed in rather than read
+ * from shared state, so the viewer can only ever display what the tap handed it.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ViewerScreen(onBack: () -> Unit) {
-    val items = ViewerState.paths
-    // Closing always wipes the shared state, so a stale list can never be shown.
-    val close = {
-        ViewerState.clear()
-        onBack()
-    }
-    if (items.isEmpty()) {
+fun ViewerScreen(
+    items: List<String>,
+    startPath: String,
+    onBack: () -> Unit,
+) {
+    var current by remember(items) { mutableStateOf(items) }
+    val close = onBack
+    if (current.isEmpty()) {
         LaunchedEffect(Unit) { close() }
         return
     }
@@ -133,25 +109,25 @@ fun ViewerScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     // Resolve by path: even if the list shifted between the tap and this frame,
     // the viewer still opens on the file that was actually tapped.
-    val initialPage = remember(items, ViewerState.startPath) {
-        items.indexOf(ViewerState.startPath).takeIf { it >= 0 } ?: ViewerState.startIndex
+    val initialPage = remember(items, startPath) {
+        items.indexOf(startPath).coerceAtLeast(0)
     }
-    val pagerState = rememberPagerState(initialPage = initialPage) { items.size }
+    val pagerState = rememberPagerState(initialPage = initialPage) { current.size }
     var chromeVisible by remember { mutableStateOf(true) }
     var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
     var confirmDelete by remember { mutableStateOf<File?>(null) }
 
-    val currentFile = remember(pagerState.currentPage, items) {
-        File(items.getOrElse(pagerState.currentPage) { items.last() })
+    val currentFile = remember(pagerState.currentPage, current) {
+        File(current.getOrElse(pagerState.currentPage) { current.last() })
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
-            key = { items.getOrElse(it) { "empty$it" } },
+            key = { current.getOrElse(it) { "empty$it" } },
         ) { page ->
-            val file = File(items[page])
+            val file = File(current[page])
             if (FsEntry.kindOf(file.name, false) == FileKind.VIDEO) {
                 VideoPage(
                     file = file,
@@ -188,7 +164,7 @@ fun ViewerScreen(onBack: () -> Unit) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        "${pagerState.currentPage + 1} of ${items.size} · " +
+                        "${pagerState.currentPage + 1} of ${current.size} · " +
                             Formatters.bytes(currentFile.length()) + " · " +
                             Formatters.fileDate(currentFile.lastModified()),
                         color = Color.White.copy(alpha = 0.7f),
@@ -250,8 +226,8 @@ fun ViewerScreen(onBack: () -> Unit) {
                     scope.launch {
                         if (file.exists()) TrashManager.moveToTrash(listOf(FsEntry.from(file)))
                         FileRepository.invalidate(file.parent)
-                        ViewerState.remove(file.absolutePath)
-                        if (ViewerState.paths.isEmpty()) close()
+                        current = current.filterNot { it == file.absolutePath }
+                        if (current.isEmpty()) close()
                     }
                 }) { Text("Move to Trash", color = fsColors.red) }
             },

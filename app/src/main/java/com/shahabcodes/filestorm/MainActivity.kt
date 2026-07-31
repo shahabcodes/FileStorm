@@ -140,7 +140,8 @@ private fun AppNav() {
     // The viewer is an overlay, not a destination. As a route it could be left on
     // the back stack and re-shown later with whatever the shared state happened to
     // hold, which is how tapping one category could surface a file from another.
-    var viewerOpen by remember { mutableStateOf(false) }
+    var viewerItems by remember { mutableStateOf<List<String>>(emptyList()) }
+    var viewerStart by remember { mutableStateOf("") }
 
     /** Never pops the start destination, which would leave an empty NavHost. */
     fun goBack() {
@@ -148,9 +149,9 @@ private fun AppNav() {
     }
 
     fun openViewer(paths: List<String>, index: Int) {
-        if (paths.isEmpty()) return
-        com.shahabcodes.filestorm.ui.viewer.ViewerState.open(paths, index)
-        viewerOpen = true
+        val start = paths.getOrNull(index) ?: return
+        viewerStart = start
+        viewerItems = paths
     }
 
     fun openBrowser(path: String) {
@@ -238,11 +239,13 @@ private fun AppNav() {
         }
     }
 
-    if (viewerOpen) {
+    if (viewerItems.isNotEmpty()) {
         com.shahabcodes.filestorm.ui.viewer.ViewerScreen(
+            items = viewerItems,
+            startPath = viewerStart,
             onBack = {
-                viewerOpen = false
-                com.shahabcodes.filestorm.ui.viewer.ViewerState.clear()
+                viewerItems = emptyList()
+                viewerStart = ""
             },
         )
     }

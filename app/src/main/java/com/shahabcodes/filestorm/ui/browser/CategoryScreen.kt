@@ -117,9 +117,12 @@ fun CategoryScreen(
         if (sortTick > 0) files = FileRepository.sortEntries(files, Prefs.sortField, Prefs.sortAscending)
     }
 
-    val visible = remember(files, query) {
-        if (query.isBlank()) files
-        else files.filter { it.name.contains(query.trim(), ignoreCase = true) }
+    // Hard invariant: a category lists nothing but its own kind, whatever the
+    // scan or any cache hands back.
+    val visible = remember(files, query, kind) {
+        val ofKind = files.filter { !it.isDirectory && it.kind == kind }
+        if (query.isBlank()) ofKind
+        else ofKind.filter { it.name.contains(query.trim(), ignoreCase = true) }
     }
     val selectedEntries = remember(files, selected) { files.filter { it.path in selected } }
 
