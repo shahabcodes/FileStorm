@@ -162,7 +162,7 @@ fun PhotoTile(
                 val tint = if (entry.isDirectory) {
                     com.shahabcodes.filestorm.data.FolderStyles.colorOf(entry.path)
                         ?.let { Color(it) } ?: fsColors.accent
-                } else kindColor(entry.kind, fsColors.isDark)
+                } else kindColor(entry.kind, fsColors)
                 Box(
                     Modifier
                         .fillMaxSize()

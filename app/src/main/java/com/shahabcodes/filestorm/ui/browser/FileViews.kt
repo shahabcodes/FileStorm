@@ -1103,8 +1103,8 @@ private fun GalleryTile(
                         .background(
                             Brush.linearGradient(
                                 listOf(
-                                    kindColor(entry.kind, fsColors.isDark).copy(alpha = 0.95f),
-                                    kindColor(entry.kind, fsColors.isDark).copy(alpha = 0.7f),
+                                    kindColor(entry.kind, fsColors).copy(alpha = 0.95f),
+                                    kindColor(entry.kind, fsColors).copy(alpha = 0.7f),
                                 )
                             )
                         ),

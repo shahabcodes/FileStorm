@@ -101,7 +101,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (mode == Appearance.BLOSSOM) {
+                    if (mode.swatchStart != 0L) {
                         // A little of the theme itself, so the name is not the
                         // only clue to what it looks like.
                         Box(
@@ -111,8 +111,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 .background(
                                     Brush.linearGradient(
                                         listOf(
-                                            com.shahabcodes.filestorm.ui.theme.Blossom.Violet,
-                                            com.shahabcodes.filestorm.ui.theme.Blossom.Rose,
+                                            Color(mode.swatchStart),
+                                            Color(mode.swatchEnd),
                                         )
                                     )
                                 )

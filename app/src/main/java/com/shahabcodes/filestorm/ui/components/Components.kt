@@ -98,16 +98,18 @@ fun RowSeparator(startIndent: Dp = 60.dp) {
     )
 }
 
-fun kindColor(kind: FileKind, dark: Boolean): Color = when (kind) {
-    FileKind.FOLDER -> if (dark) Ios.BlueDark else Ios.Blue
-    FileKind.IMAGE -> if (dark) Ios.GreenDark else Ios.Green
-    FileKind.VIDEO -> if (dark) Ios.PurpleDark else Ios.Purple
-    FileKind.AUDIO -> Ios.Pink
-    FileKind.DOCUMENT -> if (dark) Ios.OrangeDark else Ios.Orange
-    FileKind.ARCHIVE -> Ios.Indigo
-    FileKind.APK -> Ios.Teal
-    FileKind.OTHER -> Color(0xFF8E8E93)
-}
+/** Icon tint for a file type, taken from whichever theme is active. */
+fun kindColor(kind: FileKind, colors: com.shahabcodes.filestorm.ui.theme.FsColors): Color =
+    when (kind) {
+        FileKind.FOLDER -> colors.kinds.folder
+        FileKind.IMAGE -> colors.kinds.image
+        FileKind.VIDEO -> colors.kinds.video
+        FileKind.AUDIO -> colors.kinds.audio
+        FileKind.DOCUMENT -> colors.kinds.document
+        FileKind.ARCHIVE -> colors.kinds.archive
+        FileKind.APK -> colors.kinds.apk
+        FileKind.OTHER -> colors.kinds.other
+    }
 
 fun kindIcon(kind: FileKind): ImageVector = when (kind) {
     FileKind.FOLDER -> Icons.Rounded.Folder
@@ -125,8 +127,8 @@ fun kindIcon(kind: FileKind): ImageVector = when (kind) {
 fun FileIconView(entry: FsEntry, size: Dp = 40.dp, cornerRadius: Dp = 10.dp) {
     val color = if (entry.isDirectory) {
         com.shahabcodes.filestorm.data.FolderStyles.colorOf(entry.path)?.let { Color(it) }
-            ?: kindColor(entry.kind, fsColors.isDark)
-    } else kindColor(entry.kind, fsColors.isDark)
+            ?: kindColor(entry.kind, fsColors)
+    } else kindColor(entry.kind, fsColors)
     if (!entry.isDirectory && (entry.kind == FileKind.IMAGE || entry.kind == FileKind.VIDEO)) {
         Box(Modifier.size(size).clip(RoundedCornerShape(cornerRadius)).background(fsColors.fill)) {
             AsyncImage(

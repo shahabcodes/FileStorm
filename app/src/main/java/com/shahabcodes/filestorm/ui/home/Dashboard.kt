@@ -170,7 +170,7 @@ fun DashboardCard() {
                             Modifier
                                 .weight((stat.bytes / total).coerceAtLeast(0.015f))
                                 .height(14.dp)
-                                .background(kindColor(stat.kind, fsColors.isDark)),
+                                .background(kindColor(stat.kind, fsColors)),
                         )
                     }
                 }
@@ -189,7 +189,7 @@ fun DashboardCard() {
                                     Modifier
                                         .size(10.dp)
                                         .clip(CircleShape)
-                                        .background(kindColor(stat.kind, fsColors.isDark)),
+                                        .background(kindColor(stat.kind, fsColors)),
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Column {

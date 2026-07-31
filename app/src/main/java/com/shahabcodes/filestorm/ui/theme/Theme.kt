@@ -48,14 +48,55 @@ object Ios {
 }
 
 /**
- * Blossom: a soft, frosted theme built from the Glass app icon, whose
- * background runs indigo (#5856D6) to rose (#FF375F) under translucent white
- * orbs. Surfaces are barely-there blush rather than white, text is deep plum
- * instead of black, and the dividers are warm — so nothing in it is pure grey.
+ * The colour of each file type's icon. These used to be hard-coded to the iOS
+ * palette, which is why folders stayed blue whichever theme was picked; owning
+ * them here lets a theme restyle every icon in the app at once.
+ */
+data class KindColors(
+    val folder: Color,
+    val image: Color,
+    val video: Color,
+    val audio: Color,
+    val document: Color,
+    val archive: Color,
+    val apk: Color,
+    val other: Color,
+)
+
+private val IosKinds = KindColors(
+    folder = Ios.Blue,
+    image = Ios.Green,
+    video = Ios.Purple,
+    audio = Ios.Pink,
+    document = Ios.Orange,
+    archive = Ios.Indigo,
+    apk = Ios.Teal,
+    other = Color(0xFF8E8E93),
+)
+
+private val IosKindsDark = KindColors(
+    folder = Ios.BlueDark,
+    image = Ios.GreenDark,
+    video = Ios.PurpleDark,
+    audio = Ios.Pink,
+    document = Ios.OrangeDark,
+    archive = Ios.Indigo,
+    apk = Ios.Teal,
+    other = Color(0xFF98989D),
+)
+
+/**
+ * Blossom: frosted rose and violet, built from the Glass app icon, whose
+ * background runs indigo (#5856D6) into rose (#FF375F) under translucent white
+ * orbs. Surfaces are barely-there blush rather than white and text is deep plum
+ * rather than black, so nothing in it is plain grey.
  */
 object Blossom {
     val Rose = Color(0xFFDB3E90)
+    val RoseNight = Color(0xFFFF74B4)
     val Violet = Color(0xFF7A5AF0)
+    val VioletNight = Color(0xFF9F87FF)
+
     val Background = Color(0xFFFBF2F9)
     val Card = Color(0xFFFFFBFE)
     val CardSecondary = Color(0xFFFAEFF7)
@@ -66,6 +107,92 @@ object Blossom {
     val Green = Color(0xFF34BE9B)
     val Red = Color(0xFFF2416B)
     val Orange = Color(0xFFFF9A76)
+
+    val BackgroundNight = Color(0xFF140F1D)
+    val CardNight = Color(0xFF201A2D)
+    val CardSecondaryNight = Color(0xFF2A2239)
+    val LabelNight = Color(0xFFF7ECFC)
+    val SecondaryLabelNight = Color(0xFFA795BE)
+    val SeparatorNight = Color(0xFF332841)
+    val FillNight = Color(0xFF2C2338)
+    val GreenNight = Color(0xFF4FD8B2)
+    val RedNight = Color(0xFFFF5D87)
+    val OrangeNight = Color(0xFFFFB088)
+
+    val kinds = KindColors(
+        folder = Violet,
+        image = Rose,
+        video = Color(0xFFB05CE8),
+        audio = Color(0xFFFF7AA8),
+        document = Orange,
+        archive = Color(0xFF8C6BEA),
+        apk = Green,
+        other = Color(0xFFA893B4),
+    )
+    val kindsNight = KindColors(
+        folder = VioletNight,
+        image = RoseNight,
+        video = Color(0xFFC77EFF),
+        audio = Color(0xFFFF9BC0),
+        document = OrangeNight,
+        archive = Color(0xFFA98CFF),
+        apk = GreenNight,
+        other = Color(0xFFB9A7C9),
+    )
+}
+
+/**
+ * Sakura: petals and cream. Warmer and gentler than Blossom — cherry pink over
+ * a soft ivory ground with sage and apricot, where Blossom leans cooler and
+ * more violet.
+ */
+object Sakura {
+    val Pink = Color(0xFFEE6F9C)
+    val PinkNight = Color(0xFFFF92B6)
+    val Gold = Color(0xFFE8A860)
+
+    val Background = Color(0xFFFFF5F3)
+    val Card = Color(0xFFFFFDFC)
+    val CardSecondary = Color(0xFFFFEFEC)
+    val Label = Color(0xFF4C2D34)
+    val SecondaryLabel = Color(0xFFB18B94)
+    val Separator = Color(0xFFFAE1DE)
+    val Fill = Color(0xFFFCE7E4)
+    val Green = Color(0xFF6FC3A2)
+    val Red = Color(0xFFE2566F)
+    val Orange = Color(0xFFEFA469)
+
+    val BackgroundNight = Color(0xFF181114)
+    val CardNight = Color(0xFF241A1E)
+    val CardSecondaryNight = Color(0xFF2F2228)
+    val LabelNight = Color(0xFFFCEFF2)
+    val SecondaryLabelNight = Color(0xFFC3A2AB)
+    val SeparatorNight = Color(0xFF382730)
+    val FillNight = Color(0xFF31232A)
+    val GreenNight = Color(0xFF74D8B6)
+    val RedNight = Color(0xFFFF6E88)
+    val OrangeNight = Color(0xFFFFC08C)
+
+    val kinds = KindColors(
+        folder = Pink,
+        image = Green,
+        video = Color(0xFFC98BD6),
+        audio = Color(0xFFF4A0B8),
+        document = Gold,
+        archive = Color(0xFFB79AE0),
+        apk = Color(0xFF7FC4C0),
+        other = Color(0xFFC3A7AE),
+    )
+    val kindsNight = KindColors(
+        folder = PinkNight,
+        image = GreenNight,
+        video = Color(0xFFDDA3EA),
+        audio = Color(0xFFFFB6CB),
+        document = Color(0xFFFFC98A),
+        archive = Color(0xFFCBB2F5),
+        apk = Color(0xFF96DCD8),
+        other = Color(0xFFD3BAC1),
+    )
 }
 
 data class FsColors(
@@ -81,6 +208,7 @@ data class FsColors(
     val red: Color,
     val orange: Color,
     val isDark: Boolean,
+    val kinds: KindColors = IosKinds,
 )
 
 val LocalFsColors = staticCompositionLocalOf {
@@ -97,6 +225,7 @@ val LocalFsColors = staticCompositionLocalOf {
         red = Ios.Red,
         orange = Ios.Orange,
         isDark = false,
+        kinds = IosKinds,
     )
 }
 
@@ -129,61 +258,110 @@ private val iosShapes = Shapes(
 @Composable
 fun FileStormTheme(content: @Composable () -> Unit) {
     val appearance = com.shahabcodes.filestorm.data.Prefs.appearance
-    val blossom = appearance == com.shahabcodes.filestorm.data.Appearance.BLOSSOM
-    val dark = when (appearance) {
-        com.shahabcodes.filestorm.data.Appearance.SYSTEM -> isSystemInDarkTheme()
-        com.shahabcodes.filestorm.data.Appearance.LIGHT -> false
-        com.shahabcodes.filestorm.data.Appearance.DARK -> true
-        com.shahabcodes.filestorm.data.Appearance.BLOSSOM -> false
-    }
+    val systemDark = isSystemInDarkTheme()
+    val dark = appearance.isDark(systemDark)
+
     val accentChoice = com.shahabcodes.filestorm.data.Prefs.accent
-    // Blossom ships with its own rose, but a deliberate accent choice still
-    // wins — only the untouched default gets replaced.
-    val accentColor = when {
-        blossom && accentChoice == com.shahabcodes.filestorm.data.Accent.BLUE -> Blossom.Rose
-        dark -> Color(accentChoice.dark)
-        else -> Color(accentChoice.light)
+    // The decorated themes ship with their own accent, but a deliberate accent
+    // choice still wins — only the untouched default blue gets replaced.
+    val useThemeAccent = accentChoice == com.shahabcodes.filestorm.data.Accent.BLUE
+    val plainAccent = Color(if (dark) accentChoice.dark else accentChoice.light)
+
+    val fs = when (appearance) {
+        com.shahabcodes.filestorm.data.Appearance.BLOSSOM -> FsColors(
+            accent = if (useThemeAccent) Blossom.Rose else plainAccent,
+            groupedBackground = Blossom.Background,
+            card = Blossom.Card,
+            cardSecondary = Blossom.CardSecondary,
+            label = Blossom.Label,
+            secondaryLabel = Blossom.SecondaryLabel,
+            separator = Blossom.Separator,
+            fill = Blossom.Fill,
+            green = Blossom.Green,
+            red = Blossom.Red,
+            orange = Blossom.Orange,
+            isDark = false,
+            kinds = Blossom.kinds,
+        )
+
+        com.shahabcodes.filestorm.data.Appearance.BLOSSOM_NIGHT -> FsColors(
+            accent = if (useThemeAccent) Blossom.RoseNight else plainAccent,
+            groupedBackground = Blossom.BackgroundNight,
+            card = Blossom.CardNight,
+            cardSecondary = Blossom.CardSecondaryNight,
+            label = Blossom.LabelNight,
+            secondaryLabel = Blossom.SecondaryLabelNight,
+            separator = Blossom.SeparatorNight,
+            fill = Blossom.FillNight,
+            green = Blossom.GreenNight,
+            red = Blossom.RedNight,
+            orange = Blossom.OrangeNight,
+            isDark = true,
+            kinds = Blossom.kindsNight,
+        )
+
+        com.shahabcodes.filestorm.data.Appearance.SAKURA -> FsColors(
+            accent = if (useThemeAccent) Sakura.Pink else plainAccent,
+            groupedBackground = Sakura.Background,
+            card = Sakura.Card,
+            cardSecondary = Sakura.CardSecondary,
+            label = Sakura.Label,
+            secondaryLabel = Sakura.SecondaryLabel,
+            separator = Sakura.Separator,
+            fill = Sakura.Fill,
+            green = Sakura.Green,
+            red = Sakura.Red,
+            orange = Sakura.Orange,
+            isDark = false,
+            kinds = Sakura.kinds,
+        )
+
+        com.shahabcodes.filestorm.data.Appearance.SAKURA_NIGHT -> FsColors(
+            accent = if (useThemeAccent) Sakura.PinkNight else plainAccent,
+            groupedBackground = Sakura.BackgroundNight,
+            card = Sakura.CardNight,
+            cardSecondary = Sakura.CardSecondaryNight,
+            label = Sakura.LabelNight,
+            secondaryLabel = Sakura.SecondaryLabelNight,
+            separator = Sakura.SeparatorNight,
+            fill = Sakura.FillNight,
+            green = Sakura.GreenNight,
+            red = Sakura.RedNight,
+            orange = Sakura.OrangeNight,
+            isDark = true,
+            kinds = Sakura.kindsNight,
+        )
+
+        else -> if (dark) FsColors(
+            accent = plainAccent,
+            groupedBackground = Ios.GroupedBgDark,
+            card = Ios.CardDark,
+            cardSecondary = Ios.Card2Dark,
+            label = Ios.LabelDark,
+            secondaryLabel = Ios.SecondaryLabelDark,
+            separator = Ios.SeparatorDark,
+            fill = Ios.FillDark,
+            green = Ios.GreenDark,
+            red = Ios.RedDark,
+            orange = Ios.OrangeDark,
+            isDark = true,
+            kinds = IosKindsDark,
+        ) else FsColors(
+            accent = plainAccent,
+            groupedBackground = Ios.GroupedBgLight,
+            card = Ios.CardLight,
+            cardSecondary = Ios.CardLight,
+            label = Ios.LabelLight,
+            secondaryLabel = Ios.SecondaryLabelLight,
+            separator = Ios.SeparatorLight,
+            fill = Ios.FillLight,
+            green = Ios.Green,
+            red = Ios.Red,
+            orange = Ios.Orange,
+            isDark = false,
+            kinds = IosKinds,
+        )
     }
-    val fs = if (blossom) FsColors(
-        accent = accentColor,
-        groupedBackground = Blossom.Background,
-        card = Blossom.Card,
-        cardSecondary = Blossom.CardSecondary,
-        label = Blossom.Label,
-        secondaryLabel = Blossom.SecondaryLabel,
-        separator = Blossom.Separator,
-        fill = Blossom.Fill,
-        green = Blossom.Green,
-        red = Blossom.Red,
-        orange = Blossom.Orange,
-        isDark = false,
-    ) else if (dark) FsColors(
-        accent = accentColor,
-        groupedBackground = Ios.GroupedBgDark,
-        card = Ios.CardDark,
-        cardSecondary = Ios.Card2Dark,
-        label = Ios.LabelDark,
-        secondaryLabel = Ios.SecondaryLabelDark,
-        separator = Ios.SeparatorDark,
-        fill = Ios.FillDark,
-        green = Ios.GreenDark,
-        red = Ios.RedDark,
-        orange = Ios.OrangeDark,
-        isDark = true,
-    ) else FsColors(
-        accent = accentColor,
-        groupedBackground = Ios.GroupedBgLight,
-        card = Ios.CardLight,
-        cardSecondary = Ios.CardLight,
-        label = Ios.LabelLight,
-        secondaryLabel = Ios.SecondaryLabelLight,
-        separator = Ios.SeparatorLight,
-        fill = Ios.FillLight,
-        green = Ios.Green,
-        red = Ios.Red,
-        orange = Ios.Orange,
-        isDark = false,
-    )
 
     val scheme = if (dark) darkColorScheme(
         primary = fs.accent,

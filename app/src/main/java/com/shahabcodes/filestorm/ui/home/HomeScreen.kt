@@ -89,13 +89,16 @@ fun HomeScreen(
     val stats = remember { FileRepository.storageStats() }
     val transfer by TransferManager.state.collectAsState()
 
+    // Tile colours follow the active theme's file-type palette, so the
+    // dashboard restyles with everything else rather than staying iOS blue.
+    val kinds = fsColors.kinds
     val categories = listOf(
-        Category(FileKind.IMAGE, "Images", Icons.Rounded.Image, Ios.Green),
-        Category(FileKind.VIDEO, "Videos", Icons.Rounded.PlayCircleFilled, Ios.Purple),
-        Category(FileKind.AUDIO, "Audio", Icons.Rounded.AudioFile, Ios.Pink),
-        Category(FileKind.DOCUMENT, "Docs", Icons.Rounded.Description, Ios.Orange),
-        Category(FileKind.ARCHIVE, "Archives", Icons.Rounded.Archive, Ios.Indigo),
-        Category(FileKind.APK, "APKs", Icons.Rounded.Android, Ios.Teal),
+        Category(FileKind.IMAGE, "Images", Icons.Rounded.Image, kinds.image),
+        Category(FileKind.VIDEO, "Videos", Icons.Rounded.PlayCircleFilled, kinds.video),
+        Category(FileKind.AUDIO, "Audio", Icons.Rounded.AudioFile, kinds.audio),
+        Category(FileKind.DOCUMENT, "Docs", Icons.Rounded.Description, kinds.document),
+        Category(FileKind.ARCHIVE, "Archives", Icons.Rounded.Archive, kinds.archive),
+        Category(FileKind.APK, "APKs", Icons.Rounded.Android, kinds.apk),
     )
 
     val root = FileRepository.rootPath
@@ -351,12 +354,12 @@ fun HomeScreen(
                         Modifier
                             .size(32.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Ios.Indigo.copy(alpha = 0.15f)),
+                            .background(fsColors.kinds.archive.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             Icons.Rounded.CalendarMonth, null,
-                            tint = Ios.Indigo, modifier = Modifier.size(18.dp),
+                            tint = fsColors.kinds.archive, modifier = Modifier.size(18.dp),
                         )
                     }
                     Spacer(Modifier.width(14.dp))
@@ -394,12 +397,12 @@ fun HomeScreen(
                         Modifier
                             .size(32.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Ios.Teal.copy(alpha = 0.15f)),
+                            .background(fsColors.kinds.apk.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             Icons.Rounded.ContentCopy, null,
-                            tint = Ios.Teal, modifier = Modifier.size(17.dp),
+                            tint = fsColors.kinds.apk, modifier = Modifier.size(17.dp),
                         )
                     }
                     Spacer(Modifier.width(14.dp))

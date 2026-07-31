@@ -22,11 +22,32 @@ enum class SortField(val label: String, val defaultAscending: Boolean) {
     TYPE("Type", true),
 }
 
-enum class Appearance(val label: String, val blurb: String) {
+/**
+ * [swatchStart]/[swatchEnd] are 0 for the plain modes and a gradient for the
+ * decorated ones, so the settings list can show what a theme looks like
+ * instead of only naming it.
+ */
+enum class Appearance(
+    val label: String,
+    val blurb: String,
+    val swatchStart: Long = 0L,
+    val swatchEnd: Long = 0L,
+) {
     SYSTEM("Automatic", "Follows the system light/dark setting"),
     LIGHT("Light", "Classic bright surfaces"),
     DARK("Dark", "True black, easy at night"),
-    BLOSSOM("Blossom", "Frosted rose and violet, drawn from the Glass icon"),
+    BLOSSOM("Blossom", "Frosted rose and violet, drawn from the Glass icon", 0xFF7A5AF0, 0xFFDB3E90),
+    BLOSSOM_NIGHT("Blossom Night", "The same rose and violet over deep plum", 0xFF9F87FF, 0xFFFF74B4),
+    SAKURA("Sakura", "Cherry petals on cream, with sage and apricot", 0xFFEE6F9C, 0xFFE8A860),
+    SAKURA_NIGHT("Sakura Night", "Petal pink over warm charcoal", 0xFFFF92B6, 0xFFFFC08C),
+    ;
+
+    /** Whether this appearance renders dark surfaces right now. */
+    fun isDark(systemDark: Boolean): Boolean = when (this) {
+        SYSTEM -> systemDark
+        LIGHT, BLOSSOM, SAKURA -> false
+        DARK, BLOSSOM_NIGHT, SAKURA_NIGHT -> true
+    }
 }
 
 enum class Accent(val label: String, val light: Long, val dark: Long) {
