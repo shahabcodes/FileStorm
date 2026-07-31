@@ -20,8 +20,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
@@ -200,21 +201,48 @@ fun FileListView(
             }
         }
 
-        ViewMode.GALLERY -> LazyVerticalGrid(
-            columns = GridCells.Fixed(columns.coerceIn(1, 4)),
-            modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
-            contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            itemsIndexed(entries, key = { _, e -> e.path }) { _, entry ->
-                GalleryTile(
-                    entry = entry,
-                    selectionMode = selectionMode,
-                    selected = entry.path in selected,
-                    onClick = { onClick(entry) },
-                    onLongClick = { onLongClick(entry) },
-                )
+        ViewMode.GALLERY -> {
+            val span = columns.coerceIn(1, 4)
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(span),
+                modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
+                contentPadding = contentPadding,
+                verticalArrangement = Arrangement.spacedBy(tileGap(span)),
+                horizontalArrangement = Arrangement.spacedBy(tileGap(span)),
+            ) {
+                itemsIndexed(entries, key = { _, e -> e.path }) { _, entry ->
+                    PhotoTile(
+                        entry = entry,
+                        selectionMode = selectionMode,
+                        selected = entry.path in selected,
+                        corner = tileCorner(span),
+                        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                        onClick = { onClick(entry) },
+                        onLongClick = { onLongClick(entry) },
+                    )
+                }
+            }
+        }
+
+        ViewMode.MOSAIC -> {
+            val span = columns.coerceIn(1, 4)
+            androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid(
+                columns = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells.Fixed(span),
+                modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
+                contentPadding = contentPadding,
+                verticalItemSpacing = tileGap(span),
+                horizontalArrangement = Arrangement.spacedBy(tileGap(span)),
+            ) {
+                items(entries, key = { it.path }) { entry ->
+                    MosaicTile(
+                        entry = entry,
+                        selectionMode = selectionMode,
+                        selected = entry.path in selected,
+                        corner = tileCorner(span),
+                        onClick = { onClick(entry) },
+                        onLongClick = { onLongClick(entry) },
+                    )
+                }
             }
         }
     }
@@ -305,7 +333,8 @@ private fun GroupedByMonth(
     }
     val summaries = remember(groups) { groups.associate { it.first to summarise(it.second) } }
 
-    val tiled = viewMode == ViewMode.GRID || viewMode == ViewMode.GALLERY
+    val tiled = viewMode == ViewMode.GRID || viewMode == ViewMode.GALLERY ||
+        viewMode == ViewMode.MOSAIC
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
 
@@ -376,11 +405,13 @@ private fun GroupedByMonth(
                     }
                     if (label !in collapsedMonths) {
                         itemsIndexed(groupEntries, key = { _, e -> e.path }) { _, entry ->
-                            if (viewMode == ViewMode.GALLERY) {
-                                GalleryTile(
+                            if (viewMode == ViewMode.GALLERY || viewMode == ViewMode.MOSAIC) {
+                                PhotoTile(
                                     entry = entry,
                                     selectionMode = selectionMode,
                                     selected = entry.path in selected,
+                                    corner = tileCorner(span),
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                                     onClick = { onClick(entry) },
                                     onLongClick = { onLongClick(entry) },
                                 )
@@ -620,6 +651,22 @@ private fun Modifier.pinchToZoom(onZoom: (Float) -> Unit): Modifier = pointerInp
             }
         } while (event.changes.any { it.pressed })
     }
+}
+
+
+/** Tighter gaps and softer corners as tiles get smaller, like a photo wall. */
+private fun tileGap(columns: Int): androidx.compose.ui.unit.Dp = when {
+    columns <= 1 -> 10.dp
+    columns == 2 -> 6.dp
+    columns == 3 -> 4.dp
+    else -> 3.dp
+}
+
+private fun tileCorner(columns: Int): androidx.compose.ui.unit.Dp = when {
+    columns <= 1 -> 20.dp
+    columns == 2 -> 16.dp
+    columns == 3 -> 12.dp
+    else -> 9.dp
 }
 
 private val monthFormat = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault())

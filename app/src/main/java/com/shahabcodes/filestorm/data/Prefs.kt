@@ -11,6 +11,7 @@ enum class ViewMode(val label: String) {
     DETAILED("Detailed"),
     GRID("Grid"),
     GALLERY("Gallery"),
+    MOSAIC("Mosaic"),
     TIMELINE("Timeline"),
 }
 
@@ -183,12 +184,14 @@ object FolderViews {
         val stored = columns["$key|${mode.name}"]
         return stored ?: when (mode) {
             ViewMode.GALLERY -> 2
+            ViewMode.MOSAIC -> 2
             else -> 3
         }
     }
 
     fun setColumns(key: String, mode: ViewMode, value: Int) {
-        val clamped = value.coerceIn(1, if (mode == ViewMode.GALLERY) 4 else 6)
+        val maxColumns = if (mode == ViewMode.GALLERY || mode == ViewMode.MOSAIC) 4 else 6
+        val clamped = value.coerceIn(1, maxColumns)
         columns["$key|${mode.name}"] = clamped
         sp.edit().putInt("cols:$key|${mode.name}", clamped).apply()
     }
