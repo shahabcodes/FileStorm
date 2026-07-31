@@ -63,6 +63,8 @@ object Prefs {
         private set
     var secureScreen by mutableStateOf(false)
         private set
+    var diagnostics by mutableStateOf(false)
+        private set
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm", Context.MODE_PRIVATE)
@@ -78,6 +80,7 @@ object Prefs {
         appIcon = sp.getString("app_icon", "opt25") ?: "opt25"
         appName = sp.getString("app_name", "storm") ?: "storm"
         secureScreen = sp.getBoolean("secure_screen", false)
+        diagnostics = sp.getBoolean("diagnostics", false)
         appearance = runCatching {
             Appearance.valueOf(sp.getString("appearance", Appearance.SYSTEM.name)!!)
         }.getOrDefault(Appearance.SYSTEM)
@@ -114,6 +117,11 @@ object Prefs {
     fun updateAppIcon(key: String) {
         appIcon = key
         sp.edit().putString("app_icon", key).apply()
+    }
+
+    fun updateDiagnostics(value: Boolean) {
+        diagnostics = value
+        sp.edit().putBoolean("diagnostics", value).apply()
     }
 
     fun updateSecureScreen(value: Boolean) {

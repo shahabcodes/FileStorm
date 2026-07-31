@@ -78,6 +78,24 @@ fun CategoryScreen(
     val haptics = LocalHapticFeedback.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
+    // A stable id per composition instance. If one id ever reports two kinds,
+    // the screen was reused and that is the bug.
+    val instanceId = remember { com.shahabcodes.filestorm.data.Diagnostics.nextInstanceId() }
+    var boundKind by remember { mutableStateOf(kind) }
+    if (boundKind != kind) {
+        com.shahabcodes.filestorm.data.Diagnostics.log(
+            "REUSE",
+            "instance #$instanceId was $boundKind and is now $kind",
+        )
+        boundKind = kind
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        com.shahabcodes.filestorm.data.Diagnostics.log("SCREEN", "category #$instanceId enter kind=$kind")
+        onDispose {
+            com.shahabcodes.filestorm.data.Diagnostics.log("SCREEN", "category #$instanceId leave kind=$kind")
+        }
+    }
+
     // Every piece of state is keyed on the category. Without the key the same
     // composition slot is reused when a different category opens, so the old
     // category's files stayed on screen and tapping one opened the wrong file.
@@ -108,8 +126,18 @@ fun CategoryScreen(
         // Only the very first pass shows the loader; later passes reuse the cache
         // so returning to a category is instant instead of re-walking storage.
         loading = files.isEmpty()
-        files = FileRepository.sortEntries(
-            FileRepository.filesByKind(kind), Prefs.sortField, Prefs.sortAscending
+        com.shahabcodes.filestorm.data.Diagnostics.log(
+            "LOAD",
+            "#$instanceId start kind=$kind existing=${files.size} " +
+                "existingFirst=${files.firstOrNull()?.name}",
+        )
+        val scanned = FileRepository.filesByKind(kind)
+        val wrongKind = scanned.count { it.kind != kind }
+        files = FileRepository.sortEntries(scanned, Prefs.sortField, Prefs.sortAscending)
+        com.shahabcodes.filestorm.data.Diagnostics.log(
+            "LOAD",
+            "#$instanceId done kind=$kind count=${files.size} wrongKind=$wrongKind " +
+                "first=${files.firstOrNull()?.name}",
         )
         loading = false
     }
@@ -280,6 +308,13 @@ fun CategoryScreen(
                                     it.toFile().isFile
                             }
                             val index = media.indexOfFirst { it.path == entry.path }
+                            com.shahabcodes.filestorm.data.Diagnostics.log(
+                                "TAP",
+                                "#$instanceId kind=$kind tapped=" +
+                                    com.shahabcodes.filestorm.data.Diagnostics.describe(entry) +
+                                    " visible=${visible.size} media=${media.size} index=$index " +
+                                    "action=" + (if (index >= 0) "VIEWER" else "EXTERNAL"),
+                            )
                             if (index >= 0) onOpenViewer(media.map { it.path }, index)
                             else openFile(context, entry)
                         }

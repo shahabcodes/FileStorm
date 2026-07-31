@@ -110,7 +110,13 @@ fun ViewerScreen(
     // Resolve by path: even if the list shifted between the tap and this frame,
     // the viewer still opens on the file that was actually tapped.
     val initialPage = remember(items, startPath) {
-        items.indexOf(startPath).coerceAtLeast(0)
+        val resolved = items.indexOf(startPath)
+        com.shahabcodes.filestorm.data.Diagnostics.log(
+            "VIEWER",
+            "resolve start=$startPath -> page=$resolved of ${items.size}" +
+                if (resolved < 0) "  MISMATCH" else "",
+        )
+        resolved.coerceAtLeast(0)
     }
     val pagerState = rememberPagerState(initialPage = initialPage) { current.size }
     var chromeVisible by remember { mutableStateOf(true) }
@@ -118,7 +124,12 @@ fun ViewerScreen(
     var confirmDelete by remember { mutableStateOf<File?>(null) }
 
     val currentFile = remember(pagerState.currentPage, current) {
-        File(current.getOrElse(pagerState.currentPage) { current.last() })
+        val file = File(current.getOrElse(pagerState.currentPage) { current.last() })
+        com.shahabcodes.filestorm.data.Diagnostics.log(
+            "VIEWER",
+            "page ${pagerState.currentPage} showing ${file.name}",
+        )
+        file
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {

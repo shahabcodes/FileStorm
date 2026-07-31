@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Palette
@@ -383,6 +384,47 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Switch(
                     checked = Prefs.showHidden,
                     onCheckedChange = { Prefs.updateShowHidden(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = fsColors.green,
+                        checkedThumbColor = Color.White,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = fsColors.fill,
+                        uncheckedBorderColor = Color.Transparent,
+                    ),
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        SectionHeader("Troubleshooting")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Rounded.BugReport, null,
+                    tint = fsColors.accent, modifier = Modifier.size(26.dp),
+                )
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Diagnostics overlay",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = fsColors.label,
+                    )
+                    Text(
+                        "Shows a live trace of screens, taps and what gets opened, with " +
+                            "copy and share buttons",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                }
+                Switch(
+                    checked = Prefs.diagnostics,
+                    onCheckedChange = { Prefs.updateDiagnostics(it) },
                     colors = SwitchDefaults.colors(
                         checkedTrackColor = fsColors.green,
                         checkedThumbColor = Color.White,

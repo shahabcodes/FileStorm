@@ -26,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.Prefs
+import com.shahabcodes.filestorm.ui.components.DiagnosticsOverlay
 import com.shahabcodes.filestorm.ui.Biometrics
 import com.shahabcodes.filestorm.ui.LockScreen
 import com.shahabcodes.filestorm.ui.PermissionScreen
@@ -49,6 +50,7 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         hasAccess = checkAccess()
         locked = Prefs.biometricLock
+        com.shahabcodes.filestorm.data.Diagnostics.log("APP", "activity created")
 
         if (Build.VERSION.SDK_INT >= 33) {
             registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -81,6 +83,9 @@ class MainActivity : FragmentActivity() {
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                         if (hasAccess) AppNav() else PermissionScreen(onGrantClick = { requestAccess() })
                         if (locked) LockScreen(onRequestUnlock = { promptUnlock() })
+                        if (Prefs.diagnostics) {
+                            DiagnosticsOverlay(onDisable = { Prefs.updateDiagnostics(false) })
+                        }
                     }
                 }
             }
@@ -145,11 +150,20 @@ private fun AppNav() {
 
     /** Never pops the start destination, which would leave an empty NavHost. */
     fun goBack() {
+        val from = nav.currentBackStackEntry?.destination?.route
+        val to = nav.previousBackStackEntry?.destination?.route
+        com.shahabcodes.filestorm.data.Diagnostics.log("NAV", "back from=$from to=${to ?: "NONE"}")
         if (nav.previousBackStackEntry != null) nav.popBackStack()
     }
 
     fun openViewer(paths: List<String>, index: Int) {
-        val start = paths.getOrNull(index) ?: return
+        val start = paths.getOrNull(index)
+        com.shahabcodes.filestorm.data.Diagnostics.log(
+            "VIEWER",
+            "open request index=$index of ${paths.size} start=${start ?: "NULL"} " +
+                "first=${paths.firstOrNull()}",
+        )
+        if (start == null) return
         viewerStart = start
         viewerItems = paths
     }
@@ -166,7 +180,10 @@ private fun AppNav() {
         composable("home") {
             HomeScreen(
                 onOpenFolder = { path -> openBrowser(path) },
-                onOpenCategory = { kind -> nav.navigate("category/${kind.name}") },
+                onOpenCategory = { kind ->
+                    com.shahabcodes.filestorm.data.Diagnostics.log("NAV", "open category ${kind.name}")
+                    nav.navigate("category/${kind.name}")
+                },
                 onOpenTransfer = { showTransferSheet = true },
                 onOpenSettings = { nav.navigate("settings") },
                 onOpenTrash = { nav.navigate("trash") },
@@ -190,6 +207,11 @@ private fun AppNav() {
             }.getOrDefault(FileKind.IMAGE)
             // Keying on the entry id guarantees a fresh screen per visit, so one
             // category can never inherit another's list.
+            com.shahabcodes.filestorm.data.Diagnostics.log(
+                "NAV",
+                "compose category route kind=$kind entry=${backStack.id.take(8)} " +
+                    "arg=${backStack.arguments?.getString("kind")}",
+            )
             androidx.compose.runtime.key(backStack.id, kind) {
                 CategoryScreen(
                     kind = kind,
@@ -240,6 +262,10 @@ private fun AppNav() {
     }
 
     if (viewerItems.isNotEmpty()) {
+        com.shahabcodes.filestorm.data.Diagnostics.log(
+            "VIEWER",
+            "showing ${viewerItems.size} item(s) start=$viewerStart",
+        )
         com.shahabcodes.filestorm.ui.viewer.ViewerScreen(
             items = viewerItems,
             startPath = viewerStart,

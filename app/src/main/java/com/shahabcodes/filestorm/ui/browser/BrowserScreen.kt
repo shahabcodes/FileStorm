@@ -716,6 +716,13 @@ fun BrowserScreen(
                                     it.toFile().isFile
                             }
                             val index = media.indexOfFirst { it.path == entry.path }
+                            com.shahabcodes.filestorm.data.Diagnostics.log(
+                                "TAP",
+                                "folder=${File(path).name} tapped=" +
+                                    com.shahabcodes.filestorm.data.Diagnostics.describe(entry) +
+                                    " media=${media.size} index=$index " +
+                                    "action=" + (if (index >= 0) "VIEWER" else "EXTERNAL"),
+                            )
                             if (index >= 0) onOpenViewer(media.map { it.path }, index)
                             else openFile(context, entry)
                         }

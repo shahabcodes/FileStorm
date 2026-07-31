@@ -669,6 +669,10 @@ fun shareFiles(context: android.content.Context, entries: List<FsEntry>) {
 private const val MAX_SHARE_ITEMS = 100
 
 fun openFile(context: android.content.Context, entry: FsEntry) {
+    com.shahabcodes.filestorm.data.Diagnostics.log(
+        "EXTERNAL",
+        "openFile " + com.shahabcodes.filestorm.data.Diagnostics.describe(entry),
+    )
     runCatching {
         val uri = FileProvider.getUriForFile(context, context.packageName + ".provider", entry.toFile())
         val mime = MimeTypeMap.getSingleton()
