@@ -25,6 +25,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.PlayCircleFilled
 import androidx.compose.material3.Icon
@@ -55,6 +57,7 @@ import com.shahabcodes.filestorm.data.ViewMode
 import com.shahabcodes.filestorm.ui.components.FileIconView
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.SelectionCircle
+import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.components.kindColor
 import com.shahabcodes.filestorm.ui.components.kindIcon
 import com.shahabcodes.filestorm.ui.theme.fsColors
@@ -72,6 +75,8 @@ fun FileListView(
     viewMode: ViewMode,
     columns: Int = 3,
     grouped: Boolean = false,
+    collapsedMonths: Set<String> = emptySet(),
+    onToggleMonth: (String) -> Unit = {},
     onZoom: (Float) -> Unit = {},
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
@@ -84,6 +89,8 @@ fun FileListView(
             contentPadding = contentPadding,
             viewMode = viewMode,
             columns = columns,
+            collapsedMonths = collapsedMonths,
+            onToggleMonth = onToggleMonth,
             onZoom = onZoom,
             onClick = onClick,
             onLongClick = onLongClick,
@@ -205,7 +212,51 @@ fun FileListView(
 
 
 
-/** Any layout, with the entries split under sticky Month Year headings. */
+/** A month's contents at a glance. */
+private data class MonthSummary(
+    val images: Int,
+    val videos: Int,
+    val folders: Int,
+    val others: Int,
+    val bytes: Long,
+) {
+    fun line(): String = buildString {
+        val parts = mutableListOf<String>()
+        if (images > 0) parts.add("$images photo" + if (images == 1) "" else "s")
+        if (videos > 0) parts.add("$videos video" + if (videos == 1) "" else "s")
+        if (folders > 0) parts.add("$folders folder" + if (folders == 1) "" else "s")
+        if (others > 0) parts.add("$others other")
+        append(parts.joinToString(" · "))
+        if (bytes > 0) {
+            if (parts.isNotEmpty()) append(" · ")
+            append(Formatters.bytes(bytes))
+        }
+    }
+}
+
+private fun summarise(entries: List<FsEntry>): MonthSummary {
+    var images = 0
+    var videos = 0
+    var folders = 0
+    var others = 0
+    var bytes = 0L
+    entries.forEach { entry ->
+        when {
+            entry.isDirectory -> folders++
+            entry.kind == FileKind.IMAGE -> images++
+            entry.kind == FileKind.VIDEO -> videos++
+            else -> others++
+        }
+        if (!entry.isDirectory) bytes += entry.size
+    }
+    return MonthSummary(images, videos, folders, others, bytes)
+}
+
+/**
+ * Any layout, split under Month Year headings. The heading for whatever month is
+ * at the top stays pinned above the content, months can be collapsed, and the
+ * chosen sort still orders the items inside each month.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GroupedByMonth(
@@ -215,95 +266,216 @@ private fun GroupedByMonth(
     contentPadding: PaddingValues,
     viewMode: ViewMode,
     columns: Int,
+    collapsedMonths: Set<String>,
+    onToggleMonth: (String) -> Unit,
     onZoom: (Float) -> Unit,
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
 ) {
-    val groups = remember(entries, Prefs.sortAscending) {
-        val ordered = if (Prefs.sortAscending) entries.sortedBy { it.lastModified }
-        else entries.sortedByDescending { it.lastModified }
-        ordered.groupBy { monthLabel(it.lastModified) }
+    // Months run newest-first (or oldest-first), but inside a month the user's
+    // name/size/type sort still applies.
+    val groups = remember(entries, Prefs.sortAscending, Prefs.sortField) {
+        entries
+            .groupBy { monthLabel(it.lastModified) }
+            .entries
+            .sortedWith(
+                compareBy { group -> group.value.maxOfOrNull { it.lastModified } ?: 0L }
+            )
+            .let { if (Prefs.sortAscending) it else it.reversed() }
+            .map { (label, items) ->
+                label to com.shahabcodes.filestorm.data.FileRepository.sortEntries(
+                    items, Prefs.sortField, Prefs.sortAscending,
+                )
+            }
     }
+    val summaries = remember(groups) { groups.associate { it.first to summarise(it.second) } }
 
     val tiled = viewMode == ViewMode.GRID || viewMode == ViewMode.GALLERY
-    if (tiled) {
-        val span = columns.coerceIn(1, if (viewMode == ViewMode.GALLERY) 4 else 6)
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(span),
-            modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
-            contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            groups.forEach { (label, groupEntries) ->
-                item(
-                    key = "hdr_$label",
-                    span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
-                ) {
-                    TimelineHeader(label, groupEntries)
-                }
-                itemsIndexed(groupEntries, key = { _, e -> e.path }) { _, entry ->
-                    if (viewMode == ViewMode.GALLERY) {
-                        GalleryTile(
-                            entry = entry,
-                            selectionMode = selectionMode,
-                            selected = entry.path in selected,
-                            onClick = { onClick(entry) },
-                            onLongClick = { onLongClick(entry) },
-                        )
-                    } else {
-                        GridTile(
-                            entry = entry,
-                            selectionMode = selectionMode,
-                            selected = entry.path in selected,
-                            onClick = { onClick(entry) },
-                            onLongClick = { onLongClick(entry) },
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+
+    // Maps every emitted slot back to its month so the pinned heading can follow
+    // the scroll position in both the list and the grid.
+    val slotLabels = remember(groups, collapsedMonths) {
+        buildList {
+            groups.forEach { (label, items) ->
+                add(label)
+                if (label !in collapsedMonths) repeat(items.size) { add(label) }
+                add(label)
+            }
+        }
+    }
+    val firstVisible = if (tiled) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
+    val pinnedLabel = slotLabels.getOrNull(firstVisible) ?: groups.firstOrNull()?.first
+
+    Column(Modifier.fillMaxSize()) {
+        pinnedLabel?.let { label ->
+            MonthHeader(
+                label = label,
+                summary = summaries[label],
+                collapsed = label in collapsedMonths,
+                pinned = true,
+                onClick = { onToggleMonth(label) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+
+        if (tiled) {
+            val span = columns.coerceIn(1, if (viewMode == ViewMode.GALLERY) 4 else 6)
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(span),
+                state = gridState,
+                modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
+                contentPadding = contentPadding,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                groups.forEach { (label, groupEntries) ->
+                    item(
+                        key = "hdr_$label",
+                        span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                    ) {
+                        MonthHeader(
+                            label = label,
+                            summary = summaries[label],
+                            collapsed = label in collapsedMonths,
+                            pinned = false,
+                            onClick = { onToggleMonth(label) },
                         )
                     }
+                    if (label !in collapsedMonths) {
+                        itemsIndexed(groupEntries, key = { _, e -> e.path }) { _, entry ->
+                            if (viewMode == ViewMode.GALLERY) {
+                                GalleryTile(
+                                    entry = entry,
+                                    selectionMode = selectionMode,
+                                    selected = entry.path in selected,
+                                    onClick = { onClick(entry) },
+                                    onLongClick = { onLongClick(entry) },
+                                )
+                            } else {
+                                GridTile(
+                                    entry = entry,
+                                    selectionMode = selectionMode,
+                                    selected = entry.path in selected,
+                                    onClick = { onClick(entry) },
+                                    onLongClick = { onLongClick(entry) },
+                                )
+                            }
+                        }
+                    }
+                    item(
+                        key = "gap_$label",
+                        span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                    ) { Spacer(Modifier.height(8.dp)) }
+                }
+            }
+        } else {
+            LazyColumn(
+                Modifier.fillMaxSize().pinchToZoom(onZoom),
+                state = listState,
+                contentPadding = contentPadding,
+            ) {
+                groups.forEach { (label, groupEntries) ->
+                    item(key = "hdr_$label") {
+                        MonthHeader(
+                            label = label,
+                            summary = summaries[label],
+                            collapsed = label in collapsedMonths,
+                            pinned = false,
+                            onClick = { onToggleMonth(label) },
+                        )
+                    }
+                    if (label !in collapsedMonths) {
+                        itemsIndexed(groupEntries, key = { _, e -> e.path }) { index, entry ->
+                            val shape = when {
+                                groupEntries.size == 1 -> RoundedCornerShape(16.dp)
+                                index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                                index == groupEntries.lastIndex ->
+                                    RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+                                else -> RoundedCornerShape(0.dp)
+                            }
+                            Column(Modifier.clip(shape).background(fsColors.card)) {
+                                if (viewMode == ViewMode.DETAILED) {
+                                    DetailedFileRow(
+                                        entry = entry,
+                                        selectionMode = selectionMode,
+                                        selected = entry.path in selected,
+                                        onClick = { onClick(entry) },
+                                        onLongClick = { onLongClick(entry) },
+                                    )
+                                } else {
+                                    FileRow(
+                                        entry = entry,
+                                        selectionMode = selectionMode,
+                                        selected = entry.path in selected,
+                                        onClick = { onClick(entry) },
+                                        onLongClick = { onLongClick(entry) },
+                                    )
+                                }
+                                if (index != groupEntries.lastIndex) {
+                                    RowSeparator(
+                                        startIndent = if (viewMode == ViewMode.DETAILED) 76.dp else 60.dp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    item(key = "gap_$label") { Spacer(Modifier.height(14.dp)) }
                 }
             }
         }
-    } else {
-        LazyColumn(
-            Modifier.fillMaxSize().pinchToZoom(onZoom),
-            contentPadding = contentPadding,
-        ) {
-            groups.forEach { (label, groupEntries) ->
-                stickyHeader(key = "hdr_$label") { TimelineHeader(label, groupEntries) }
-                itemsIndexed(groupEntries, key = { _, e -> e.path }) { index, entry ->
-                    val shape = when {
-                        groupEntries.size == 1 -> RoundedCornerShape(16.dp)
-                        index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                        index == groupEntries.lastIndex ->
-                            RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
-                        else -> RoundedCornerShape(0.dp)
-                    }
-                    Column(Modifier.clip(shape).background(fsColors.card)) {
-                        if (viewMode == ViewMode.DETAILED) {
-                            DetailedFileRow(
-                                entry = entry,
-                                selectionMode = selectionMode,
-                                selected = entry.path in selected,
-                                onClick = { onClick(entry) },
-                                onLongClick = { onLongClick(entry) },
-                            )
-                        } else {
-                            FileRow(
-                                entry = entry,
-                                selectionMode = selectionMode,
-                                selected = entry.path in selected,
-                                onClick = { onClick(entry) },
-                                onLongClick = { onLongClick(entry) },
-                            )
-                        }
-                        if (index != groupEntries.lastIndex) {
-                            RowSeparator(startIndent = if (viewMode == ViewMode.DETAILED) 76.dp else 60.dp)
-                        }
-                    }
-                }
-                item(key = "gap_$label") { Spacer(Modifier.height(18.dp)) }
+    }
+}
+
+/** Month heading with its summary and a collapse chevron. */
+@Composable
+private fun MonthHeader(
+    label: String,
+    summary: MonthSummary?,
+    collapsed: Boolean,
+    pinned: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(fsColors.groupedBackground)
+            .pressScale(onClick)
+            .padding(vertical = if (pinned) 10.dp else 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(width = 4.dp, height = 20.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(fsColors.accent),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.titleMedium,
+                color = fsColors.label,
+                maxLines = 1,
+            )
+            summary?.let {
+                Text(
+                    it.line(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.secondaryLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
+        Icon(
+            if (collapsed) Icons.Rounded.ExpandMore else Icons.Rounded.ExpandLess,
+            if (collapsed) "Expand" else "Collapse",
+            tint = fsColors.accent,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 

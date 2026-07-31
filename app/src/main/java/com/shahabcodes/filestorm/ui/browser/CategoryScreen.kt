@@ -91,6 +91,7 @@ fun CategoryScreen(
     val viewKey = "category:" + kind.name
     val viewMode = com.shahabcodes.filestorm.data.FolderViews.viewFor(viewKey)
     var pinchAccumulator by remember { mutableStateOf(1f) }
+    var collapsedMonths by remember { mutableStateOf(setOf<String>()) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var viewMenuOpen by remember { mutableStateOf(false) }
 
@@ -251,6 +252,11 @@ fun CategoryScreen(
                     viewMode = viewMode,
                     columns = com.shahabcodes.filestorm.data.FolderViews.columnsFor(viewKey, viewMode),
                     grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(viewKey),
+                    collapsedMonths = collapsedMonths,
+                    onToggleMonth = { month ->
+                        collapsedMonths = if (month in collapsedMonths) collapsedMonths - month
+                        else collapsedMonths + month
+                    },
                     onZoom = { zoom -> pinchAccumulator = applyPinch(viewKey, viewMode, pinchAccumulator * zoom) },
                     onClick = { entry ->
                         if (selectionMode) {

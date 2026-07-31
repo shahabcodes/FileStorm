@@ -251,6 +251,7 @@ fun BrowserScreen(
     var selected by remember(path) { mutableStateOf(setOf<String>()) }
     var menuOpen by remember { mutableStateOf(false) }
     var pinchAccumulator by remember { mutableStateOf(1f) }
+    var collapsedMonths by remember { mutableStateOf(setOf<String>()) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var viewMenuOpen by remember { mutableStateOf(false) }
     var showDateSheet by remember { mutableStateOf(false) }
@@ -695,6 +696,11 @@ fun BrowserScreen(
                     viewMode = viewMode,
                     columns = com.shahabcodes.filestorm.data.FolderViews.columnsFor(path, viewMode),
                     grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(path),
+                    collapsedMonths = collapsedMonths,
+                    onToggleMonth = { month ->
+                        collapsedMonths = if (month in collapsedMonths) collapsedMonths - month
+                        else collapsedMonths + month
+                    },
                     onZoom = { zoom -> pinchAccumulator = applyPinch(path, viewMode, pinchAccumulator * zoom) },
                     onClick = { entry ->
                         if (selectionMode) {
