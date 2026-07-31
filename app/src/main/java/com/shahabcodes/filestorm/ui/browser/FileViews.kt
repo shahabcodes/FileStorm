@@ -71,10 +71,25 @@ fun FileListView(
     contentPadding: PaddingValues,
     viewMode: ViewMode,
     columns: Int = 3,
+    grouped: Boolean = false,
     onZoom: (Float) -> Unit = {},
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
 ) {
+    if (grouped) {
+        GroupedByMonth(
+            entries = entries,
+            selectionMode = selectionMode,
+            selected = selected,
+            contentPadding = contentPadding,
+            viewMode = viewMode,
+            columns = columns,
+            onZoom = onZoom,
+            onClick = onClick,
+            onLongClick = onLongClick,
+        )
+        return
+    }
     when (viewMode) {
         ViewMode.LIST, ViewMode.DETAILED -> LazyColumn(
             Modifier.fillMaxSize().pinchToZoom(onZoom),
@@ -188,6 +203,109 @@ fun FileListView(
     }
 }
 
+
+
+/** Any layout, with the entries split under sticky Month Year headings. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GroupedByMonth(
+    entries: List<FsEntry>,
+    selectionMode: Boolean,
+    selected: Set<String>,
+    contentPadding: PaddingValues,
+    viewMode: ViewMode,
+    columns: Int,
+    onZoom: (Float) -> Unit,
+    onClick: (FsEntry) -> Unit,
+    onLongClick: (FsEntry) -> Unit,
+) {
+    val groups = remember(entries, Prefs.sortAscending) {
+        val ordered = if (Prefs.sortAscending) entries.sortedBy { it.lastModified }
+        else entries.sortedByDescending { it.lastModified }
+        ordered.groupBy { monthLabel(it.lastModified) }
+    }
+
+    val tiled = viewMode == ViewMode.GRID || viewMode == ViewMode.GALLERY
+    if (tiled) {
+        val span = columns.coerceIn(1, if (viewMode == ViewMode.GALLERY) 4 else 6)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(span),
+            modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            groups.forEach { (label, groupEntries) ->
+                item(
+                    key = "hdr_$label",
+                    span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                ) {
+                    TimelineHeader(label, groupEntries)
+                }
+                itemsIndexed(groupEntries, key = { _, e -> e.path }) { _, entry ->
+                    if (viewMode == ViewMode.GALLERY) {
+                        GalleryTile(
+                            entry = entry,
+                            selectionMode = selectionMode,
+                            selected = entry.path in selected,
+                            onClick = { onClick(entry) },
+                            onLongClick = { onLongClick(entry) },
+                        )
+                    } else {
+                        GridTile(
+                            entry = entry,
+                            selectionMode = selectionMode,
+                            selected = entry.path in selected,
+                            onClick = { onClick(entry) },
+                            onLongClick = { onLongClick(entry) },
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        LazyColumn(
+            Modifier.fillMaxSize().pinchToZoom(onZoom),
+            contentPadding = contentPadding,
+        ) {
+            groups.forEach { (label, groupEntries) ->
+                stickyHeader(key = "hdr_$label") { TimelineHeader(label, groupEntries) }
+                itemsIndexed(groupEntries, key = { _, e -> e.path }) { index, entry ->
+                    val shape = when {
+                        groupEntries.size == 1 -> RoundedCornerShape(16.dp)
+                        index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                        index == groupEntries.lastIndex ->
+                            RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+                        else -> RoundedCornerShape(0.dp)
+                    }
+                    Column(Modifier.clip(shape).background(fsColors.card)) {
+                        if (viewMode == ViewMode.DETAILED) {
+                            DetailedFileRow(
+                                entry = entry,
+                                selectionMode = selectionMode,
+                                selected = entry.path in selected,
+                                onClick = { onClick(entry) },
+                                onLongClick = { onLongClick(entry) },
+                            )
+                        } else {
+                            FileRow(
+                                entry = entry,
+                                selectionMode = selectionMode,
+                                selected = entry.path in selected,
+                                onClick = { onClick(entry) },
+                                onLongClick = { onLongClick(entry) },
+                            )
+                        }
+                        if (index != groupEntries.lastIndex) {
+                            RowSeparator(startIndent = if (viewMode == ViewMode.DETAILED) 76.dp else 60.dp)
+                        }
+                    }
+                }
+                item(key = "gap_$label") { Spacer(Modifier.height(18.dp)) }
+            }
+        }
+    }
+}
 
 /**
  * Maps an accumulated pinch factor onto the folder's view: pinching out grows

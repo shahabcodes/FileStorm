@@ -133,18 +133,35 @@ object FolderViews {
     private lateinit var sp: SharedPreferences
     private val modes = androidx.compose.runtime.mutableStateMapOf<String, ViewMode>()
     private val columns = androidx.compose.runtime.mutableStateMapOf<String, Int>()
+    private val grouped = androidx.compose.runtime.mutableStateMapOf<String, Boolean>()
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm_folder_views", Context.MODE_PRIVATE)
         sp.all.forEach { (key, value) ->
             when {
                 key.startsWith("cols:") && value is Int -> columns[key.removePrefix("cols:")] = value
+                key.startsWith("group:") && value is Boolean -> grouped[key.removePrefix("group:")] = value
                 value is String -> runCatching { modes[key] = ViewMode.valueOf(value) }
             }
         }
     }
 
-    fun viewFor(key: String): ViewMode = modes[key] ?: Prefs.viewMode
+    /** TIMELINE is kept only for older saves; it now means "list, grouped". */
+    fun viewFor(key: String): ViewMode {
+        val stored = modes[key] ?: Prefs.viewMode
+        return if (stored == ViewMode.TIMELINE) ViewMode.LIST else stored
+    }
+
+    /** Month grouping is independent of the layout, so it works in every view. */
+    fun groupedFor(key: String): Boolean =
+        grouped[key] ?: ((modes[key] ?: Prefs.viewMode) == ViewMode.TIMELINE)
+
+    fun setGrouped(key: String, value: Boolean) {
+        grouped[key] = value
+        sp.edit().putBoolean("group:$key", value).apply()
+        // Drop the legacy timeline mode so the layout choice is honoured.
+        if (modes[key] == ViewMode.TIMELINE) setView(key, ViewMode.LIST)
+    }
 
     fun hasOverride(key: String): Boolean = modes.containsKey(key)
 

@@ -2,7 +2,6 @@ package com.shahabcodes.filestorm.ui.viewer
 
 import android.content.Intent
 import android.webkit.MimeTypeMap
-import android.widget.VideoView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -40,6 +40,8 @@ import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.ZoomIn
+import androidx.compose.material.icons.rounded.ZoomOut
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -352,7 +354,11 @@ private fun ImagePage(file: File, onToggleChrome: () -> Unit) {
     }
 }
 
-/** VideoView-backed player with play/pause, ±10s, seek bar, time and mute. */
+/**
+ * TextureView-backed player. TextureView, unlike VideoView's SurfaceView, can be
+ * scaled and translated, so video supports the same pinch-zoom and pan as photos
+ * while still swiping between items when not zoomed.
+ */
 @Composable
 private fun VideoPage(
     file: File,
@@ -360,55 +366,141 @@ private fun VideoPage(
     chromeVisible: Boolean,
     onToggleChrome: () -> Unit,
 ) {
-    var view by remember(file) { mutableStateOf<VideoView?>(null) }
+    var player by remember(file) { mutableStateOf<android.media.MediaPlayer?>(null) }
     var playing by remember(file) { mutableStateOf(false) }
     var muted by remember(file) { mutableStateOf(false) }
     var duration by remember(file) { mutableIntStateOf(0) }
     var position by remember(file) { mutableIntStateOf(0) }
     var scrubbing by remember(file) { mutableStateOf(false) }
+    var videoWidth by remember(file) { mutableIntStateOf(0) }
+    var videoHeight by remember(file) { mutableIntStateOf(0) }
+
+    var scale by remember(file) { mutableFloatStateOf(1f) }
+    var offsetX by remember(file) { mutableFloatStateOf(0f) }
+    var offsetY by remember(file) { mutableFloatStateOf(0f) }
 
     Box(
         Modifier
             .fillMaxSize()
-            .pointerInput(file) { detectTapGestures { onToggleChrome() } },
-        contentAlignment = Alignment.Center,
-    ) {
-        AndroidView(
-            factory = { ctx ->
-                VideoView(ctx).apply {
-                    // Let Compose own every gesture so the pager still gets drags.
-                    isClickable = false
-                    isFocusable = false
-                    setOnTouchListener { _, _ -> false }
-                    setVideoPath(file.absolutePath)
-                    setOnPreparedListener { mp ->
-                        duration = mp.duration
-                        mp.setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f)
-                    }
-                    setOnCompletionListener { playing = false }
-                    view = this
+            .pointerInput(file) {
+                detectTapGestures(
+                    onTap = { onToggleChrome() },
+                    onDoubleTap = {
+                        if (scale > 1.05f) {
+                            scale = 1f
+                            offsetX = 0f
+                            offsetY = 0f
+                        } else {
+                            scale = 2.5f
+                        }
+                    },
+                )
+            }
+            .pointerInput(file) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        val multiTouch = event.changes.count { it.pressed } >= 2
+                        if (multiTouch || scale > 1.02f) {
+                            val zoom = if (multiTouch) event.calculateZoom() else 1f
+                            val pan = event.calculatePan()
+                            scale = (scale * zoom).coerceIn(1f, 6f)
+                            if (scale > 1.02f) {
+                                val maxX = size.width * (scale - 1) / 2f
+                                val maxY = size.height * (scale - 1) / 2f
+                                offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
+                                offsetY = (offsetY + pan.y).coerceIn(-maxY, maxY)
+                            } else {
+                                offsetX = 0f
+                                offsetY = 0f
+                            }
+                            event.changes.forEach { it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        val ratio = if (videoWidth > 0 && videoHeight > 0) {
+            videoWidth.toFloat() / videoHeight.toFloat()
+        } else 0f
+
+        AndroidView(
+            factory = { ctx ->
+                android.view.TextureView(ctx).apply {
+                    surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
+                        override fun onSurfaceTextureAvailable(
+                            texture: android.graphics.SurfaceTexture,
+                            width: Int,
+                            height: Int,
+                        ) {
+                            runCatching {
+                                val mp = android.media.MediaPlayer()
+                                mp.setSurface(android.view.Surface(texture))
+                                mp.setDataSource(file.absolutePath)
+                                mp.setOnPreparedListener {
+                                    duration = it.duration
+                                    videoWidth = it.videoWidth
+                                    videoHeight = it.videoHeight
+                                    it.setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f)
+                                }
+                                mp.setOnCompletionListener { playing = false }
+                                mp.prepareAsync()
+                                player = mp
+                            }
+                        }
+
+                        override fun onSurfaceTextureSizeChanged(
+                            texture: android.graphics.SurfaceTexture,
+                            width: Int,
+                            height: Int,
+                        ) = Unit
+
+                        override fun onSurfaceTextureDestroyed(
+                            texture: android.graphics.SurfaceTexture,
+                        ): Boolean {
+                            runCatching { player?.release() }
+                            player = null
+                            playing = false
+                            return true
+                        }
+
+                        override fun onSurfaceTextureUpdated(
+                            texture: android.graphics.SurfaceTexture,
+                        ) = Unit
+                    }
+                }
+            },
+            modifier = (if (ratio > 0f) Modifier.fillMaxWidth().aspectRatio(ratio) else Modifier.fillMaxSize())
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY,
+                ),
         )
 
         LaunchedEffect(active) {
             if (!active) {
-                view?.pause()
+                runCatching { player?.pause() }
                 playing = false
             }
         }
         DisposableEffect(file) {
             onDispose {
-                view?.stopPlayback()
-                view = null
+                runCatching { player?.release() }
+                player = null
             }
         }
         LaunchedEffect(playing, active) {
             while (playing && active) {
-                view?.let { if (!scrubbing) position = it.currentPosition }
+                runCatching { player?.let { if (!scrubbing) position = it.currentPosition } }
                 delay(200)
             }
+        }
+        LaunchedEffect(muted) {
+            runCatching { player?.setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f) }
         }
 
         if (!playing) {
@@ -418,7 +510,7 @@ private fun VideoPage(
                     .background(Color.Black.copy(alpha = 0.45f), CircleShape)
                     .pointerInput(file) {
                         detectTapGestures {
-                            view?.start()
+                            runCatching { player?.start() }
                             playing = true
                         }
                     },
@@ -458,7 +550,7 @@ private fun VideoPage(
                             position = (fraction * duration).toInt()
                         },
                         onValueChangeFinished = {
-                            view?.seekTo(position)
+                            runCatching { player?.seekTo(position) }
                             scrubbing = false
                         },
                         colors = SliderDefaults.colors(
@@ -480,32 +572,46 @@ private fun VideoPage(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     BarIcon(Icons.Rounded.Replay10, "Back 10 seconds") {
-                        view?.let {
-                            val target = (it.currentPosition - 10_000).coerceAtLeast(0)
-                            it.seekTo(target)
-                            position = target
+                        runCatching {
+                            player?.let {
+                                val target = (it.currentPosition - 10_000).coerceAtLeast(0)
+                                it.seekTo(target)
+                                position = target
+                            }
                         }
                     }
                     BarIcon(
                         if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         if (playing) "Pause" else "Play",
                     ) {
-                        val v = view ?: return@BarIcon
-                        if (playing) v.pause() else v.start()
+                        val mp = player ?: return@BarIcon
+                        runCatching { if (playing) mp.pause() else mp.start() }
                         playing = !playing
                     }
                     BarIcon(Icons.Rounded.Forward10, "Forward 10 seconds") {
-                        view?.let {
-                            val target = (it.currentPosition + 10_000).coerceAtMost(duration)
-                            it.seekTo(target)
-                            position = target
+                        runCatching {
+                            player?.let {
+                                val target = (it.currentPosition + 10_000).coerceAtMost(duration)
+                                it.seekTo(target)
+                                position = target
+                            }
                         }
                     }
                     BarIcon(
                         if (muted) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
                         if (muted) "Unmute" else "Mute",
+                    ) { muted = !muted }
+                    BarIcon(
+                        if (scale > 1.02f) Icons.Rounded.ZoomOut else Icons.Rounded.ZoomIn,
+                        if (scale > 1.02f) "Reset zoom" else "Zoom in",
                     ) {
-                        muted = !muted
+                        if (scale > 1.02f) {
+                            scale = 1f
+                            offsetX = 0f
+                            offsetY = 0f
+                        } else {
+                            scale = 2f
+                        }
                     }
                 }
             }

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AutoAwesomeMosaic
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CreateNewFolder
@@ -161,15 +162,17 @@ fun SortMenu(expanded: Boolean, onDismiss: () -> Unit, onChanged: () -> Unit) {
 fun ViewModeMenu(
     expanded: Boolean,
     current: ViewMode,
+    grouped: Boolean,
     onDismiss: () -> Unit,
     onSelect: (ViewMode) -> Unit,
+    onGroupedChange: (Boolean) -> Unit,
 ) {
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
         modifier = Modifier.background(fsColors.cardSecondary),
     ) {
-        ViewMode.entries.forEach { mode ->
+        ViewMode.entries.filter { it != ViewMode.TIMELINE }.forEach { mode ->
             val active = current == mode
             DropdownMenuItem(
                 text = { Text(mode.label, color = if (active) fsColors.accent else fsColors.label) },
@@ -187,6 +190,33 @@ fun ViewModeMenu(
                 },
             )
         }
+        androidx.compose.material3.HorizontalDivider(color = fsColors.separator)
+        DropdownMenuItem(
+            text = {
+                Text(
+                    "Group by month",
+                    color = if (grouped) fsColors.accent else fsColors.label,
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.CalendarMonth, null,
+                    tint = if (grouped) fsColors.accent else fsColors.secondaryLabel,
+                )
+            },
+            trailingIcon = {
+                if (grouped) {
+                    Icon(
+                        Icons.Rounded.CheckCircle, null,
+                        tint = fsColors.accent, modifier = Modifier.size(16.dp),
+                    )
+                }
+            },
+            onClick = {
+                onGroupedChange(!grouped)
+                onDismiss()
+            },
+        )
     }
 }
 
@@ -428,8 +458,12 @@ fun BrowserScreen(
                     ViewModeMenu(
                         expanded = viewMenuOpen,
                         current = viewMode,
+                        grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(path),
                         onDismiss = { viewMenuOpen = false },
                         onSelect = { com.shahabcodes.filestorm.data.FolderViews.setView(path, it) },
+                        onGroupedChange = {
+                            com.shahabcodes.filestorm.data.FolderViews.setGrouped(path, it)
+                        },
                     )
                 }
                 Box {
@@ -660,6 +694,7 @@ fun BrowserScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
                     viewMode = viewMode,
                     columns = com.shahabcodes.filestorm.data.FolderViews.columnsFor(path, viewMode),
+                    grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(path),
                     onZoom = { zoom -> pinchAccumulator = applyPinch(path, viewMode, pinchAccumulator * zoom) },
                     onClick = { entry ->
                         if (selectionMode) {

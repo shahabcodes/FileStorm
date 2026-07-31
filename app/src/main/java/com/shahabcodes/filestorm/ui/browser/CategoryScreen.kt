@@ -173,8 +173,12 @@ fun CategoryScreen(
                     ViewModeMenu(
                         expanded = viewMenuOpen,
                         current = viewMode,
+                        grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(viewKey),
                         onDismiss = { viewMenuOpen = false },
                         onSelect = { com.shahabcodes.filestorm.data.FolderViews.setView(viewKey, it) },
+                        onGroupedChange = {
+                            com.shahabcodes.filestorm.data.FolderViews.setGrouped(viewKey, it)
+                        },
                     )
                 }
                 Box {
@@ -246,6 +250,7 @@ fun CategoryScreen(
                     ),
                     viewMode = viewMode,
                     columns = com.shahabcodes.filestorm.data.FolderViews.columnsFor(viewKey, viewMode),
+                    grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(viewKey),
                     onZoom = { zoom -> pinchAccumulator = applyPinch(viewKey, viewMode, pinchAccumulator * zoom) },
                     onClick = { entry ->
                         if (selectionMode) {
