@@ -37,6 +37,8 @@ data class FsEntry(
         }
 
         fun from(file: File): FsEntry {
+            // One stat call feeds everything below; isDirectory/length/lastModified
+            // each hit the filesystem again otherwise.
             val isDir = file.isDirectory
             return FsEntry(
                 path = file.absolutePath,

@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.RemoveDone
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.FolderOff
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
@@ -98,16 +99,26 @@ class BrowserViewModel(val path: String) : ViewModel() {
     val entries = MutableStateFlow<List<FsEntry>>(emptyList())
     val loading = MutableStateFlow(true)
 
+    /** Guards against re-listing a huge folder every time the screen re-enters. */
+    private var loadedWithHidden: Boolean? = null
+
     init {
         refresh()
     }
 
-    fun refresh() {
+    fun refresh(force: Boolean = false) {
+        if (force) FileRepository.invalidate(path)
         viewModelScope.launch {
-            loading.value = true
+            loading.value = entries.value.isEmpty()
             entries.value = FileRepository.list(path)
+            loadedWithHidden = Prefs.showHidden
             loading.value = false
         }
+    }
+
+    /** Only re-reads when the hidden-files setting actually changed. */
+    fun refreshIfSettingsChanged() {
+        if (loadedWithHidden != Prefs.showHidden) refresh()
     }
 
     fun resort() {
@@ -202,6 +213,9 @@ fun BrowserScreen(
     val haptics = LocalHapticFeedback.current
 
     val viewMode = com.shahabcodes.filestorm.data.FolderViews.viewFor(path)
+    var dateFilter by remember(path) { mutableStateOf<ClosedRange<Long>?>(null) }
+    var dateFilterLabel by remember(path) { mutableStateOf("") }
+    var showFilterSheet by remember { mutableStateOf(false) }
     var query by remember(path) { mutableStateOf("") }
     var selectionMode by remember(path) { mutableStateOf(false) }
     var selected by remember(path) { mutableStateOf(setOf<String>()) }
@@ -221,16 +235,22 @@ fun BrowserScreen(
     var folderMetaRoot by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Prefs.showHidden) { vm.refresh() }
+    LaunchedEffect(Prefs.showHidden) { vm.refreshIfSettingsChanged() }
 
     fun goBack() {
         if (!BrowserTabs.pop()) onExit()
     }
     BackHandler { goBack() }
 
-    val visibleEntries = remember(entries, query) {
-        if (query.isBlank()) entries
-        else entries.filter { it.name.contains(query.trim(), ignoreCase = true) }
+    val visibleEntries = remember(entries, query, dateFilter) {
+        var list = entries
+        if (query.isNotBlank()) {
+            list = list.filter { it.name.contains(query.trim(), ignoreCase = true) }
+        }
+        dateFilter?.let { range ->
+            list = list.filter { it.lastModified in range }
+        }
+        list
     }
     val selectedEntries = remember(entries, selected) { entries.filter { it.path in selected } }
 
@@ -483,6 +503,14 @@ fun BrowserScreen(
                             },
                         )
                         DropdownMenuItem(
+                            text = { Text("Filter by date…", color = fsColors.label) },
+                            leadingIcon = { Icon(Icons.Rounded.FilterAlt, null, tint = fsColors.accent) },
+                            onClick = {
+                                menuOpen = false
+                                showFilterSheet = true
+                            },
+                        )
+                        DropdownMenuItem(
                             text = { Text("Select by date…", color = fsColors.label) },
                             leadingIcon = { Icon(Icons.Rounded.DateRange, null, tint = fsColors.accent) },
                             onClick = {
@@ -549,6 +577,47 @@ fun BrowserScreen(
             placeholder = "Search this folder",
             modifier = Modifier.padding(horizontal = 16.dp),
         )
+        if (dateFilter != null) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(fsColors.accent.copy(alpha = 0.15f))
+                        .pressScale {
+                            dateFilter = null
+                            dateFilterLabel = ""
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.FilterAlt, null,
+                        tint = fsColors.accent, modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        dateFilterLabel,
+                        color = fsColors.accent,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        Icons.Rounded.Close, "Clear filter",
+                        tint = fsColors.accent, modifier = Modifier.size(14.dp),
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "${visibleEntries.size} shown",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.secondaryLabel,
+                )
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
 
         // ── File list ───────────────────────────────────────────────────
@@ -667,6 +736,23 @@ fun BrowserScreen(
     }
 
     // ── Sheets & dialogs ────────────────────────────────────────────────
+    if (showFilterSheet) {
+        DateFilterSheet(
+            entries = entries,
+            onDismiss = { showFilterSheet = false },
+            onPick = { range, label ->
+                showFilterSheet = false
+                dateFilter = range
+                dateFilterLabel = label
+            },
+            onClear = {
+                showFilterSheet = false
+                dateFilter = null
+                dateFilterLabel = ""
+            },
+        )
+    }
+
     if (showDateSheet) {
         DateRangeSheet(
             onDismiss = { showDateSheet = false },
@@ -826,10 +912,16 @@ fun BrowserScreen(
         )
     }
 
-    // Refresh listing when a transfer touching this folder finishes.
+    // Re-read only when a transfer actually finishes while this folder is open,
+    // never merely because the screen came back into composition.
     val transfer by TransferManager.state.collectAsState()
+    var lastTransferState by remember { mutableStateOf(transfer.state) }
     LaunchedEffect(transfer.state) {
-        if (!transfer.isActive) vm.refresh()
+        if (transfer.state != lastTransferState) {
+            val finished = !transfer.isActive
+            lastTransferState = transfer.state
+            if (finished) vm.refresh(force = true)
+        }
     }
 }
 

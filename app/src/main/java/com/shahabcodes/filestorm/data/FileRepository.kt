@@ -18,6 +18,19 @@ object FileRepository {
 
     val rootPath: String = Environment.getExternalStorageDirectory().absolutePath
 
+    private class Cached(val stamp: Long, val showHidden: Boolean, val entries: List<FsEntry>)
+
+    /**
+     * Directory listings are cached per path and reused while the folder's own
+     * timestamp is unchanged, so returning to a folder holding tens of thousands
+     * of files does not re-stat every entry.
+     */
+    private val listCache = java.util.concurrent.ConcurrentHashMap<String, Cached>()
+
+    fun invalidate(path: String? = null) {
+        if (path == null) listCache.clear() else listCache.remove(path)
+    }
+
     suspend fun list(
         path: String,
         field: SortField = Prefs.sortField,
@@ -25,12 +38,22 @@ object FileRepository {
         showHidden: Boolean = Prefs.showHidden,
     ): List<FsEntry> = withContext(Dispatchers.IO) {
         val dir = File(path)
-        val children = dir.listFiles() ?: return@withContext emptyList()
-        val entries = children
-            .filter { it.name != ".FileStorm" }
-            .filter { showHidden || !it.name.startsWith(".") }
-            .map { FsEntry.from(it) }
-        sortEntries(entries, field, ascending)
+        val stamp = dir.lastModified()
+        val cached = listCache[path]
+        val base = if (cached != null && cached.stamp == stamp && cached.showHidden == showHidden) {
+            cached.entries
+        } else {
+            val children = dir.listFiles() ?: return@withContext emptyList()
+            val fresh = ArrayList<FsEntry>(children.size)
+            for (child in children) {
+                if (child.name == ".FileStorm") continue
+                if (!showHidden && child.name.startsWith(".")) continue
+                fresh.add(FsEntry.from(child))
+            }
+            listCache[path] = Cached(stamp, showHidden, fresh)
+            fresh
+        }
+        sortEntries(base, field, ascending)
     }
 
     /** Folders always group first; the chosen order applies within each group. */
@@ -102,16 +125,20 @@ object FileRepository {
         return StorageStats(totalBytes = stat.totalBytes, freeBytes = stat.availableBytes)
     }
 
-    fun createFolder(parent: String, name: String): Boolean =
-        File(parent, name.trim()).mkdirs()
+    fun createFolder(parent: String, name: String): Boolean {
+        invalidate(parent)
+        return File(parent, name.trim()).mkdirs()
+    }
 
     fun rename(entry: FsEntry, newName: String): Boolean {
         val target = File(entry.toFile().parentFile, newName.trim())
         if (target.exists()) return false
+        invalidate(entry.toFile().parent)
         return entry.toFile().renameTo(target)
     }
 
     suspend fun delete(entries: List<FsEntry>): Int = withContext(Dispatchers.IO) {
+        entries.forEach { invalidate(it.toFile().parent) }
         var failed = 0
         entries.forEach { if (!it.toFile().deleteRecursively()) failed++ }
         failed

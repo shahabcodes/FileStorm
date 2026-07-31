@@ -1,12 +1,18 @@
 package com.shahabcodes.filestorm.ui.viewer
 
+import android.content.Intent
+import android.webkit.MimeTypeMap
 import android.widget.VideoView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +20,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,18 +27,26 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.VolumeOff
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -42,31 +55,37 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.shahabcodes.filestorm.data.FileKind
+import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.FsEntry
+import com.shahabcodes.filestorm.data.TrashManager
 import com.shahabcodes.filestorm.ui.browser.InfoSheet
 import com.shahabcodes.filestorm.ui.browser.openFile
+import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.util.Formatters
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
-import kotlin.math.abs
 
 /** Holds what the viewer should show; avoids passing long lists through navigation. */
 object ViewerState {
-    var paths: List<String> = emptyList()
+    var paths by mutableStateOf<List<String>>(emptyList())
         private set
     var startIndex: Int = 0
         private set
@@ -75,9 +94,13 @@ object ViewerState {
         paths = items
         startIndex = index.coerceIn(0, (items.size - 1).coerceAtLeast(0))
     }
+
+    fun remove(path: String) {
+        paths = paths.filterNot { it == path }
+    }
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ViewerScreen(onBack: () -> Unit) {
     val items = ViewerState.paths
@@ -86,22 +109,24 @@ fun ViewerScreen(onBack: () -> Unit) {
         return
     }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = ViewerState.startIndex) { items.size }
     var chromeVisible by remember { mutableStateOf(true) }
     var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
+    var confirmDelete by remember { mutableStateOf<File?>(null) }
 
     val currentFile = remember(pagerState.currentPage, items) {
-        File(items.getOrElse(pagerState.currentPage) { items.first() })
+        File(items.getOrElse(pagerState.currentPage) { items.last() })
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
+            key = { items.getOrElse(it) { "empty$it" } },
         ) { page ->
             val file = File(items[page])
-            val kind = FsEntry.kindOf(file.name, false)
-            if (kind == FileKind.VIDEO) {
+            if (FsEntry.kindOf(file.name, false) == FileKind.VIDEO) {
                 VideoPage(
                     file = file,
                     active = pagerState.currentPage == page,
@@ -113,7 +138,6 @@ fun ViewerScreen(onBack: () -> Unit) {
             }
         }
 
-        // Top bar
         AnimatedVisibility(
             visible = chromeVisible,
             enter = fadeIn(),
@@ -125,19 +149,11 @@ fun ViewerScreen(onBack: () -> Unit) {
                     .fillMaxWidth()
                     .background(Color.Black.copy(alpha = 0.55f))
                     .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.Rounded.Close, "Close",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .pointerInput(Unit) { detectTapGestures { onBack() } }
-                        .padding(8.dp)
-                        .size(22.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Column(Modifier.weight(1f)) {
+                BarIcon(Icons.Rounded.Close, "Close") { onBack() }
+                Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
                     Text(
                         currentFile.name,
                         color = Color.White,
@@ -147,39 +163,16 @@ fun ViewerScreen(onBack: () -> Unit) {
                     )
                     Text(
                         "${pagerState.currentPage + 1} of ${items.size} · " +
-                            Formatters.bytes(currentFile.length()),
+                            Formatters.bytes(currentFile.length()) + " · " +
+                            Formatters.fileDate(currentFile.lastModified()),
                         color = Color.White.copy(alpha = 0.7f),
                         style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
                     )
                 }
-                Icon(
-                    Icons.Rounded.Info, "Details",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .pointerInput(currentFile) {
-                            detectTapGestures {
-                                if (currentFile.exists()) infoTarget = FsEntry.from(currentFile)
-                            }
-                        }
-                        .padding(8.dp)
-                        .size(22.dp),
-                )
-                Icon(
-                    Icons.Rounded.OpenInNew, "Open with",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .pointerInput(currentFile) {
-                            detectTapGestures {
-                                if (currentFile.exists()) openFile(context, FsEntry.from(currentFile))
-                            }
-                        }
-                        .padding(8.dp)
-                        .size(22.dp),
-                )
             }
         }
 
-        // Bottom filmstrip position hint
         AnimatedVisibility(
             visible = chromeVisible,
             enter = fadeIn(),
@@ -189,16 +182,22 @@ fun ViewerScreen(onBack: () -> Unit) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.45f))
+                    .background(Color.Black.copy(alpha = 0.55f))
                     .navigationBarsPadding()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.Center,
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    Formatters.fileDate(currentFile.lastModified()),
-                    color = Color.White.copy(alpha = 0.75f),
-                    style = MaterialTheme.typography.labelSmall,
-                )
+                BarIcon(Icons.Rounded.Share, "Share") { share(context, currentFile) }
+                BarIcon(Icons.Rounded.Info, "Details") {
+                    if (currentFile.exists()) infoTarget = FsEntry.from(currentFile)
+                }
+                BarIcon(Icons.Rounded.OpenInNew, "Open with") {
+                    if (currentFile.exists()) openFile(context, FsEntry.from(currentFile))
+                }
+                BarIcon(Icons.Rounded.Delete, "Delete", Color(0xFFFF6B6B)) {
+                    confirmDelete = currentFile
+                }
             }
         }
     }
@@ -206,9 +205,78 @@ fun ViewerScreen(onBack: () -> Unit) {
     infoTarget?.let { target ->
         InfoSheet(entry = target, onDismiss = { infoTarget = null })
     }
+
+    confirmDelete?.let { file ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            containerColor = fsColors.card,
+            title = { Text("Move to Trash?", color = fsColors.label) },
+            text = {
+                Text(
+                    "${file.name} (${Formatters.bytes(file.length())}) goes to the Trash, " +
+                        "where you can restore it until you empty it.",
+                    color = fsColors.secondaryLabel,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = null
+                    scope.launch {
+                        if (file.exists()) TrashManager.moveToTrash(listOf(FsEntry.from(file)))
+                        FileRepository.invalidate(file.parent)
+                        ViewerState.remove(file.absolutePath)
+                        if (ViewerState.paths.isEmpty()) onBack()
+                    }
+                }) { Text("Move to Trash", color = fsColors.red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = null }) {
+                    Text("Cancel", color = fsColors.secondaryLabel)
+                }
+            },
+        )
+    }
 }
 
-/** Pinch-zoom, pan and double-tap-to-zoom image page. */
+@Composable
+private fun BarIcon(
+    icon: ImageVector,
+    label: String,
+    tint: Color = Color.White,
+    onClick: () -> Unit,
+) {
+    Icon(
+        icon, label,
+        tint = tint,
+        modifier = Modifier
+            .pointerInput(label) { detectTapGestures { onClick() } }
+            .padding(12.dp)
+            .size(22.dp),
+    )
+}
+
+private fun share(context: android.content.Context, file: File) {
+    runCatching {
+        val uri = FileProvider.getUriForFile(context, context.packageName + ".provider", file)
+        val mime = MimeTypeMap.getSingleton()
+            .getMimeTypeFromExtension(file.extension.lowercase()) ?: "*/*"
+        context.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND)
+                    .setType(mime)
+                    .putExtra(Intent.EXTRA_STREAM, uri)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                "Share ${file.name}",
+            )
+        )
+    }
+}
+
+/**
+ * Zoomable image page. Gestures are only consumed when two fingers are down, or
+ * when a single finger pans an already-zoomed image — otherwise the horizontal
+ * drag reaches the pager so swiping between items keeps working.
+ */
 @Composable
 private fun ImagePage(file: File, onToggleChrome: () -> Unit) {
     var scale by remember(file) { mutableFloatStateOf(1f) }
@@ -233,19 +301,34 @@ private fun ImagePage(file: File, onToggleChrome: () -> Unit) {
                 )
             }
             .pointerInput(file) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val next = (scale * zoom).coerceIn(1f, 6f)
-                    scale = next
-                    if (next > 1.02f) {
-                        // Keep panning inside sensible bounds for the zoom level.
-                        val maxX = size.width * (next - 1) / 2f
-                        val maxY = size.height * (next - 1) / 2f
-                        offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
-                        offsetY = (offsetY + pan.y).coerceIn(-maxY, maxY)
-                    } else {
-                        offsetX = 0f
-                        offsetY = 0f
-                    }
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        val multiTouch = event.changes.count { it.pressed } >= 2
+                        if (multiTouch) {
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
+                            scale = (scale * zoom).coerceIn(1f, 6f)
+                            if (scale > 1.02f) {
+                                val maxX = size.width * (scale - 1) / 2f
+                                val maxY = size.height * (scale - 1) / 2f
+                                offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
+                                offsetY = (offsetY + pan.y).coerceIn(-maxY, maxY)
+                            } else {
+                                offsetX = 0f
+                                offsetY = 0f
+                            }
+                            event.changes.forEach { it.consume() }
+                        } else if (scale > 1.02f) {
+                            val pan = event.calculatePan()
+                            val maxX = size.width * (scale - 1) / 2f
+                            val maxY = size.height * (scale - 1) / 2f
+                            offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
+                            offsetY = (offsetY + pan.y).coerceIn(-maxY, maxY)
+                            event.changes.forEach { it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
                 }
             },
         contentAlignment = Alignment.Center,
@@ -269,7 +352,7 @@ private fun ImagePage(file: File, onToggleChrome: () -> Unit) {
     }
 }
 
-/** VideoView-backed player with a compact custom control bar. */
+/** VideoView-backed player with play/pause, ±10s, seek bar, time and mute. */
 @Composable
 private fun VideoPage(
     file: File,
@@ -279,6 +362,7 @@ private fun VideoPage(
 ) {
     var view by remember(file) { mutableStateOf<VideoView?>(null) }
     var playing by remember(file) { mutableStateOf(false) }
+    var muted by remember(file) { mutableStateOf(false) }
     var duration by remember(file) { mutableIntStateOf(0) }
     var position by remember(file) { mutableIntStateOf(0) }
     var scrubbing by remember(file) { mutableStateOf(false) }
@@ -292,10 +376,14 @@ private fun VideoPage(
         AndroidView(
             factory = { ctx ->
                 VideoView(ctx).apply {
+                    // Let Compose own every gesture so the pager still gets drags.
+                    isClickable = false
+                    isFocusable = false
+                    setOnTouchListener { _, _ -> false }
                     setVideoPath(file.absolutePath)
                     setOnPreparedListener { mp ->
                         duration = mp.duration
-                        mp.setOnVideoSizeChangedListener { _, _, _ -> requestLayout() }
+                        mp.setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f)
                     }
                     setOnCompletionListener { playing = false }
                     view = this
@@ -304,7 +392,6 @@ private fun VideoPage(
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Only the visible page keeps playing.
         LaunchedEffect(active) {
             if (!active) {
                 view?.pause()
@@ -327,8 +414,8 @@ private fun VideoPage(
         if (!playing) {
             Box(
                 Modifier
-                    .size(72.dp)
-                    .background(Color.Black.copy(alpha = 0.45f), androidx.compose.foundation.shape.CircleShape)
+                    .size(74.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), CircleShape)
                     .pointerInput(file) {
                         detectTapGestures {
                             view?.start()
@@ -353,28 +440,12 @@ private fun VideoPage(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.55f))
+                    .background(Color.Black.copy(alpha = 0.5f))
                     .navigationBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .padding(bottom = 30.dp),
+                    .padding(horizontal = 10.dp)
+                    .padding(top = 6.dp, bottom = 62.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        if (playing) "Pause" else "Play",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .pointerInput(file) {
-                                detectTapGestures {
-                                    val v = view ?: return@detectTapGestures
-                                    if (playing) v.pause() else v.start()
-                                    playing = !playing
-                                }
-                            }
-                            .padding(6.dp)
-                            .size(26.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
                     Text(
                         clock(position),
                         color = Color.White,
@@ -402,6 +473,40 @@ private fun VideoPage(
                         color = Color.White.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.labelSmall,
                     )
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BarIcon(Icons.Rounded.Replay10, "Back 10 seconds") {
+                        view?.let {
+                            val target = (it.currentPosition - 10_000).coerceAtLeast(0)
+                            it.seekTo(target)
+                            position = target
+                        }
+                    }
+                    BarIcon(
+                        if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        if (playing) "Pause" else "Play",
+                    ) {
+                        val v = view ?: return@BarIcon
+                        if (playing) v.pause() else v.start()
+                        playing = !playing
+                    }
+                    BarIcon(Icons.Rounded.Forward10, "Forward 10 seconds") {
+                        view?.let {
+                            val target = (it.currentPosition + 10_000).coerceAtMost(duration)
+                            it.seekTo(target)
+                            position = target
+                        }
+                    }
+                    BarIcon(
+                        if (muted) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
+                        if (muted) "Unmute" else "Mute",
+                    ) {
+                        muted = !muted
+                    }
                 }
             }
         }

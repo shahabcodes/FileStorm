@@ -195,6 +195,8 @@ fun FileListView(
  * them, the way the iOS photo grid behaves. Returns the reset accumulator.
  */
 fun applyPinch(key: String, mode: ViewMode, accumulated: Float): Float {
+    // Timeline is a deliberate grouping, not a zoom level - leave it alone.
+    if (mode == ViewMode.TIMELINE) return 1f
     val grid = mode == ViewMode.GRID || mode == ViewMode.GALLERY
     val maxColumns = if (mode == ViewMode.GALLERY) 4 else 6
     when {
