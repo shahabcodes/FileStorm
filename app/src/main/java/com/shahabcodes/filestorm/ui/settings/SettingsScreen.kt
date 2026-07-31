@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -304,6 +305,47 @@ fun SettingsScreen(onBack: () -> Unit) {
                             onSuccess = { Prefs.updateBiometricLock(enable) },
                         )
                     },
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = fsColors.green,
+                        checkedThumbColor = Color.White,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = fsColors.fill,
+                        uncheckedBorderColor = Color.Transparent,
+                    ),
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // ── Privacy ────────────────────────────────────────────────────
+        SectionHeader("Privacy")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Rounded.VisibilityOff, null,
+                    tint = fsColors.accent, modifier = Modifier.size(26.dp),
+                )
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Hide preview in recents",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = fsColors.label,
+                    )
+                    Text(
+                        "Blanks the app preview in the recent-apps switcher and blocks screenshots",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                }
+                Switch(
+                    checked = Prefs.secureScreen,
+                    onCheckedChange = { Prefs.updateSecureScreen(it) },
                     colors = SwitchDefaults.colors(
                         checkedTrackColor = fsColors.green,
                         checkedThumbColor = Color.White,

@@ -95,6 +95,7 @@ fun CategoryScreen(
     var monthSorts by remember {
         mutableStateOf(mapOf<String, Pair<com.shahabcodes.filestorm.data.SortField, Boolean>>())
     }
+    var compressTargets by remember { mutableStateOf<List<FsEntry>>(emptyList()) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var viewMenuOpen by remember { mutableStateOf(false) }
 
@@ -330,6 +331,18 @@ fun CategoryScreen(
                 }
             }
         }
+    }
+
+    if (compressTargets.isNotEmpty()) {
+        CompressSheet(
+            entries = compressTargets,
+            destinationFolder = compressTargets.first().toFile().parent ?: FileRepository.rootPath,
+            onDismiss = { compressTargets = emptyList() },
+            onFinished = {
+                exitSelection()
+                reloadKey++
+            },
+        )
     }
 
     infoTarget?.let { target ->

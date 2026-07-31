@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -133,6 +134,7 @@ fun SelectionActionBar(
     selectedCount: Int,
     onShare: (() -> Unit)? = null,
     shareEnabled: Boolean = true,
+    onCompress: (() -> Unit)? = null,
     onCopy: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
@@ -151,6 +153,12 @@ fun SelectionActionBar(
                     Icons.Rounded.Share, "Share",
                     enabled = selectedCount > 0 && shareEnabled,
                     onClick = onShare,
+                )
+            }
+            if (onCompress != null) {
+                ActionPill(
+                    Icons.Rounded.Archive, "Zip",
+                    enabled = selectedCount > 0, onClick = onCompress,
                 )
             }
             ActionPill(Icons.Rounded.ContentCopy, "Copy", enabled = selectedCount > 0, onClick = onCopy)

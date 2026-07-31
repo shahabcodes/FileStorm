@@ -56,6 +56,17 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
+            // FLAG_SECURE blanks the recent-apps preview (and blocks screenshots).
+            androidx.compose.runtime.LaunchedEffect(Prefs.secureScreen) {
+                if (Prefs.secureScreen) {
+                    window.setFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                    )
+                } else {
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
             FileStormTheme {
                 Surface(
                     modifier = Modifier

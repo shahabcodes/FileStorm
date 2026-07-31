@@ -267,6 +267,8 @@ fun BrowserScreen(
     var metaTarget by remember { mutableStateOf<FsEntry?>(null) }
     var batchMetaOpen by remember { mutableStateOf(false) }
     var folderMetaRoot by remember { mutableStateOf<String?>(null) }
+    var compressTargets by remember { mutableStateOf<List<FsEntry>>(emptyList()) }
+    var extractTarget by remember { mutableStateOf<FsEntry?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Prefs.showHidden) { vm.refreshIfSettingsChanged() }
@@ -776,6 +778,7 @@ fun BrowserScreen(
                         selectedCount = selected.size,
                         onShare = { shareFiles(context, selectedEntries) },
                         shareEnabled = selectedEntries.any { !it.isDirectory },
+                        onCompress = { compressTargets = selectedEntries },
                         onCopy = { showPicker = TransferOp.COPY },
                         onMove = { showPicker = TransferOp.MOVE },
                         onDelete = { confirmDelete = true },
@@ -890,6 +893,10 @@ fun BrowserScreen(
                 selected = setOf(target.path)
             },
             onShare = if (!target.isDirectory) ({ shareFiles(context, listOf(target)) }) else null,
+            onExtract = if (com.shahabcodes.filestorm.data.archive.ArchiveManager.isArchive(target.toFile())) {
+                { extractTarget = target }
+            } else null,
+            onCompress = { compressTargets = listOf(target) },
         )
     }
 
@@ -915,6 +922,26 @@ fun BrowserScreen(
                 exitSelection()
                 vm.refresh()
             },
+        )
+    }
+
+    if (compressTargets.isNotEmpty()) {
+        CompressSheet(
+            entries = compressTargets,
+            destinationFolder = path,
+            onDismiss = { compressTargets = emptyList() },
+            onFinished = {
+                exitSelection()
+                vm.refresh(force = true)
+            },
+        )
+    }
+
+    extractTarget?.let { archive ->
+        ExtractSheet(
+            archive = archive,
+            onDismiss = { extractTarget = null },
+            onFinished = { vm.refresh(force = true) },
         )
     }
 

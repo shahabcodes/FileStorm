@@ -60,6 +60,8 @@ object Prefs {
         private set
     var appName by mutableStateOf("storm")
         private set
+    var secureScreen by mutableStateOf(false)
+        private set
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm", Context.MODE_PRIVATE)
@@ -74,6 +76,7 @@ object Prefs {
         sortAscending = sp.getBoolean("sort_ascending", true)
         appIcon = sp.getString("app_icon", "opt25") ?: "opt25"
         appName = sp.getString("app_name", "storm") ?: "storm"
+        secureScreen = sp.getBoolean("secure_screen", false)
         appearance = runCatching {
             Appearance.valueOf(sp.getString("appearance", Appearance.SYSTEM.name)!!)
         }.getOrDefault(Appearance.SYSTEM)
@@ -110,6 +113,11 @@ object Prefs {
     fun updateAppIcon(key: String) {
         appIcon = key
         sp.edit().putString("app_icon", key).apply()
+    }
+
+    fun updateSecureScreen(value: Boolean) {
+        secureScreen = value
+        sp.edit().putBoolean("secure_screen", value).apply()
     }
 
     fun updateAppName(key: String) {

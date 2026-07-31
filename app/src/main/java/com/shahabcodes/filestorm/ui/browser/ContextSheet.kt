@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.AutoAwesomeMosaic
+import androidx.compose.material.icons.rounded.Unarchive
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
@@ -79,6 +81,8 @@ fun EntryContextSheet(
     onDelete: () -> Unit,
     onSelect: () -> Unit,
     onShare: (() -> Unit)? = null,
+    onExtract: (() -> Unit)? = null,
+    onCompress: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
@@ -193,6 +197,14 @@ fun EntryContextSheet(
             Spacer(Modifier.height(14.dp))
 
             GroupedCard {
+                if (onExtract != null) {
+                    ContextRow(Icons.Rounded.Unarchive, "Extract archive…") { onDismiss(); onExtract() }
+                    RowSeparator(startIndent = 54.dp)
+                }
+                if (onCompress != null) {
+                    ContextRow(Icons.Rounded.Archive, "Compress to zip…") { onDismiss(); onCompress() }
+                    RowSeparator(startIndent = 54.dp)
+                }
                 if (onShare != null) {
                     ContextRow(Icons.Rounded.Share, "Share") { onDismiss(); onShare() }
                     RowSeparator(startIndent = 54.dp)
