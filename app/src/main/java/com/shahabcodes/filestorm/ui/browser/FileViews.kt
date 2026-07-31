@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -33,7 +35,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -53,6 +58,7 @@ import coil.request.ImageRequest
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FsEntry
 import com.shahabcodes.filestorm.data.Prefs
+import com.shahabcodes.filestorm.data.SortField
 import com.shahabcodes.filestorm.data.ViewMode
 import com.shahabcodes.filestorm.ui.components.FileIconView
 import com.shahabcodes.filestorm.ui.components.RowSeparator
@@ -77,6 +83,8 @@ fun FileListView(
     grouped: Boolean = false,
     collapsedMonths: Set<String> = emptySet(),
     onToggleMonth: (String) -> Unit = {},
+    monthSorts: Map<String, Pair<SortField, Boolean>> = emptyMap(),
+    onMonthSort: (String, SortField, Boolean) -> Unit = { _, _, _ -> },
     onZoom: (Float) -> Unit = {},
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
@@ -91,6 +99,8 @@ fun FileListView(
             columns = columns,
             collapsedMonths = collapsedMonths,
             onToggleMonth = onToggleMonth,
+            monthSorts = monthSorts,
+            onMonthSort = onMonthSort,
             onZoom = onZoom,
             onClick = onClick,
             onLongClick = onLongClick,
@@ -268,13 +278,15 @@ private fun GroupedByMonth(
     columns: Int,
     collapsedMonths: Set<String>,
     onToggleMonth: (String) -> Unit,
+    monthSorts: Map<String, Pair<SortField, Boolean>>,
+    onMonthSort: (String, SortField, Boolean) -> Unit,
     onZoom: (Float) -> Unit,
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
 ) {
     // Months run newest-first (or oldest-first), but inside a month the user's
     // name/size/type sort still applies.
-    val groups = remember(entries, Prefs.sortAscending, Prefs.sortField) {
+    val groups = remember(entries, Prefs.sortAscending, Prefs.sortField, monthSorts) {
         entries
             .groupBy { monthLabel(it.lastModified) }
             .entries
@@ -283,8 +295,11 @@ private fun GroupedByMonth(
             )
             .let { if (Prefs.sortAscending) it else it.reversed() }
             .map { (label, items) ->
+                // A month can carry its own sort; otherwise it follows the folder.
+                val (field, ascending) = monthSorts[label]
+                    ?: (Prefs.sortField to Prefs.sortAscending)
                 label to com.shahabcodes.filestorm.data.FileRepository.sortEntries(
-                    items, Prefs.sortField, Prefs.sortAscending,
+                    items, field, ascending,
                 )
             }
     }
@@ -305,17 +320,31 @@ private fun GroupedByMonth(
             }
         }
     }
+    val headerSlots = remember(groups, collapsedMonths) {
+        buildMap {
+            var index = 0
+            groups.forEach { (label, items) ->
+                put(label, index)
+                index += 1 + (if (label in collapsedMonths) 0 else items.size) + 1
+            }
+        }
+    }
     val firstVisible = if (tiled) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
     val pinnedLabel = slotLabels.getOrNull(firstVisible) ?: groups.firstOrNull()?.first
+    // While a month's own heading is still on screen there is no need to repeat
+    // it above the list - that is what caused the doubled heading.
+    val showPinned = pinnedLabel != null && firstVisible > (headerSlots[pinnedLabel] ?: 0)
 
     Column(Modifier.fillMaxSize()) {
-        pinnedLabel?.let { label ->
+        if (showPinned && pinnedLabel != null) {
             MonthHeader(
-                label = label,
-                summary = summaries[label],
-                collapsed = label in collapsedMonths,
+                label = pinnedLabel,
+                summary = summaries[pinnedLabel],
+                collapsed = pinnedLabel in collapsedMonths,
                 pinned = true,
-                onClick = { onToggleMonth(label) },
+                sort = monthSorts[pinnedLabel],
+                onClick = { onToggleMonth(pinnedLabel) },
+                onSortPicked = { field, asc -> onMonthSort(pinnedLabel, field, asc) },
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
@@ -340,7 +369,9 @@ private fun GroupedByMonth(
                             summary = summaries[label],
                             collapsed = label in collapsedMonths,
                             pinned = false,
+                            sort = monthSorts[label],
                             onClick = { onToggleMonth(label) },
+                            onSortPicked = { field, asc -> onMonthSort(label, field, asc) },
                         )
                     }
                     if (label !in collapsedMonths) {
@@ -383,7 +414,9 @@ private fun GroupedByMonth(
                             summary = summaries[label],
                             collapsed = label in collapsedMonths,
                             pinned = false,
+                            sort = monthSorts[label],
                             onClick = { onToggleMonth(label) },
+                            onSortPicked = { field, asc -> onMonthSort(label, field, asc) },
                         )
                     }
                     if (label !in collapsedMonths) {
@@ -428,54 +461,105 @@ private fun GroupedByMonth(
     }
 }
 
-/** Month heading with its summary and a collapse chevron. */
+/** Month heading: tap to collapse, long-press for a sort menu for that month. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MonthHeader(
     label: String,
     summary: MonthSummary?,
     collapsed: Boolean,
     pinned: Boolean,
+    sort: Pair<SortField, Boolean>?,
     onClick: () -> Unit,
+    onSortPicked: (SortField, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .background(fsColors.groupedBackground)
-            .pressScale(onClick)
-            .padding(vertical = if (pinned) 10.dp else 8.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
+    var menuOpen by remember { mutableStateOf(false) }
+
+    Box(modifier) {
+        Row(
             Modifier
-                .size(width = 4.dp, height = 20.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(fsColors.accent),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                label,
-                style = MaterialTheme.typography.titleMedium,
-                color = fsColors.label,
-                maxLines = 1,
+                .fillMaxWidth()
+                .background(fsColors.groupedBackground)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { menuOpen = true },
+                )
+                .padding(vertical = if (pinned) 10.dp else 8.dp, horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(width = 4.dp, height = 20.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(fsColors.accent),
             )
-            summary?.let {
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
-                    it.line(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = fsColors.secondaryLabel,
+                    label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = fsColors.label,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                )
+                summary?.let {
+                    Text(
+                        it.line() + if (sort != null) " · by ${sort.first.label.lowercase()}" else "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fsColors.secondaryLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Icon(
+                if (collapsed) Icons.Rounded.ExpandMore else Icons.Rounded.ExpandLess,
+                if (collapsed) "Expand" else "Collapse",
+                tint = fsColors.accent,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+
+        androidx.compose.material3.DropdownMenu(
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false },
+            modifier = Modifier.background(fsColors.cardSecondary),
+        ) {
+            Text(
+                "Sort $label by",
+                style = MaterialTheme.typography.labelSmall,
+                color = fsColors.secondaryLabel,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+            SortField.entries.forEach { field ->
+                val active = (sort?.first ?: Prefs.sortField) == field
+                val ascending = if (active) (sort?.second ?: Prefs.sortAscending) else field.defaultAscending
+                androidx.compose.material3.DropdownMenuItem(
+                    text = {
+                        Text(
+                            field.label,
+                            color = if (active) fsColors.accent else fsColors.label,
+                        )
+                    },
+                    trailingIcon = {
+                        if (active) {
+                            Icon(
+                                if (ascending) Icons.Rounded.ArrowUpward else Icons.Rounded.ArrowDownward,
+                                null,
+                                tint = fsColors.accent,
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
+                    },
+                    onClick = {
+                        // Re-picking the active field flips its direction.
+                        val nextAscending = if (active) !ascending else field.defaultAscending
+                        onSortPicked(field, nextAscending)
+                        menuOpen = false
+                    },
                 )
             }
         }
-        Icon(
-            if (collapsed) Icons.Rounded.ExpandMore else Icons.Rounded.ExpandLess,
-            if (collapsed) "Expand" else "Collapse",
-            tint = fsColors.accent,
-            modifier = Modifier.size(22.dp),
-        )
     }
 }
 
