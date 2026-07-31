@@ -137,6 +137,21 @@ private fun AppNav() {
     val nav = rememberNavController()
     val context = androidx.compose.ui.platform.LocalContext.current
     var showTransferSheet by remember { mutableStateOf(false) }
+    // The viewer is an overlay, not a destination. As a route it could be left on
+    // the back stack and re-shown later with whatever the shared state happened to
+    // hold, which is how tapping one category could surface a file from another.
+    var viewerOpen by remember { mutableStateOf(false) }
+
+    /** Never pops the start destination, which would leave an empty NavHost. */
+    fun goBack() {
+        if (nav.previousBackStackEntry != null) nav.popBackStack()
+    }
+
+    fun openViewer(paths: List<String>, index: Int) {
+        if (paths.isEmpty()) return
+        com.shahabcodes.filestorm.ui.viewer.ViewerState.open(paths, index)
+        viewerOpen = true
+    }
 
     fun openBrowser(path: String) {
         val safe = if (File(path).exists()) path else FileRepository.rootPath
@@ -150,9 +165,7 @@ private fun AppNav() {
         composable("home") {
             HomeScreen(
                 onOpenFolder = { path -> openBrowser(path) },
-                onOpenCategory = { kind ->
-                    nav.navigate("category/${kind.name}") { launchSingleTop = true }
-                },
+                onOpenCategory = { kind -> nav.navigate("category/${kind.name}") },
                 onOpenTransfer = { showTransferSheet = true },
                 onOpenSettings = { nav.navigate("settings") },
                 onOpenTrash = { nav.navigate("trash") },
@@ -162,50 +175,50 @@ private fun AppNav() {
         }
         composable("browse") {
             BrowserScreen(
-                onExit = { nav.popBackStack() },
+                onExit = { goBack() },
                 onOpenTransfer = { showTransferSheet = true },
                 onArrange = { p, mode ->
                     nav.navigate("arrange?path=" + Uri.encode(p) + "&mode=" + mode.name)
                 },
-                onOpenViewer = { paths, index ->
-                    com.shahabcodes.filestorm.ui.viewer.ViewerState.open(paths, index)
-                    nav.navigate("viewer") { launchSingleTop = true }
-                },
+                onOpenViewer = { paths, index -> openViewer(paths, index) },
             )
         }
         composable("category/{kind}") { backStack ->
-            val kind = FileKind.valueOf(backStack.arguments?.getString("kind") ?: "IMAGE")
-            CategoryScreen(
-                kind = kind,
-                onBack = { nav.popBackStack() },
-                onOpenTransfer = { showTransferSheet = true },
-                onOpenViewer = { paths, index ->
-                    com.shahabcodes.filestorm.ui.viewer.ViewerState.open(paths, index)
-                    nav.navigate("viewer") { launchSingleTop = true }
-                },
-            )
+            val kind = runCatching {
+                FileKind.valueOf(backStack.arguments?.getString("kind") ?: "IMAGE")
+            }.getOrDefault(FileKind.IMAGE)
+            // Keying on the entry id guarantees a fresh screen per visit, so one
+            // category can never inherit another's list.
+            androidx.compose.runtime.key(backStack.id, kind) {
+                CategoryScreen(
+                    kind = kind,
+                    onBack = { goBack() },
+                    onOpenTransfer = { showTransferSheet = true },
+                    onOpenViewer = { paths, index -> openViewer(paths, index) },
+                )
+            }
         }
         composable("transfer") {
-            TransferScreen(onBack = { nav.popBackStack() })
+            TransferScreen(onBack = { goBack() })
         }
         composable("settings") {
-            SettingsScreen(onBack = { nav.popBackStack() })
+            SettingsScreen(onBack = { goBack() })
         }
         composable("trash") {
-            com.shahabcodes.filestorm.ui.trash.TrashScreen(onBack = { nav.popBackStack() })
+            com.shahabcodes.filestorm.ui.trash.TrashScreen(onBack = { goBack() })
         }
         composable("jobs") {
             com.shahabcodes.filestorm.ui.jobs.JobsScreen(
-                onBack = { nav.popBackStack() },
+                onBack = { goBack() },
                 onOpenProgress = { nav.navigate("jobprogress") },
                 onOpenVerify = { nav.navigate("verify") },
             )
         }
         composable("jobprogress") {
-            com.shahabcodes.filestorm.ui.jobs.JobProgressScreen(onBack = { nav.popBackStack() })
+            com.shahabcodes.filestorm.ui.jobs.JobProgressScreen(onBack = { goBack() })
         }
         composable("verify") {
-            com.shahabcodes.filestorm.ui.jobs.VerifyScreen(onBack = { nav.popBackStack() })
+            com.shahabcodes.filestorm.ui.jobs.VerifyScreen(onBack = { goBack() })
         }
         composable("arrange?path={path}&mode={mode}") { backStack ->
             val target = Uri.decode(backStack.arguments?.getString("path") ?: FileRepository.rootPath)
@@ -217,15 +230,21 @@ private fun AppNav() {
             com.shahabcodes.filestorm.ui.arrange.ArrangeScreen(
                 path = target,
                 mode = mode,
-                onBack = { nav.popBackStack() },
+                onBack = { goBack() },
             )
         }
-        composable("viewer") {
-            com.shahabcodes.filestorm.ui.viewer.ViewerScreen(onBack = { nav.popBackStack() })
-        }
         composable("duplicates") {
-            com.shahabcodes.filestorm.ui.dup.DuplicatesScreen(onBack = { nav.popBackStack() })
+            com.shahabcodes.filestorm.ui.dup.DuplicatesScreen(onBack = { goBack() })
         }
+    }
+
+    if (viewerOpen) {
+        com.shahabcodes.filestorm.ui.viewer.ViewerScreen(
+            onBack = {
+                viewerOpen = false
+                com.shahabcodes.filestorm.ui.viewer.ViewerState.clear()
+            },
+        )
     }
 
     if (showTransferSheet) {

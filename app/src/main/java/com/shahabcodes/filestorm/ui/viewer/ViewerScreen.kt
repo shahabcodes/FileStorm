@@ -125,7 +125,7 @@ fun ViewerScreen(onBack: () -> Unit) {
         onBack()
     }
     if (items.isEmpty()) {
-        LaunchedEffect(Unit) { onBack() }
+        LaunchedEffect(Unit) { close() }
         return
     }
     androidx.activity.compose.BackHandler { close() }
