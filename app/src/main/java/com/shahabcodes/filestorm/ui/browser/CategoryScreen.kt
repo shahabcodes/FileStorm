@@ -78,24 +78,27 @@ fun CategoryScreen(
     val haptics = LocalHapticFeedback.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
-    var files by remember { mutableStateOf<List<FsEntry>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var query by remember { mutableStateOf("") }
-    var selectionMode by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf(setOf<String>()) }
-    var showDateSheet by remember { mutableStateOf(false) }
-    var showPicker by remember { mutableStateOf<TransferOp?>(null) }
-    var confirmDelete by remember { mutableStateOf(false) }
-    var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
-    var reloadKey by remember { mutableStateOf(0) }
+    // Every piece of state is keyed on the category. Without the key the same
+    // composition slot is reused when a different category opens, so the old
+    // category's files stayed on screen and tapping one opened the wrong file.
+    var files by remember(kind) { mutableStateOf<List<FsEntry>>(emptyList()) }
+    var loading by remember(kind) { mutableStateOf(true) }
+    var query by remember(kind) { mutableStateOf("") }
+    var selectionMode by remember(kind) { mutableStateOf(false) }
+    var selected by remember(kind) { mutableStateOf(setOf<String>()) }
+    var showDateSheet by remember(kind) { mutableStateOf(false) }
+    var showPicker by remember(kind) { mutableStateOf<TransferOp?>(null) }
+    var confirmDelete by remember(kind) { mutableStateOf(false) }
+    var infoTarget by remember(kind) { mutableStateOf<FsEntry?>(null) }
+    var reloadKey by remember(kind) { mutableStateOf(0) }
     val viewKey = "category:" + kind.name
     val viewMode = com.shahabcodes.filestorm.data.FolderViews.viewFor(viewKey)
-    var pinchAccumulator by remember { mutableStateOf(1f) }
-    var collapsedMonths by remember { mutableStateOf(setOf<String>()) }
-    var monthSorts by remember {
+    var pinchAccumulator by remember(kind) { mutableStateOf(1f) }
+    var collapsedMonths by remember(kind) { mutableStateOf(setOf<String>()) }
+    var monthSorts by remember(kind) {
         mutableStateOf(mapOf<String, Pair<com.shahabcodes.filestorm.data.SortField, Boolean>>())
     }
-    var compressTargets by remember { mutableStateOf<List<FsEntry>>(emptyList()) }
+    var compressTargets by remember(kind) { mutableStateOf<List<FsEntry>>(emptyList()) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var viewMenuOpen by remember { mutableStateOf(false) }
 
@@ -270,7 +273,8 @@ fun CategoryScreen(
                             else selected + entry.path
                         } else {
                             val media = visible.filter {
-                                it.kind == FileKind.IMAGE || it.kind == FileKind.VIDEO
+                                (it.kind == FileKind.IMAGE || it.kind == FileKind.VIDEO) &&
+                                    it.toFile().isFile
                             }
                             val index = media.indexOfFirst { it.path == entry.path }
                             if (index >= 0) onOpenViewer(media.map { it.path }, index)

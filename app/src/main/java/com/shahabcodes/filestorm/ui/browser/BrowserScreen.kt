@@ -712,7 +712,8 @@ fun BrowserScreen(
                             val media = visibleEntries.filter {
                                 !it.isDirectory &&
                                     (it.kind == com.shahabcodes.filestorm.data.FileKind.IMAGE ||
-                                        it.kind == com.shahabcodes.filestorm.data.FileKind.VIDEO)
+                                        it.kind == com.shahabcodes.filestorm.data.FileKind.VIDEO) &&
+                                    it.toFile().isFile
                             }
                             val index = media.indexOfFirst { it.path == entry.path }
                             if (index >= 0) onOpenViewer(media.map { it.path }, index)

@@ -94,9 +94,14 @@ object ViewerState {
     var startIndex: Int = 0
         private set
 
+    /** The exact file that was tapped, so the pager cannot land somewhere else. */
+    var startPath: String = ""
+        private set
+
     fun open(items: List<String>, index: Int) {
         paths = items
         startIndex = index.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+        startPath = items.getOrNull(startIndex).orEmpty()
     }
 
     fun remove(path: String) {
@@ -106,6 +111,7 @@ object ViewerState {
     fun clear() {
         paths = emptyList()
         startIndex = 0
+        startPath = ""
     }
 }
 
@@ -125,7 +131,12 @@ fun ViewerScreen(onBack: () -> Unit) {
     androidx.activity.compose.BackHandler { close() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(initialPage = ViewerState.startIndex) { items.size }
+    // Resolve by path: even if the list shifted between the tap and this frame,
+    // the viewer still opens on the file that was actually tapped.
+    val initialPage = remember(items, ViewerState.startPath) {
+        items.indexOf(ViewerState.startPath).takeIf { it >= 0 } ?: ViewerState.startIndex
+    }
+    val pagerState = rememberPagerState(initialPage = initialPage) { items.size }
     var chromeVisible by remember { mutableStateOf(true) }
     var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
     var confirmDelete by remember { mutableStateOf<File?>(null) }
