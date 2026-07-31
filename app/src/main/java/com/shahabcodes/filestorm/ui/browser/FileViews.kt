@@ -108,9 +108,17 @@ fun FileListView(
         )
         return
     }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    val staggeredState =
+        androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+    Box(Modifier.fillMaxSize()) {
     when (viewMode) {
         ViewMode.LIST, ViewMode.DETAILED -> LazyColumn(
             Modifier.fillMaxSize().pinchToZoom(onZoom),
+            state = listState,
             contentPadding = contentPadding,
         ) {
             itemsIndexed(entries, key = { _, e -> e.path }) { index, entry ->
@@ -147,6 +155,7 @@ fun FileListView(
 
         ViewMode.GRID -> LazyVerticalGrid(
             columns = GridCells.Fixed(columns.coerceIn(1, 6)),
+            state = gridState,
             modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -205,6 +214,7 @@ fun FileListView(
             val span = columns.coerceIn(1, 4)
             LazyVerticalGrid(
                 columns = GridCells.Fixed(span),
+                state = gridState,
                 modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
                 contentPadding = contentPadding,
                 verticalArrangement = Arrangement.spacedBy(tileGap(span)),
@@ -228,6 +238,7 @@ fun FileListView(
             val span = columns.coerceIn(1, 4)
             androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid(
                 columns = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells.Fixed(span),
+                state = staggeredState,
                 modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
                 contentPadding = contentPadding,
                 verticalItemSpacing = tileGap(span),
@@ -245,6 +256,43 @@ fun FileListView(
                 }
             }
         }
+    }
+
+        val handle = when (viewMode) {
+            ViewMode.LIST, ViewMode.DETAILED, ViewMode.TIMELINE -> ScrollHandle(
+                itemCount = entries.size,
+                firstVisible = listState.firstVisibleItemIndex,
+                scrolling = listState.isScrollInProgress,
+                jumpTo = { listState.scrollToItem(it) },
+            )
+            ViewMode.MOSAIC -> ScrollHandle(
+                itemCount = entries.size,
+                firstVisible = staggeredState.firstVisibleItemIndex,
+                scrolling = staggeredState.isScrollInProgress,
+                jumpTo = { staggeredState.scrollToItem(it) },
+            )
+            else -> ScrollHandle(
+                itemCount = entries.size,
+                firstVisible = gridState.firstVisibleItemIndex,
+                scrolling = gridState.isScrollInProgress,
+                jumpTo = { gridState.scrollToItem(it) },
+            )
+        }
+        FastScroller(
+            handle = handle,
+            labelFor = { index -> scrubberLabel(entries.getOrNull(index)) },
+        )
+    }
+}
+
+/** What the scrubber bubble says: month when sorting by date, else initial. */
+private fun scrubberLabel(entry: FsEntry?): String {
+    if (entry == null) return ""
+    return when (Prefs.sortField) {
+        SortField.NAME -> entry.name.take(1).uppercase()
+        SortField.SIZE -> Formatters.bytes(entry.size)
+        SortField.TYPE -> entry.extension.uppercase().ifEmpty { "FILE" }
+        SortField.DATE -> monthLabel(entry.lastModified)
     }
 }
 
@@ -290,10 +338,26 @@ private fun summarise(entries: List<FsEntry>): MonthSummary {
     return MonthSummary(images, videos, folders, others, bytes)
 }
 
+/** One row of the grouped view: a month heading, a day heading, an item or a gap. */
+private sealed interface GroupSlot {
+    val month: String
+
+    data class MonthRow(override val month: String) : GroupSlot
+    data class DayRow(override val month: String, val label: String, val count: Int) : GroupSlot
+    data class ItemRow(
+        override val month: String,
+        val entry: FsEntry,
+        val first: Boolean,
+        val last: Boolean,
+    ) : GroupSlot
+    data class GapRow(override val month: String) : GroupSlot
+}
+
 /**
- * Any layout, split under Month Year headings. The heading for whatever month is
- * at the top stays pinned above the content, months can be collapsed, and the
- * chosen sort still orders the items inside each month.
+ * Any layout, split under Month Year headings, with day sub-headings inside a
+ * month whenever that month is date-sorted and spans more than one day. The
+ * heading of whatever is on top stays pinned, months collapse, and a scrubber
+ * appears for long folders.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -318,12 +382,9 @@ private fun GroupedByMonth(
         entries
             .groupBy { monthLabel(it.lastModified) }
             .entries
-            .sortedWith(
-                compareBy { group -> group.value.maxOfOrNull { it.lastModified } ?: 0L }
-            )
+            .sortedWith(compareBy { group -> group.value.maxOfOrNull { it.lastModified } ?: 0L })
             .let { if (Prefs.sortAscending) it else it.reversed() }
             .map { (label, items) ->
-                // A month can carry its own sort; otherwise it follows the folder.
                 val (field, ascending) = monthSorts[label]
                     ?: (Prefs.sortField to Prefs.sortAscending)
                 label to com.shahabcodes.filestorm.data.FileRepository.sortEntries(
@@ -333,36 +394,60 @@ private fun GroupedByMonth(
     }
     val summaries = remember(groups) { groups.associate { it.first to summarise(it.second) } }
 
+    val slots = remember(groups, collapsedMonths, monthSorts) {
+        buildList {
+            groups.forEach { (label, items) ->
+                add(GroupSlot.MonthRow(label))
+                if (label !in collapsedMonths) {
+                    val field = monthSorts[label]?.first ?: Prefs.sortField
+                    val ascending = monthSorts[label]?.second ?: Prefs.sortAscending
+                    val days = if (field == SortField.DATE) {
+                        items.groupBy { dayLabel(it.lastModified) }
+                            .entries
+                            .sortedWith(compareBy { d -> d.value.maxOfOrNull { it.lastModified } ?: 0L })
+                            .let { if (ascending) it else it.reversed() }
+                    } else emptyList()
+
+                    if (days.size > 1) {
+                        days.forEach { (dayName, dayItems) ->
+                            add(GroupSlot.DayRow(label, dayName, dayItems.size))
+                            dayItems.forEachIndexed { index, entry ->
+                                add(
+                                    GroupSlot.ItemRow(
+                                        label, entry,
+                                        first = index == 0,
+                                        last = index == dayItems.lastIndex,
+                                    )
+                                )
+                            }
+                        }
+                    } else {
+                        items.forEachIndexed { index, entry ->
+                            add(
+                                GroupSlot.ItemRow(
+                                    label, entry,
+                                    first = index == 0,
+                                    last = index == items.lastIndex,
+                                )
+                            )
+                        }
+                    }
+                }
+                add(GroupSlot.GapRow(label))
+            }
+        }
+    }
+
     val tiled = viewMode == ViewMode.GRID || viewMode == ViewMode.GALLERY ||
         viewMode == ViewMode.MOSAIC
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
 
-    // Maps every emitted slot back to its month so the pinned heading can follow
-    // the scroll position in both the list and the grid.
-    val slotLabels = remember(groups, collapsedMonths) {
-        buildList {
-            groups.forEach { (label, items) ->
-                add(label)
-                if (label !in collapsedMonths) repeat(items.size) { add(label) }
-                add(label)
-            }
-        }
-    }
-    val headerSlots = remember(groups, collapsedMonths) {
-        buildMap {
-            var index = 0
-            groups.forEach { (label, items) ->
-                put(label, index)
-                index += 1 + (if (label in collapsedMonths) 0 else items.size) + 1
-            }
-        }
-    }
     val firstVisible = if (tiled) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
-    val pinnedLabel = slotLabels.getOrNull(firstVisible) ?: groups.firstOrNull()?.first
-    // While a month's own heading is still on screen there is no need to repeat
-    // it above the list - that is what caused the doubled heading.
-    val showPinned = pinnedLabel != null && firstVisible > (headerSlots[pinnedLabel] ?: 0)
+    val topSlot = slots.getOrNull(firstVisible)
+    val pinnedLabel = topSlot?.month ?: groups.firstOrNull()?.first
+    // While a month's own heading is on screen there is no need to repeat it.
+    val showPinned = pinnedLabel != null && topSlot !is GroupSlot.MonthRow
 
     Column(Modifier.fillMaxSize()) {
         if (showPinned && pinnedLabel != null) {
@@ -378,116 +463,144 @@ private fun GroupedByMonth(
             )
         }
 
-        if (tiled) {
-            val span = columns.coerceIn(1, if (viewMode == ViewMode.GALLERY) 4 else 6)
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(span),
-                state = gridState,
-                modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
-                contentPadding = contentPadding,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                groups.forEach { (label, groupEntries) ->
-                    item(
-                        key = "hdr_$label",
-                        span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
-                    ) {
-                        MonthHeader(
-                            label = label,
-                            summary = summaries[label],
-                            collapsed = label in collapsedMonths,
-                            pinned = false,
-                            sort = monthSorts[label],
-                            onClick = { onToggleMonth(label) },
-                            onSortPicked = { field, asc -> onMonthSort(label, field, asc) },
-                        )
-                    }
-                    if (label !in collapsedMonths) {
-                        itemsIndexed(groupEntries, key = { _, e -> e.path }) { _, entry ->
-                            if (viewMode == ViewMode.GALLERY || viewMode == ViewMode.MOSAIC) {
-                                PhotoTile(
-                                    entry = entry,
-                                    selectionMode = selectionMode,
-                                    selected = entry.path in selected,
-                                    corner = tileCorner(span),
-                                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                                    onClick = { onClick(entry) },
-                                    onLongClick = { onLongClick(entry) },
-                                )
+        Box(Modifier.fillMaxSize()) {
+            if (tiled) {
+                val span = columns.coerceIn(
+                    1,
+                    if (viewMode == ViewMode.GALLERY || viewMode == ViewMode.MOSAIC) 4 else 6,
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(span),
+                    state = gridState,
+                    modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
+                    contentPadding = contentPadding,
+                    verticalArrangement = Arrangement.spacedBy(tileGap(span)),
+                    horizontalArrangement = Arrangement.spacedBy(tileGap(span)),
+                ) {
+                    itemsIndexed(
+                        slots,
+                        key = { index, slot ->
+                            if (slot is GroupSlot.ItemRow) slot.entry.path else "slot$index"
+                        },
+                        span = { _, slot ->
+                            if (slot is GroupSlot.ItemRow) {
+                                androidx.compose.foundation.lazy.grid.GridItemSpan(1)
                             } else {
-                                GridTile(
-                                    entry = entry,
-                                    selectionMode = selectionMode,
-                                    selected = entry.path in selected,
-                                    onClick = { onClick(entry) },
-                                    onLongClick = { onLongClick(entry) },
-                                )
+                                androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan)
                             }
-                        }
-                    }
-                    item(
-                        key = "gap_$label",
-                        span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
-                    ) { Spacer(Modifier.height(8.dp)) }
-                }
-            }
-        } else {
-            LazyColumn(
-                Modifier.fillMaxSize().pinchToZoom(onZoom),
-                state = listState,
-                contentPadding = contentPadding,
-            ) {
-                groups.forEach { (label, groupEntries) ->
-                    item(key = "hdr_$label") {
-                        MonthHeader(
-                            label = label,
-                            summary = summaries[label],
-                            collapsed = label in collapsedMonths,
-                            pinned = false,
-                            sort = monthSorts[label],
-                            onClick = { onToggleMonth(label) },
-                            onSortPicked = { field, asc -> onMonthSort(label, field, asc) },
-                        )
-                    }
-                    if (label !in collapsedMonths) {
-                        itemsIndexed(groupEntries, key = { _, e -> e.path }) { index, entry ->
-                            val shape = when {
-                                groupEntries.size == 1 -> RoundedCornerShape(16.dp)
-                                index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                                index == groupEntries.lastIndex ->
-                                    RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
-                                else -> RoundedCornerShape(0.dp)
-                            }
-                            Column(Modifier.clip(shape).background(fsColors.card)) {
-                                if (viewMode == ViewMode.DETAILED) {
-                                    DetailedFileRow(
-                                        entry = entry,
+                        },
+                    ) { _, slot ->
+                        when (slot) {
+                            is GroupSlot.MonthRow -> MonthHeader(
+                                label = slot.month,
+                                summary = summaries[slot.month],
+                                collapsed = slot.month in collapsedMonths,
+                                pinned = false,
+                                sort = monthSorts[slot.month],
+                                onClick = { onToggleMonth(slot.month) },
+                                onSortPicked = { f, a -> onMonthSort(slot.month, f, a) },
+                            )
+                            is GroupSlot.DayRow -> DayHeader(slot.label, slot.count)
+                            is GroupSlot.GapRow -> Spacer(Modifier.height(6.dp))
+                            is GroupSlot.ItemRow -> {
+                                if (viewMode == ViewMode.GALLERY || viewMode == ViewMode.MOSAIC) {
+                                    PhotoTile(
+                                        entry = slot.entry,
                                         selectionMode = selectionMode,
-                                        selected = entry.path in selected,
-                                        onClick = { onClick(entry) },
-                                        onLongClick = { onLongClick(entry) },
+                                        selected = slot.entry.path in selected,
+                                        corner = tileCorner(span),
+                                        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                                        onClick = { onClick(slot.entry) },
+                                        onLongClick = { onLongClick(slot.entry) },
                                     )
                                 } else {
-                                    FileRow(
-                                        entry = entry,
+                                    GridTile(
+                                        entry = slot.entry,
                                         selectionMode = selectionMode,
-                                        selected = entry.path in selected,
-                                        onClick = { onClick(entry) },
-                                        onLongClick = { onLongClick(entry) },
-                                    )
-                                }
-                                if (index != groupEntries.lastIndex) {
-                                    RowSeparator(
-                                        startIndent = if (viewMode == ViewMode.DETAILED) 76.dp else 60.dp
+                                        selected = slot.entry.path in selected,
+                                        onClick = { onClick(slot.entry) },
+                                        onLongClick = { onLongClick(slot.entry) },
                                     )
                                 }
                             }
                         }
                     }
-                    item(key = "gap_$label") { Spacer(Modifier.height(14.dp)) }
+                }
+            } else {
+                LazyColumn(
+                    Modifier.fillMaxSize().pinchToZoom(onZoom),
+                    state = listState,
+                    contentPadding = contentPadding,
+                ) {
+                    itemsIndexed(
+                        slots,
+                        key = { index, slot ->
+                            if (slot is GroupSlot.ItemRow) slot.entry.path else "slot$index"
+                        },
+                    ) { _, slot ->
+                        when (slot) {
+                            is GroupSlot.MonthRow -> MonthHeader(
+                                label = slot.month,
+                                summary = summaries[slot.month],
+                                collapsed = slot.month in collapsedMonths,
+                                pinned = false,
+                                sort = monthSorts[slot.month],
+                                onClick = { onToggleMonth(slot.month) },
+                                onSortPicked = { f, a -> onMonthSort(slot.month, f, a) },
+                            )
+                            is GroupSlot.DayRow -> DayHeader(slot.label, slot.count)
+                            is GroupSlot.GapRow -> Spacer(Modifier.height(14.dp))
+                            is GroupSlot.ItemRow -> {
+                                val shape = when {
+                                    slot.first && slot.last -> RoundedCornerShape(16.dp)
+                                    slot.first -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                                    slot.last -> RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+                                    else -> RoundedCornerShape(0.dp)
+                                }
+                                Column(Modifier.clip(shape).background(fsColors.card)) {
+                                    if (viewMode == ViewMode.DETAILED) {
+                                        DetailedFileRow(
+                                            entry = slot.entry,
+                                            selectionMode = selectionMode,
+                                            selected = slot.entry.path in selected,
+                                            onClick = { onClick(slot.entry) },
+                                            onLongClick = { onLongClick(slot.entry) },
+                                        )
+                                    } else {
+                                        FileRow(
+                                            entry = slot.entry,
+                                            selectionMode = selectionMode,
+                                            selected = slot.entry.path in selected,
+                                            onClick = { onClick(slot.entry) },
+                                            onLongClick = { onLongClick(slot.entry) },
+                                        )
+                                    }
+                                    if (!slot.last) {
+                                        RowSeparator(
+                                            startIndent = if (viewMode == ViewMode.DETAILED) 76.dp else 60.dp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
+
+            FastScroller(
+                handle = if (tiled) ScrollHandle(
+                    itemCount = slots.size,
+                    firstVisible = gridState.firstVisibleItemIndex,
+                    scrolling = gridState.isScrollInProgress,
+                    jumpTo = { gridState.scrollToItem(it) },
+                ) else ScrollHandle(
+                    itemCount = slots.size,
+                    firstVisible = listState.firstVisibleItemIndex,
+                    scrolling = listState.isScrollInProgress,
+                    jumpTo = { listState.scrollToItem(it) },
+                ),
+                labelFor = { index -> slots.getOrNull(index)?.month ?: "" },
+            )
         }
     }
 }
@@ -667,6 +780,56 @@ private fun tileCorner(columns: Int): androidx.compose.ui.unit.Dp = when {
     columns == 2 -> 16.dp
     columns == 3 -> 12.dp
     else -> 9.dp
+}
+
+
+private val dayFormat = java.text.SimpleDateFormat("EEE, d MMMM", java.util.Locale.getDefault())
+
+/** "Today" / "Yesterday" / "Mon, 15 March" for the sub-headings inside a month. */
+private fun dayLabel(millis: Long): String {
+    if (millis <= 0) return "Unknown date"
+    val now = java.util.Calendar.getInstance()
+    val then = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    fun sameDay(a: java.util.Calendar, b: java.util.Calendar) =
+        a.get(java.util.Calendar.YEAR) == b.get(java.util.Calendar.YEAR) &&
+            a.get(java.util.Calendar.DAY_OF_YEAR) == b.get(java.util.Calendar.DAY_OF_YEAR)
+    if (sameDay(now, then)) return "Today"
+    val yesterday = java.util.Calendar.getInstance().apply {
+        add(java.util.Calendar.DAY_OF_YEAR, -1)
+    }
+    if (sameDay(yesterday, then)) return "Yesterday"
+    return dayFormat.format(java.util.Date(millis))
+}
+
+/** Small heading between days inside a month. */
+@Composable
+private fun DayHeader(label: String, count: Int) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(fsColors.groupedBackground)
+            .padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = fsColors.secondaryLabel,
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(fsColors.separator),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "$count",
+            style = MaterialTheme.typography.labelSmall,
+            color = fsColors.secondaryLabel.copy(alpha = 0.8f),
+        )
+    }
 }
 
 private val monthFormat = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault())
