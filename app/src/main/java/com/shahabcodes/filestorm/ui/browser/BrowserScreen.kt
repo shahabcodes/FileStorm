@@ -774,6 +774,8 @@ fun BrowserScreen(
                     }
                     SelectionActionBar(
                         selectedCount = selected.size,
+                        onShare = { shareFiles(context, selectedEntries) },
+                        shareEnabled = selectedEntries.any { !it.isDirectory },
                         onCopy = { showPicker = TransferOp.COPY },
                         onMove = { showPicker = TransferOp.MOVE },
                         onDelete = { confirmDelete = true },
@@ -887,6 +889,7 @@ fun BrowserScreen(
                 selectionMode = true
                 selected = setOf(target.path)
             },
+            onShare = if (!target.isDirectory) ({ shareFiles(context, listOf(target)) }) else null,
         )
     }
 

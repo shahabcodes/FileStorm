@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.MoveToInbox
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Tab
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -77,6 +78,7 @@ fun EntryContextSheet(
     onMove: () -> Unit,
     onDelete: () -> Unit,
     onSelect: () -> Unit,
+    onShare: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
@@ -191,6 +193,10 @@ fun EntryContextSheet(
             Spacer(Modifier.height(14.dp))
 
             GroupedCard {
+                if (onShare != null) {
+                    ContextRow(Icons.Rounded.Share, "Share") { onDismiss(); onShare() }
+                    RowSeparator(startIndent = 54.dp)
+                }
                 ContextRow(Icons.Rounded.ContentCopy, "Copy to…") { onDismiss(); onCopy() }
                 RowSeparator(startIndent = 54.dp)
                 ContextRow(Icons.Rounded.DriveFileMove, "Move to…") { onDismiss(); onMove() }

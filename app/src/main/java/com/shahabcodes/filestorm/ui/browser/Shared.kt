@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.RestoreFromTrash
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.DriveFileMove
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material3.AlertDialog
@@ -126,10 +127,12 @@ fun FileRow(
     }
 }
 
-/** Bottom action bar shown in selection mode: Copy / Move / Delete. */
+/** Bottom action bar shown in selection mode: Share / Copy / Move / Delete. */
 @Composable
 fun SelectionActionBar(
     selectedCount: Int,
+    onShare: (() -> Unit)? = null,
+    shareEnabled: Boolean = true,
     onCopy: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
@@ -143,6 +146,13 @@ fun SelectionActionBar(
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onShare != null) {
+                ActionPill(
+                    Icons.Rounded.Share, "Share",
+                    enabled = selectedCount > 0 && shareEnabled,
+                    onClick = onShare,
+                )
+            }
             ActionPill(Icons.Rounded.ContentCopy, "Copy", enabled = selectedCount > 0, onClick = onCopy)
             ActionPill(Icons.Rounded.DriveFileMove, "Move", enabled = selectedCount > 0, onClick = onMove)
             ActionPill(
@@ -590,6 +600,65 @@ fun openFolderGated(
         onOpen()
     }
 }
+
+/**
+ * Shares one or many files through the system chooser. Folders cannot be shared
+ * and are skipped; very large selections are capped because the intent payload
+ * has a hard size limit.
+ */
+fun shareFiles(context: android.content.Context, entries: List<FsEntry>) {
+    val files = entries.filter { !it.isDirectory && it.toFile().isFile }
+    if (files.isEmpty()) {
+        android.widget.Toast
+            .makeText(context, "Folders cannot be shared", android.widget.Toast.LENGTH_SHORT)
+            .show()
+        return
+    }
+    val capped = files.take(MAX_SHARE_ITEMS)
+    runCatching {
+        val authority = context.packageName + ".provider"
+        val uris = ArrayList<android.net.Uri>(
+            capped.map { FileProvider.getUriForFile(context, authority, it.toFile()) }
+        )
+        val types = capped
+            .map { MimeTypeMap.getSingleton().getMimeTypeFromExtension(it.extension) ?: "*/*" }
+            .distinct()
+        val type = when {
+            types.size == 1 -> types.first()
+            types.map { it.substringBefore('/') }.distinct().size == 1 ->
+                types.first().substringBefore('/') + "/*"
+            else -> "*/*"
+        }
+        val intent = if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND)
+                .setType(type)
+                .putExtra(Intent.EXTRA_STREAM, uris.first())
+        } else {
+            Intent(Intent.ACTION_SEND_MULTIPLE)
+                .setType(type)
+                .putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        }.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(
+            Intent.createChooser(
+                intent,
+                if (uris.size == 1) "Share ${capped.first().name}" else "Share ${uris.size} files",
+            )
+        )
+        if (files.size > capped.size) {
+            android.widget.Toast.makeText(
+                context,
+                "Sharing the first ${capped.size} of ${files.size} files",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
+    }.onFailure {
+        android.widget.Toast
+            .makeText(context, "Could not share these files", android.widget.Toast.LENGTH_SHORT)
+            .show()
+    }
+}
+
+private const val MAX_SHARE_ITEMS = 100
 
 fun openFile(context: android.content.Context, entry: FsEntry) {
     runCatching {

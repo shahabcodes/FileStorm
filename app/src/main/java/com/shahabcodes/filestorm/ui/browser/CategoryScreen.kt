@@ -321,6 +321,8 @@ fun CategoryScreen(
                     }
                     SelectionActionBar(
                         selectedCount = selected.size,
+                        onShare = { shareFiles(context, selectedEntries) },
+                        shareEnabled = selectedEntries.any { !it.isDirectory },
                         onCopy = { showPicker = TransferOp.COPY },
                         onMove = { showPicker = TransferOp.MOVE },
                         onDelete = { confirmDelete = true },
