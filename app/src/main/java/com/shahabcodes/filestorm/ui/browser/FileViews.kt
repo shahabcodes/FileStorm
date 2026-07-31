@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.PlayCircleFilled
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -87,12 +88,21 @@ fun FileListView(
     monthSorts: Map<String, Pair<SortField, Boolean>> = emptyMap(),
     onMonthSort: (String, SortField, Boolean) -> Unit = { _, _, _ -> },
     onZoom: (Float) -> Unit = {},
+    /**
+     * Changes whenever the *criteria* change — search text, date filter, sort.
+     * The list then jumps back to the top, because a filtered list left at row
+     * 12,000 looks empty and the scrollbar sits in the wrong place. Deliberately
+     * not the entries themselves: a file being added or renamed must not throw
+     * away where the user was.
+     */
+    scrollResetKey: Any? = null,
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
 ) {
     if (grouped) {
         GroupedByMonth(
             entries = entries,
+            scrollResetKey = scrollResetKey,
             selectionMode = selectionMode,
             selected = selected,
             contentPadding = contentPadding,
@@ -113,6 +123,7 @@ fun FileListView(
     val staggeredState =
         androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    ResetScrollOnChange(scrollResetKey, listState, gridState, staggeredState)
 
     Box(Modifier.fillMaxSize()) {
     when (viewMode) {
@@ -363,6 +374,7 @@ private sealed interface GroupSlot {
 @Composable
 private fun GroupedByMonth(
     entries: List<FsEntry>,
+    scrollResetKey: Any? = null,
     selectionMode: Boolean,
     selected: Set<String>,
     contentPadding: PaddingValues,
@@ -376,25 +388,37 @@ private fun GroupedByMonth(
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
 ) {
-    // Months run newest-first (or oldest-first), but inside a month the user's
-    // name/size/type sort still applies.
-    val groups = remember(entries, Prefs.sortAscending, Prefs.sortField, monthSorts) {
-        entries
-            .groupBy { monthLabel(it.lastModified) }
-            .entries
-            .sortedWith(compareBy { group -> group.value.maxOfOrNull { it.lastModified } ?: 0L })
-            .let { if (Prefs.sortAscending) it else it.reversed() }
-            .map { (label, items) ->
-                val (field, ascending) = monthSorts[label]
-                    ?: (Prefs.sortField to Prefs.sortAscending)
-                label to com.shahabcodes.filestorm.data.FileRepository.sortEntries(
-                    items, field, ascending,
-                )
-            }
+    // Grouping, per-month sorting and slot building all scale with the folder,
+    // so for tens of thousands of files they cannot run during composition —
+    // that blocks the frame and reads as a freeze. Compute on a worker and let
+    // the previous result stay on screen until the new one is ready.
+    val ascending = Prefs.sortAscending
+    val sortField = Prefs.sortField
+    val groups by androidx.compose.runtime.produceState(
+        initialValue = emptyList<Pair<String, List<FsEntry>>>(),
+        entries, ascending, sortField, monthSorts,
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            entries
+                .groupBy { monthLabel(it.lastModified) }
+                .entries
+                .sortedWith(compareBy { group -> group.value.maxOfOrNull { it.lastModified } ?: 0L })
+                .let { if (ascending) it else it.reversed() }
+                .map { (label, items) ->
+                    val (field, asc) = monthSorts[label] ?: (sortField to ascending)
+                    label to com.shahabcodes.filestorm.data.FileRepository.sortEntries(
+                        items, field, asc,
+                    )
+                }
+        }
     }
     val summaries = remember(groups) { groups.associate { it.first to summarise(it.second) } }
 
-    val slots = remember(groups, collapsedMonths, monthSorts) {
+    val slots by androidx.compose.runtime.produceState(
+        initialValue = emptyList<GroupSlot>(),
+        groups, collapsedMonths, monthSorts,
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         buildList {
             groups.forEach { (label, items) ->
                 add(GroupSlot.MonthRow(label))
@@ -436,12 +460,14 @@ private fun GroupedByMonth(
                 add(GroupSlot.GapRow(label))
             }
         }
+        }
     }
 
     val tiled = viewMode == ViewMode.GRID || viewMode == ViewMode.GALLERY ||
         viewMode == ViewMode.MOSAIC
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    ResetScrollOnChange(scrollResetKey, listState, gridState, null)
 
     val firstVisible = if (tiled) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
     val topSlot = slots.getOrNull(firstVisible)
@@ -786,20 +812,60 @@ private fun tileCorner(columns: Int): androidx.compose.ui.unit.Dp = when {
 private val dayFormat = java.text.SimpleDateFormat("EEE, d MMMM", java.util.Locale.getDefault())
 
 /** "Today" / "Yesterday" / "Mon, 15 March" for the sub-headings inside a month. */
-private fun dayLabel(millis: Long): String {
-    if (millis <= 0) return "Unknown date"
-    val now = java.util.Calendar.getInstance()
-    val then = java.util.Calendar.getInstance().apply { timeInMillis = millis }
-    fun sameDay(a: java.util.Calendar, b: java.util.Calendar) =
-        a.get(java.util.Calendar.YEAR) == b.get(java.util.Calendar.YEAR) &&
-            a.get(java.util.Calendar.DAY_OF_YEAR) == b.get(java.util.Calendar.DAY_OF_YEAR)
-    if (sameDay(now, then)) return "Today"
-    val yesterday = java.util.Calendar.getInstance().apply {
-        add(java.util.Calendar.DAY_OF_YEAR, -1)
+/**
+ * Date labels are asked for once per file, so a 35k-file folder used to build
+ * three Calendars and run a formatter 35k times on the composition thread —
+ * which is what made big folders freeze. Both labels are now keyed by local day
+ * and cached, so the formatter runs once per distinct day instead.
+ */
+private object DateLabels {
+    private val dayCache = HashMap<Long, String>()
+    private val monthCache = HashMap<Long, String>()
+    private var todayIndex = Long.MIN_VALUE
+    private var computedAt = 0L
+
+    private fun dayIndexOf(millis: Long): Long {
+        val offset = java.util.TimeZone.getDefault().getOffset(millis)
+        return Math.floorDiv(millis + offset, 86_400_000L)
     }
-    if (sameDay(yesterday, then)) return "Yesterday"
-    return dayFormat.format(java.util.Date(millis))
+
+    /** "Today" has to stop meaning yesterday once the clock rolls over. */
+    private fun refreshToday() {
+        val now = System.currentTimeMillis()
+        if (now - computedAt < 60_000L && todayIndex != Long.MIN_VALUE) return
+        val fresh = dayIndexOf(now)
+        if (fresh != todayIndex) {
+            dayCache.clear()
+            todayIndex = fresh
+        }
+        computedAt = now
+    }
+
+    @Synchronized
+    fun day(millis: Long): String {
+        if (millis <= 0) return "Unknown date"
+        refreshToday()
+        val index = dayIndexOf(millis)
+        return dayCache.getOrPut(index) {
+            when (index) {
+                todayIndex -> "Today"
+                todayIndex - 1 -> "Yesterday"
+                else -> dayFormat.format(java.util.Date(millis))
+            }
+        }
+    }
+
+    @Synchronized
+    fun month(millis: Long): String {
+        if (millis <= 0) return "Unknown date"
+        // One entry per day is plenty; a month has at most 31 of them.
+        return monthCache.getOrPut(dayIndexOf(millis)) {
+            monthFormat.format(java.util.Date(millis))
+        }
+    }
 }
+
+private fun dayLabel(millis: Long): String = DateLabels.day(millis)
 
 /** Small heading between days inside a month. */
 @Composable
@@ -834,8 +900,7 @@ private fun DayHeader(label: String, count: Int) {
 
 private val monthFormat = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault())
 
-private fun monthLabel(millis: Long): String =
-    if (millis <= 0) "Unknown date" else monthFormat.format(java.util.Date(millis))
+private fun monthLabel(millis: Long): String = DateLabels.month(millis)
 
 /** Sticky month heading with the group's item count and total size. */
 @Composable
@@ -1097,5 +1162,27 @@ private fun GalleryTile(
                 SelectionCircle(selected = selected, size = 24.dp)
             }
         }
+    }
+}
+
+/**
+ * Sends every list back to the top when the filter criteria change, skipping the
+ * very first composition so that opening a folder does not fight state
+ * restoration.
+ */
+@Composable
+private fun ResetScrollOnChange(
+    key: Any?,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    staggeredState: androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState?,
+) {
+    var lastKey by remember { mutableStateOf(key) }
+    LaunchedEffect(key) {
+        if (key == lastKey) return@LaunchedEffect
+        lastKey = key
+        listState.scrollToItem(0)
+        gridState.scrollToItem(0)
+        staggeredState?.scrollToItem(0)
     }
 }

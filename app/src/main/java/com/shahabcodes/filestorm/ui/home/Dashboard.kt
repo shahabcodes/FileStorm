@@ -245,7 +245,7 @@ private fun LegendRow(color: Color, label: String, value: String) {
  * and offers the one tap that fixes it.
  */
 @Composable
-fun AppStorageCard() {
+fun AppStorageCard(onSeeAll: () -> Unit = {}) {
     val context = LocalContext.current
     val snapshot = AppStorageAnalyzer.snapshot
     val scanning = AppStorageAnalyzer.scanning
@@ -385,11 +385,20 @@ fun AppStorageCard() {
                 val top = snapshot.apps.take(6)
                 if (top.isNotEmpty()) {
                     Spacer(Modifier.height(16.dp))
-                    Text(
-                        "Biggest apps",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = fsColors.secondaryLabel,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Biggest apps",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = fsColors.secondaryLabel,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            "See all ${snapshot.appCount}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = fsColors.accent,
+                            modifier = Modifier.pressScale(onSeeAll).padding(4.dp),
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     val biggest = top.first().totalBytes.coerceAtLeast(1L)
                     top.forEachIndexed { index, app ->

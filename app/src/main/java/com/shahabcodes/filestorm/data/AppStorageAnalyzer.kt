@@ -176,9 +176,8 @@ object AppStorageAnalyzer {
     private fun persist(s: Snapshot) {
         runCatching {
             val array = JSONArray()
-            // Keeping the whole list would bloat the prefs file; the dashboard
-            // only ever shows the heaviest apps.
-            s.apps.take(60).forEach { app ->
+            // The All Apps screen needs every entry, so the whole list is kept.
+            s.apps.forEach { app ->
                 array.put(
                     JSONObject()
                         .put("pkg", app.packageName)

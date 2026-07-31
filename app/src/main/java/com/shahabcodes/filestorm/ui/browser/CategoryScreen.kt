@@ -280,6 +280,7 @@ fun CategoryScreen(
                 }
                 else -> FileListView(
                     entries = visible,
+                    scrollResetKey = listOf(query, Prefs.sortField, Prefs.sortAscending),
                     selectionMode = selectionMode,
                     selected = selected,
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(

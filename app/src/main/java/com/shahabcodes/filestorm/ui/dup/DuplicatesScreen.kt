@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
@@ -520,7 +521,7 @@ private fun ResultsView(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
                     start = 16.dp, end = 16.dp, bottom = 170.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item {
                     GroupedCard {
@@ -549,6 +550,16 @@ private fun ResultsView(
                                         )
                                     }
                                 }
+                            }
+                            if (s.truncatedBy > 0) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Showing the first ${s.pairs.size}. ${s.truncatedBy} more " +
+                                        "extra copy(s) were found — clear these and run the " +
+                                        "sweep again to see the rest.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = fsColors.orange,
+                                )
                             }
                             if (s.cleanedCount >= 0) {
                                 Spacer(Modifier.height(8.dp))
@@ -582,9 +593,9 @@ private fun ResultsView(
                             )
                         }
                     }
-                    item {
+                    itemsIndexed(s.pairs, key = { _, pair -> pair.id }) { index, pair ->
                         GroupedCard {
-                            s.pairs.forEachIndexed { index, pair ->
+                            run {
                                 Row(
                                     Modifier
                                         .fillMaxWidth()
@@ -645,7 +656,6 @@ private fun ResultsView(
                                         )
                                     }
                                 }
-                                if (index != s.pairs.lastIndex) RowSeparator(startIndent = 64.dp)
                             }
                         }
                     }

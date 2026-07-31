@@ -83,6 +83,7 @@ fun HomeScreen(
     onOpenTrash: () -> Unit,
     onOpenJobs: () -> Unit,
     onOpenDuplicates: () -> Unit,
+    onOpenApps: () -> Unit,
 ) {
     LaunchedEffect(Unit) { TrashManager.refresh() }
     val stats = remember { FileRepository.storageStats() }
@@ -169,7 +170,7 @@ fun HomeScreen(
         item { DashboardCard() }
 
         // What the installed apps are taking up
-        item { AppStorageCard() }
+        item { AppStorageCard(onSeeAll = onOpenApps) }
 
         // Favorites
         if (Favorites.paths.isNotEmpty()) {

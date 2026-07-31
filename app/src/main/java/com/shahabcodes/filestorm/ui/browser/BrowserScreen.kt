@@ -686,6 +686,7 @@ fun BrowserScreen(
                 }
                 else -> FileListView(
                     entries = visibleEntries,
+                    scrollResetKey = listOf(query, dateFilter, Prefs.sortField, Prefs.sortAscending),
                     selectionMode = selectionMode,
                     selected = selected,
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),

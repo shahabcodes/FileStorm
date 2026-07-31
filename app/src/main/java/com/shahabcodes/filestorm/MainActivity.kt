@@ -218,6 +218,7 @@ private fun AppNav() {
                 onOpenTrash = { entry.ifCurrent { nav.navigate("trash") } },
                 onOpenJobs = { entry.ifCurrent { nav.navigate("jobs") } },
                 onOpenDuplicates = { entry.ifCurrent { nav.navigate("duplicates") } },
+                onOpenApps = { entry.ifCurrent { nav.navigate("apps") } },
             )
         }
         composable("browse") { entry ->
@@ -287,6 +288,11 @@ private fun AppNav() {
                 path = target,
                 mode = mode,
                 onBack = { goBack() },
+            )
+        }
+        composable("apps") { entry ->
+            com.shahabcodes.filestorm.ui.home.AppStorageScreen(
+                onBack = { entry.ifCurrent { goBack() } },
             )
         }
         composable("duplicates") {

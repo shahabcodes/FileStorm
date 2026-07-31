@@ -46,6 +46,7 @@ data class DupState(
     val cleaning: Boolean = false,
     val cleanedCount: Int = -1,
     val cleanedBytes: Long = 0L,
+    val truncatedBy: Int = 0,
 ) {
     val isActive: Boolean get() = phase == DupPhase.SCANNING || phase == DupPhase.COMPARING
     val wholeStorage: Boolean get() = searchScope == DupScope.WHOLE_STORAGE
@@ -71,6 +72,9 @@ data class DupState(
  * pair is reported. Cleanup moves one chosen side to the recoverable Trash.
  */
 object DuplicateFinder {
+
+    /** Beyond this the list stops being reviewable and starts being a memory bill. */
+    private const val MAX_RESULTS = 20_000
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _state = MutableStateFlow(DupState())
@@ -181,23 +185,50 @@ object DuplicateFinder {
      */
     private suspend fun runWholeStorage(deepCompare: Boolean, includeHidden: Boolean) {
         val root = File(FileRepository.rootPath)
-        val all = scanFiles(root, includeHidden, wholeStorage = true)
-        if (cancelled || all == null) {
+
+        // Holding every File on a 50 GB phone is hundreds of thousands of objects
+        // and runs the heap out. Instead walk twice: the first pass remembers only
+        // a 64-bit fingerprint per file and which fingerprints repeat, the second
+        // keeps just the files whose fingerprint is known to repeat. Peak memory
+        // is then a couple of long sets plus the actual duplicates.
+        val seen = LongSet()
+        val repeated = LongSet()
+        var total = 0
+        val counted = walk(root, includeHidden) { file, size ->
+            total++
+            if (total % 500 == 0) {
+                _state.value = _state.value.copy(scannedFiles = total)
+            }
+            val fingerprint = fingerprint(file.name, size)
+            if (!seen.add(fingerprint)) repeated.add(fingerprint)
+        }
+        if (cancelled || !counted) {
             _state.value = _state.value.copy(
                 phase = DupPhase.CANCELLED,
                 finishedAt = System.currentTimeMillis(),
             )
             return
         }
-        _state.value = _state.value.copy(scannedFiles = all.size)
+        _state.value = _state.value.copy(scannedFiles = total, phase = DupPhase.SCANNING)
+        seen.clear()
 
+        // Second pass. Grouping by the real key resolves any fingerprint collision.
         val groups = HashMap<String, MutableList<File>>()
-        for (f in all) {
-            if (f.length() <= 0L) continue // empty files match everything; not useful
-            val key = f.name.lowercase() + "|" + f.length()
-            groups.getOrPut(key) { mutableListOf() }.add(f)
+        val kept = walk(root, includeHidden) { file, size ->
+            if (repeated.contains(fingerprint(file.name, size))) {
+                groups.getOrPut(file.name.lowercase() + "|" + size) { mutableListOf() }.add(file)
+            }
         }
+        if (cancelled || !kept) {
+            _state.value = _state.value.copy(
+                phase = DupPhase.CANCELLED,
+                finishedAt = System.currentTimeMillis(),
+            )
+            return
+        }
+
         var id = 0
+        var skipped = 0
         val candidates = mutableListOf<DupPair>()
         for (group in groups.values) {
             if (cancelled) break
@@ -207,19 +238,122 @@ object DuplicateFinder {
             val sorted = group.sortedWith(compareBy({ it.lastModified() }, { it.absolutePath }))
             val keeper = sorted.first()
             for (extra in sorted.drop(1)) {
+                if (candidates.size >= MAX_RESULTS) {
+                    skipped++
+                    continue
+                }
                 candidates.add(
                     DupPair(id++, keeper.absolutePath, extra.absolutePath, extra.name, extra.length())
                 )
             }
         }
+        _state.value = _state.value.copy(truncatedBy = skipped)
         finish(candidates, deepCompare)
     }
 
-    private fun scanFiles(
+    /**
+     * Streams every eligible file to [onFile] without building a list. Returns
+     * false if the walk was cancelled.
+     */
+    private inline fun walk(
         root: File,
         includeHidden: Boolean,
-        wholeStorage: Boolean = false,
-    ): List<File>? {
+        onFile: (File, Long) -> Unit,
+    ): Boolean {
+        val queue = ArrayDeque<File>()
+        queue.add(root)
+        val rootPath = root.absolutePath.trimEnd(File.separatorChar)
+        while (queue.isNotEmpty()) {
+            if (cancelled) return false
+            val dir = queue.removeFirst()
+            val children = dir.listFiles() ?: continue
+            for (child in children) {
+                if (child.name == ".FileStorm") continue
+                if (!includeHidden && child.name.startsWith(".")) continue
+                if (dir.absolutePath == rootPath && child.name == "Android") {
+                    // Descend into Android/media only; the rest is app-private.
+                    val media = File(child, "media")
+                    if (media.isDirectory) queue.add(media)
+                    continue
+                }
+                if (child.isDirectory) {
+                    queue.add(child)
+                } else {
+                    val size = child.length()
+                    // Empty files match every other empty file; never useful.
+                    if (size > 0L) onFile(child, size)
+                }
+            }
+        }
+        return true
+    }
+
+    private fun fingerprint(name: String, size: Long): Long {
+        var h = name.lowercase().hashCode().toLong() and 0xFFFFFFFFL
+        h = h * 1_000_003L + size
+        // Mix so that near-identical inputs land far apart in the table.
+        h = h xor (h ushr 33)
+        h *= -0xae502812aa7333L
+        h = h xor (h ushr 29)
+        return if (h == 0L) 1L else h
+    }
+
+    /**
+     * Open-addressed set of non-zero longs. A HashSet<Long> would box every
+     * entry — roughly 40 bytes each — which is exactly what has to be avoided
+     * when there are hundreds of thousands of files.
+     */
+    private class LongSet(initialCapacity: Int = 1 shl 16) {
+        private var keys = LongArray(initialCapacity)
+        private var size = 0
+        private var mask = initialCapacity - 1
+
+        fun clear() {
+            keys = LongArray(1 shl 12)
+            mask = keys.size - 1
+            size = 0
+        }
+
+        fun contains(key: Long): Boolean {
+            var i = (key.hashCode() and mask)
+            while (true) {
+                val k = keys[i]
+                if (k == 0L) return false
+                if (k == key) return true
+                i = (i + 1) and mask
+            }
+        }
+
+        /** Returns true when the key was new. */
+        fun add(key: Long): Boolean {
+            var i = (key.hashCode() and mask)
+            while (true) {
+                val k = keys[i]
+                if (k == 0L) {
+                    keys[i] = key
+                    size++
+                    if (size * 10 >= keys.size * 7) grow()
+                    return true
+                }
+                if (k == key) return false
+                i = (i + 1) and mask
+            }
+        }
+
+        private fun grow() {
+            val old = keys
+            keys = LongArray(old.size * 2)
+            mask = keys.size - 1
+            for (k in old) {
+                if (k == 0L) continue
+                var i = (k.hashCode() and mask)
+                while (keys[i] != 0L) i = (i + 1) and mask
+                keys[i] = k
+            }
+        }
+    }
+
+    private fun scanFiles(root: File, includeHidden: Boolean): List<File>? {
         val out = mutableListOf<File>()
         val queue = ArrayDeque<File>()
         queue.add(root)
@@ -231,14 +365,6 @@ object DuplicateFinder {
                 // The app's own trash is never a duplicate candidate.
                 if (child.name == ".FileStorm") continue
                 if (!includeHidden && child.name.startsWith(".")) continue
-                if (wholeStorage && dir.absolutePath == root.absolutePath.trimEnd(File.separatorChar) &&
-                    child.name == "Android"
-                ) {
-                    // Descend into Android/media only; the rest is app-private.
-                    val media = File(child, "media")
-                    if (media.isDirectory) queue.add(media)
-                    continue
-                }
                 if (child.isDirectory) queue.add(child)
                 else {
                     out.add(child)
@@ -338,10 +464,13 @@ object DuplicateFinder {
                 }
             }.getOrDefault(false)
             if (equal) confirmed.add(pair)
+            // Copying the whole confirmed list on every file is quadratic and
+            // was the reason a large deep compare crawled; publish periodically.
+            val shouldPublish = confirmed.size % 50 == 0
             _state.value = _state.value.copy(
                 comparedCount = _state.value.comparedCount + 1,
                 doneBytes = baseline + pair.size,
-                pairs = confirmed.toList(),
+                pairs = if (shouldPublish) confirmed.toList() else _state.value.pairs,
             )
             sampleSpeed()
         }
