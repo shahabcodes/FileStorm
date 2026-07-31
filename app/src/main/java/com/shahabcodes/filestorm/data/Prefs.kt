@@ -37,6 +37,18 @@ enum class Accent(val label: String, val light: Long, val dark: Long) {
     GREEN("Mint", 0xFF34C759, 0xFF30D158),
     TEAL("Lagoon", 0xFF30B0C7, 0xFF40C8E0),
     INDIGO("Twilight", 0xFF5856D6, 0xFF5E5CE6),
+    BLOSSOM("Blossom", 0xFFF06CA8, 0xFFFF8FC4),
+    GOLD("Honey", 0xFFC79000, 0xFFEFB01A),
+    GRAPHITE("Graphite", 0xFF5B6572, 0xFF98A2B3),
+}
+
+/** Which animation the app shows while it waits on the filesystem. */
+enum class LoaderStyle(val label: String, val blurb: String) {
+    ARC("Storm Arc", "Sweeping arc with a breathing core"),
+    DOTS("Bounce", "Three dots bouncing in sequence"),
+    PULSE("Ripple", "Rings pulsing outward"),
+    BARS("Equaliser", "Bars rising and falling"),
+    ORBIT("Orbit", "A dot circling its track"),
 }
 
 /** App settings, Compose-observable and persisted. */
@@ -65,6 +77,8 @@ object Prefs {
         private set
     var diagnostics by mutableStateOf(false)
         private set
+    var loaderStyle by mutableStateOf(LoaderStyle.ARC)
+        private set
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm", Context.MODE_PRIVATE)
@@ -81,6 +95,9 @@ object Prefs {
         appName = sp.getString("app_name", "storm") ?: "storm"
         secureScreen = sp.getBoolean("secure_screen", false)
         diagnostics = sp.getBoolean("diagnostics", false)
+        loaderStyle = runCatching {
+            LoaderStyle.valueOf(sp.getString("loader_style", LoaderStyle.ARC.name)!!)
+        }.getOrDefault(LoaderStyle.ARC)
         appearance = runCatching {
             Appearance.valueOf(sp.getString("appearance", Appearance.SYSTEM.name)!!)
         }.getOrDefault(Appearance.SYSTEM)
@@ -117,6 +134,11 @@ object Prefs {
     fun updateAppIcon(key: String) {
         appIcon = key
         sp.edit().putString("app_icon", key).apply()
+    }
+
+    fun updateLoaderStyle(value: LoaderStyle) {
+        loaderStyle = value
+        sp.edit().putString("loader_style", value.name).apply()
     }
 
     fun updateDiagnostics(value: Boolean) {

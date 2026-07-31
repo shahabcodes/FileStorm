@@ -8,6 +8,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -67,6 +70,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -299,6 +305,8 @@ private fun ImagePage(file: File, onToggleChrome: () -> Unit) {
     var scale by remember(file) { mutableFloatStateOf(1f) }
     var offsetX by remember(file) { mutableFloatStateOf(0f) }
     var offsetY by remember(file) { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    var zoomJob by remember(file) { mutableStateOf<Job?>(null) }
 
     Box(
         Modifier
@@ -306,13 +314,32 @@ private fun ImagePage(file: File, onToggleChrome: () -> Unit) {
             .pointerInput(file) {
                 detectTapGestures(
                     onTap = { toggle() },
-                    onDoubleTap = {
-                        if (scale > 1.05f) {
-                            scale = 1f
-                            offsetX = 0f
-                            offsetY = 0f
+                    onDoubleTap = { tap ->
+                        // Zoom towards the point that was tapped rather than the
+                        // middle of the screen, and glide there instead of
+                        // snapping, which is what makes it feel like Photos.
+                        val target = if (scale > 1.05f) 1f else 2.75f
+                        val toX: Float
+                        val toY: Float
+                        if (target <= 1f) {
+                            toX = 0f
+                            toY = 0f
                         } else {
-                            scale = 2.5f
+                            val maxX = size.width * (target - 1) / 2f
+                            val maxY = size.height * (target - 1) / 2f
+                            toX = ((tap.x - size.width / 2f) * (1 - target)).coerceIn(-maxX, maxX)
+                            toY = ((tap.y - size.height / 2f) * (1 - target)).coerceIn(-maxY, maxY)
+                        }
+                        val fromScale = scale
+                        val fromX = offsetX
+                        val fromY = offsetY
+                        zoomJob?.cancel()
+                        zoomJob = scope.launch {
+                            animate(0f, 1f, animationSpec = tween(240, easing = FastOutSlowInEasing)) { t, _ ->
+                                scale = fromScale + (target - fromScale) * t
+                                offsetX = fromX + (toX - fromX) * t
+                                offsetY = fromY + (toY - fromY) * t
+                            }
                         }
                     },
                 )
@@ -324,6 +351,7 @@ private fun ImagePage(file: File, onToggleChrome: () -> Unit) {
                         val event = awaitPointerEvent()
                         val multiTouch = event.changes.count { it.pressed } >= 2
                         if (multiTouch) {
+                            zoomJob?.cancel()
                             val zoom = event.calculateZoom()
                             val pan = event.calculatePan()
                             scale = (scale * zoom).coerceIn(1f, 6f)
@@ -394,6 +422,8 @@ private fun VideoPage(
     var scale by remember(file) { mutableFloatStateOf(1f) }
     var offsetX by remember(file) { mutableFloatStateOf(0f) }
     var offsetY by remember(file) { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    var zoomJob by remember(file) { mutableStateOf<Job?>(null) }
 
     Box(
         Modifier
@@ -401,13 +431,32 @@ private fun VideoPage(
             .pointerInput(file) {
                 detectTapGestures(
                     onTap = { toggle() },
-                    onDoubleTap = {
-                        if (scale > 1.05f) {
-                            scale = 1f
-                            offsetX = 0f
-                            offsetY = 0f
+                    onDoubleTap = { tap ->
+                        // Zoom towards the point that was tapped rather than the
+                        // middle of the screen, and glide there instead of
+                        // snapping, which is what makes it feel like Photos.
+                        val target = if (scale > 1.05f) 1f else 2.75f
+                        val toX: Float
+                        val toY: Float
+                        if (target <= 1f) {
+                            toX = 0f
+                            toY = 0f
                         } else {
-                            scale = 2.5f
+                            val maxX = size.width * (target - 1) / 2f
+                            val maxY = size.height * (target - 1) / 2f
+                            toX = ((tap.x - size.width / 2f) * (1 - target)).coerceIn(-maxX, maxX)
+                            toY = ((tap.y - size.height / 2f) * (1 - target)).coerceIn(-maxY, maxY)
+                        }
+                        val fromScale = scale
+                        val fromX = offsetX
+                        val fromY = offsetY
+                        zoomJob?.cancel()
+                        zoomJob = scope.launch {
+                            animate(0f, 1f, animationSpec = tween(240, easing = FastOutSlowInEasing)) { t, _ ->
+                                scale = fromScale + (target - fromScale) * t
+                                offsetX = fromX + (toX - fromX) * t
+                                offsetY = fromY + (toY - fromY) * t
+                            }
                         }
                     },
                 )
@@ -419,6 +468,7 @@ private fun VideoPage(
                         val event = awaitPointerEvent()
                         val multiTouch = event.changes.count { it.pressed } >= 2
                         if (multiTouch || scale > 1.02f) {
+                            zoomJob?.cancel()
                             val zoom = if (multiTouch) event.calculateZoom() else 1f
                             val pan = event.calculatePan()
                             scale = (scale * zoom).coerceIn(1f, 6f)

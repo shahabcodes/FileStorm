@@ -5,6 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +27,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -74,6 +77,7 @@ fun DuplicatesScreen(onBack: () -> Unit) {
     var deep by remember { mutableStateOf(false) }
     var hidden by remember { mutableStateOf(true) }
     var picking by remember { mutableStateOf(0) } // 0 none, 1 folder1, 2 folder2
+    var wholeStorage by remember { mutableStateOf(false) }
     var selected by remember(s.pairs) { mutableStateOf(s.pairs.map { it.id }.toSet()) }
     var confirmSide by remember { mutableStateOf(0) }
     var comparePair by remember { mutableStateOf<com.shahabcodes.filestorm.data.dup.DupPair?>(null) }
@@ -125,7 +129,8 @@ fun DuplicatesScreen(onBack: () -> Unit) {
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         Text(
-            "Match files across two folders and reclaim space",
+            if (wholeStorage) "Sweep the whole phone for repeated files"
+            else "Match files across two folders and reclaim space",
             style = MaterialTheme.typography.bodySmall,
             color = fsColors.secondaryLabel,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -135,17 +140,23 @@ fun DuplicatesScreen(onBack: () -> Unit) {
         when (s.phase) {
             DupPhase.IDLE -> SetupView(
                 folder1 = folder1, folder2 = folder2, deep = deep, hidden = hidden,
+                wholeStorage = wholeStorage,
+                onScopeChange = { wholeStorage = it },
                 onPick1 = { picking = 1 }, onPick2 = { picking = 2 },
                 onDeepChange = { deep = it },
                 onHiddenChange = { hidden = it },
-                onStart = { DuplicateFinder.start(folder1, folder2, deep, hidden) },
+                onStart = {
+                    if (wholeStorage) DuplicateFinder.startWholeStorage(deep, hidden)
+                    else DuplicateFinder.start(folder1, folder2, deep, hidden)
+                },
             )
 
             DupPhase.SCANNING -> Centered {
                 CircularProgressIndicator(color = fsColors.accent)
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "Scanning folders… ${s.scannedFiles} files",
+                    if (s.wholeStorage) "Scanning all storage… ${s.scannedFiles} files"
+                    else "Scanning folders… ${s.scannedFiles} files",
                     color = fsColors.secondaryLabel,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -242,11 +253,23 @@ fun DuplicatesScreen(onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmSide = 0 },
             containerColor = fsColors.card,
-            title = { Text("Delete from \"$folderName\"?", color = fsColors.label) },
+            title = {
+                Text(
+                    if (s.wholeStorage) "Delete $count extra copy(s)?"
+                    else "Delete from \"$folderName\"?",
+                    color = fsColors.label,
+                )
+            },
             text = {
                 Text(
-                    "$count duplicate file(s) (${Formatters.bytes(bytes)}) will be moved from " +
-                        "\"$folderName\" to the Trash. The copies in the other folder stay untouched.",
+                    if (s.wholeStorage) {
+                        "$count file(s) (${Formatters.bytes(bytes)}) will be moved to the Trash. " +
+                            "One copy of every file is always kept, and nothing leaves the " +
+                            "Trash until you empty it."
+                    } else {
+                        "$count duplicate file(s) (${Formatters.bytes(bytes)}) will be moved from " +
+                            "\"$folderName\" to the Trash. The copies in the other folder stay untouched."
+                    },
                     color = fsColors.secondaryLabel,
                 )
             },
@@ -295,17 +318,58 @@ private fun SetupView(
     folder2: String,
     deep: Boolean,
     hidden: Boolean,
+    wholeStorage: Boolean,
+    onScopeChange: (Boolean) -> Unit,
     onPick1: () -> Unit,
     onPick2: () -> Unit,
     onDeepChange: (Boolean) -> Unit,
     onHiddenChange: (Boolean) -> Unit,
     onStart: () -> Unit,
 ) {
-    Column(Modifier.padding(horizontal = 16.dp)) {
-        GroupedCard {
-            FolderRow("Folder 1", folder1, onPick1)
-            RowSeparator(startIndent = 16.dp)
-            FolderRow("Folder 2", folder2, onPick2)
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(fsColors.fill)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            ScopeTab("Two Folders", !wholeStorage, Modifier.weight(1f)) { onScopeChange(false) }
+            ScopeTab("Entire Storage", wholeStorage, Modifier.weight(1f)) { onScopeChange(true) }
+        }
+        Spacer(Modifier.height(14.dp))
+        if (wholeStorage) {
+            GroupedCard {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Storage, null, tint = fsColors.accent, modifier = Modifier.size(26.dp))
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            "Whole-storage sweep",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        Text(
+                            "Every folder on internal storage is searched, however deeply " +
+                                "nested. Each set of identical files keeps its oldest copy " +
+                                "and the rest are listed as extras.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                        )
+                    }
+                }
+            }
+        } else {
+            GroupedCard {
+                FolderRow("Folder 1", folder1, onPick1)
+                RowSeparator(startIndent = 16.dp)
+                FolderRow("Folder 2", folder2, onPick2)
+            }
         }
         Spacer(Modifier.height(14.dp))
         GroupedCard {
@@ -360,7 +424,7 @@ private fun SetupView(
             }
         }
         Spacer(Modifier.height(18.dp))
-        val ready = folder1.isNotEmpty() && folder2.isNotEmpty()
+        val ready = wholeStorage || (folder1.isNotEmpty() && folder2.isNotEmpty())
         Box(
             Modifier
                 .fillMaxWidth()
@@ -379,10 +443,39 @@ private fun SetupView(
         Spacer(Modifier.height(8.dp))
         Text(
             "Files match when their name, type and size are identical. Nested folders are always " +
-                "searched; File Storm's own trash is never touched.",
+                "searched; File Storm's own trash is never touched." +
+                if (wholeStorage) {
+                    " App-private Android/data and Android/obb are skipped because Android " +
+                        "blocks them, but Android/media — where WhatsApp and similar apps store " +
+                        "files — is included."
+                } else "",
             style = MaterialTheme.typography.labelSmall,
             color = fsColors.secondaryLabel,
             modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        Spacer(Modifier.height(28.dp))
+    }
+}
+
+@Composable
+private fun ScopeTab(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) fsColors.card else Color.Transparent)
+            .pressScale(onClick)
+            .padding(vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (selected) fsColors.label else fsColors.secondaryLabel,
         )
     }
 }
@@ -441,6 +534,7 @@ private fun ResultsView(
                                 Column {
                                     Text(
                                         if (s.pairs.isEmpty()) "No duplicates found"
+                                        else if (s.wholeStorage) "${s.extraCopies} extra copy(s) found"
                                         else "${s.pairs.size} duplicate pair(s) found",
                                         style = MaterialTheme.typography.titleMedium,
                                         color = fsColors.label,
@@ -523,13 +617,15 @@ private fun ResultsView(
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                         Text(
-                                            "1: " + pretty(File(pair.pathA).parent ?: ""),
+                                            (if (s.wholeStorage) "Keep: " else "1: ") +
+                                                pretty(File(pair.pathA).parent ?: ""),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = fsColors.secondaryLabel,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         )
                                         Text(
-                                            "2: " + pretty(File(pair.pathB).parent ?: ""),
+                                            (if (s.wholeStorage) "Extra: " else "2: ") +
+                                                pretty(File(pair.pathB).parent ?: ""),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = fsColors.secondaryLabel,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -567,22 +663,36 @@ private fun ResultsView(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 ) {
                     Text(
-                        "Delete ${selected.size} selected duplicate(s) from:",
+                        if (s.wholeStorage) {
+                            "${selected.size} selected · one copy of each is always kept"
+                        } else {
+                            "Delete ${selected.size} selected duplicate(s) from:"
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         color = fsColors.secondaryLabel,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (s.wholeStorage) {
+                        // Only the extras can go. Offering "delete the keepers"
+                        // here could wipe every copy in a group of three or more.
                         SideButton(
-                            label = File(s.folder1).name.ifEmpty { "Folder 1" },
+                            label = "Delete Extra Copies",
                             enabled = selected.isNotEmpty(),
-                            modifier = Modifier.weight(1f),
-                        ) { onDelete(1) }
-                        SideButton(
-                            label = File(s.folder2).name.ifEmpty { "Folder 2" },
-                            enabled = selected.isNotEmpty(),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                         ) { onDelete(2) }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SideButton(
+                                label = File(s.folder1).name.ifEmpty { "Folder 1" },
+                                enabled = selected.isNotEmpty(),
+                                modifier = Modifier.weight(1f),
+                            ) { onDelete(1) }
+                            SideButton(
+                                label = File(s.folder2).name.ifEmpty { "Folder 2" },
+                                enabled = selected.isNotEmpty(),
+                                modifier = Modifier.weight(1f),
+                            ) { onDelete(2) }
+                        }
                     }
                 }
             }

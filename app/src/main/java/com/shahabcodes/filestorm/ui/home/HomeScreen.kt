@@ -168,6 +168,9 @@ fun HomeScreen(
         // Storage dashboard
         item { DashboardCard() }
 
+        // What the installed apps are taking up
+        item { AppStorageCard() }
+
         // Favorites
         if (Favorites.paths.isNotEmpty()) {
             item {

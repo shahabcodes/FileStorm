@@ -44,8 +44,10 @@ import androidx.fragment.app.FragmentActivity
 import com.shahabcodes.filestorm.BuildConfig
 import com.shahabcodes.filestorm.data.Accent
 import com.shahabcodes.filestorm.data.Appearance
+import com.shahabcodes.filestorm.data.LoaderStyle
 import com.shahabcodes.filestorm.data.Prefs
 import com.shahabcodes.filestorm.ui.Biometrics
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.pressScale
@@ -396,6 +398,45 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
 
+        SectionHeader("Loading Indicator")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            LoaderStyle.entries.forEachIndexed { i, style ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .pressScale { Prefs.updateLoaderStyle(style) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Every option animates live, so the choice is obvious.
+                    Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
+                        FsSpinner(style = style, size = 34.dp, strokeWidth = 3.dp)
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            style.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        Text(
+                            style.blurb,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                        )
+                    }
+                    if (Prefs.loaderStyle == style) {
+                        Icon(
+                            Icons.Rounded.Check, null,
+                            tint = fsColors.accent, modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                if (i != LoaderStyle.entries.lastIndex) RowSeparator(startIndent = 16.dp)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
         SectionHeader("Troubleshooting")
         GroupedCard(Modifier.padding(horizontal = 16.dp)) {
             Row(
@@ -437,15 +478,40 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
 
-        Text(
-            "File Storm v${BuildConfig.VERSION_NAME}",
-            style = MaterialTheme.typography.bodySmall,
-            color = fsColors.secondaryLabel.copy(alpha = 0.6f),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 40.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
+        SectionHeader("About")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    "File Storm",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = fsColors.label,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Version ${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fsColors.secondaryLabel,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Developed by",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.secondaryLabel,
+                )
+                Spacer(Modifier.height(1.dp))
+                Text(
+                    "shahabkodes",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = fsColors.accent,
+                )
+            }
+        }
+        Spacer(Modifier.height(40.dp))
     }
 }
 

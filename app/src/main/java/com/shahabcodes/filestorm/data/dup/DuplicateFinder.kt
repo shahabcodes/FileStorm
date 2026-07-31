@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.data.dup
 
+import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.FsEntry
 import com.shahabcodes.filestorm.data.TrashManager
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +14,9 @@ import java.io.FileInputStream
 
 enum class DupPhase { IDLE, SCANNING, COMPARING, DONE, CANCELLED, FAILED }
 
+/** Two hand-picked folders, or a sweep of everything on internal storage. */
+enum class DupScope { TWO_FOLDERS, WHOLE_STORAGE }
+
 data class DupPair(
     val id: Int,
     val pathA: String,
@@ -22,6 +26,7 @@ data class DupPair(
 )
 
 data class DupState(
+    val searchScope: DupScope = DupScope.TWO_FOLDERS,
     val folder1: String = "",
     val folder2: String = "",
     val deepCompare: Boolean = false,
@@ -43,6 +48,9 @@ data class DupState(
     val cleanedBytes: Long = 0L,
 ) {
     val isActive: Boolean get() = phase == DupPhase.SCANNING || phase == DupPhase.COMPARING
+    val wholeStorage: Boolean get() = searchScope == DupScope.WHOLE_STORAGE
+    /** Distinct files that would be freed, since one group can span many pairs. */
+    val extraCopies: Int get() = pairs.map { it.pathB }.distinct().size
     val wastedBytes: Long get() = pairs.sumOf { it.size }
     val progress: Float
         get() = when {
@@ -71,6 +79,26 @@ object DuplicateFinder {
     @Volatile
     private var cancelled = false
 
+    /**
+     * Sweeps all of internal storage and groups identical files wherever they
+     * live. Each group keeps its first copy and reports the rest as extras.
+     */
+    fun startWholeStorage(deepCompare: Boolean, includeHidden: Boolean = true): Boolean {
+        if (_state.value.isActive || _state.value.cleaning) return false
+        cancelled = false
+        _state.value = DupState(
+            searchScope = DupScope.WHOLE_STORAGE,
+            folder1 = FileRepository.rootPath,
+            folder2 = "",
+            deepCompare = deepCompare,
+            includeHidden = includeHidden,
+            phase = DupPhase.SCANNING,
+            startedAt = System.currentTimeMillis(),
+        )
+        scope.launch { runWholeStorage(deepCompare, includeHidden) }
+        return true
+    }
+
     fun start(
         folder1: String,
         folder2: String,
@@ -82,6 +110,7 @@ object DuplicateFinder {
         val f2 = File(folder2)
         cancelled = false
         _state.value = DupState(
+            searchScope = DupScope.TWO_FOLDERS,
             folder1 = folder1,
             folder2 = folder2,
             deepCompare = deepCompare,
@@ -125,6 +154,7 @@ object DuplicateFinder {
         val victims = s.pairs
             .filter { it.id in selectedIds }
             .map { if (side == 1) it.pathA else it.pathB }
+            .distinct()
         if (victims.isEmpty()) return
         _state.value = s.copy(cleaning = true)
         scope.launch {
@@ -144,7 +174,52 @@ object DuplicateFinder {
         }
     }
 
-    private fun scanFiles(root: File, includeHidden: Boolean): List<File>? {
+    /**
+     * Whole-storage sweep. Android/data and Android/obb are app-private sandboxes
+     * that are unreadable on modern Android, but Android/media is not — that is
+     * where WhatsApp and friends keep real user files, so it stays in scope.
+     */
+    private suspend fun runWholeStorage(deepCompare: Boolean, includeHidden: Boolean) {
+        val root = File(FileRepository.rootPath)
+        val all = scanFiles(root, includeHidden, wholeStorage = true)
+        if (cancelled || all == null) {
+            _state.value = _state.value.copy(
+                phase = DupPhase.CANCELLED,
+                finishedAt = System.currentTimeMillis(),
+            )
+            return
+        }
+        _state.value = _state.value.copy(scannedFiles = all.size)
+
+        val groups = HashMap<String, MutableList<File>>()
+        for (f in all) {
+            if (f.length() <= 0L) continue // empty files match everything; not useful
+            val key = f.name.lowercase() + "|" + f.length()
+            groups.getOrPut(key) { mutableListOf() }.add(f)
+        }
+        var id = 0
+        val candidates = mutableListOf<DupPair>()
+        for (group in groups.values) {
+            if (cancelled) break
+            if (group.size < 2) continue
+            // Keep the oldest copy — it is the likeliest original — and report
+            // every other copy as an extra that can be reclaimed.
+            val sorted = group.sortedWith(compareBy({ it.lastModified() }, { it.absolutePath }))
+            val keeper = sorted.first()
+            for (extra in sorted.drop(1)) {
+                candidates.add(
+                    DupPair(id++, keeper.absolutePath, extra.absolutePath, extra.name, extra.length())
+                )
+            }
+        }
+        finish(candidates, deepCompare)
+    }
+
+    private fun scanFiles(
+        root: File,
+        includeHidden: Boolean,
+        wholeStorage: Boolean = false,
+    ): List<File>? {
         val out = mutableListOf<File>()
         val queue = ArrayDeque<File>()
         queue.add(root)
@@ -156,6 +231,14 @@ object DuplicateFinder {
                 // The app's own trash is never a duplicate candidate.
                 if (child.name == ".FileStorm") continue
                 if (!includeHidden && child.name.startsWith(".")) continue
+                if (wholeStorage && dir.absolutePath == root.absolutePath.trimEnd(File.separatorChar) &&
+                    child.name == "Android"
+                ) {
+                    // Descend into Android/media only; the rest is app-private.
+                    val media = File(child, "media")
+                    if (media.isDirectory) queue.add(media)
+                    continue
+                }
                 if (child.isDirectory) queue.add(child)
                 else {
                     out.add(child)
@@ -200,6 +283,18 @@ object DuplicateFinder {
             return
         }
 
+        finish(candidates, deepCompare)
+    }
+
+    /** Shared tail: optionally prove the contents match, then publish the result. */
+    private suspend fun finish(candidates: List<DupPair>, deepCompare: Boolean) {
+        if (cancelled) {
+            _state.value = _state.value.copy(
+                phase = DupPhase.CANCELLED,
+                finishedAt = System.currentTimeMillis(),
+            )
+            return
+        }
         if (!deepCompare) {
             _state.value = _state.value.copy(
                 phase = DupPhase.DONE,
