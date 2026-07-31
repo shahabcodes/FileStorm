@@ -15,6 +15,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+enum class ArrangeMode {
+    /** Group photos and videos into MonthYear folders. */
+    MONTHLY,
+
+    /** Pull every file out of subfolders into the chosen folder. */
+    FLATTEN,
+}
+
 enum class ArrangePhase {
     IDLE,
     SCANNING,
@@ -36,6 +44,7 @@ data class MonthPlan(
 
 data class ArrangeState(
     val root: String = "",
+    val mode: ArrangeMode = ArrangeMode.MONTHLY,
     val phase: ArrangePhase = ArrangePhase.IDLE,
     /** Plain-language description of exactly what is happening right now. */
     val message: String = "",
@@ -87,6 +96,7 @@ object ArrangeRunner {
 
     private val monthFormat = SimpleDateFormat("MMMMyyyy", Locale.ENGLISH)
     private const val UNKNOWN = "UnknownDate"
+    private const val FLATTEN_LABEL = "__flatten__"
 
     /** Files grouped by month label, filled during the scan. */
     private var planned: Map<String, List<File>> = emptyMap()
@@ -103,13 +113,16 @@ object ArrangeRunner {
     }
 
     /** Phase 1: walk every subfolder and work out the month layout. */
-    fun scan(root: String) {
+    fun scan(root: String, mode: ArrangeMode = ArrangeMode.MONTHLY) {
         if (_state.value.isBusy) return
         cancelled = false
         _state.value = ArrangeState(
             root = root,
+            mode = mode,
             phase = ArrangePhase.SCANNING,
-            message = "Looking through every subfolder for photos and videos…",
+            message = if (mode == ArrangeMode.FLATTEN)
+                "Looking through every subfolder for files to bring together…"
+            else "Looking through every subfolder for photos and videos…",
             startedAt = System.currentTimeMillis(),
         )
         scope.launch {
@@ -140,13 +153,15 @@ object ArrangeRunner {
                         queue.add(child)
                     } else {
                         val kind = FsEntry.kindOf(child.name, false)
-                        if (kind == FileKind.IMAGE || kind == FileKind.VIDEO) {
+                        val wanted = mode == ArrangeMode.FLATTEN ||
+                            kind == FileKind.IMAGE || kind == FileKind.VIDEO
+                        if (wanted) {
                             media.add(child)
                             if (media.size % 100 == 0) {
                                 _state.value = _state.value.copy(
                                     scannedFiles = media.size,
                                     scannedFolders = folderCount,
-                                    message = "Found ${media.size} photos and videos so far…",
+                                    message = "Found ${media.size} file(s) so far…",
                                 )
                             }
                         }
@@ -155,7 +170,10 @@ object ArrangeRunner {
             }
 
             // Files already sitting in a correctly named month folder are left alone.
-            val groups = media
+            val groups = if (mode == ArrangeMode.FLATTEN) {
+                val loose = media.filter { it.parentFile?.absolutePath != rootDir.absolutePath }
+                if (loose.isEmpty()) emptyMap() else mapOf(FLATTEN_LABEL to loose)
+            } else media
                 .groupBy { file ->
                     val modified = file.lastModified()
                     if (modified <= 0) UNKNOWN else monthFormat.format(Date(modified))
@@ -168,7 +186,16 @@ object ArrangeRunner {
                 .filterValues { it.isNotEmpty() }
 
             planned = groups
-            val monthPlans = groups.entries
+            val monthPlans = if (mode == ArrangeMode.FLATTEN) {
+                groups.map { (_, files) ->
+                    MonthPlan(
+                        label = File(rootDir.absolutePath).name.ifEmpty { "This folder" },
+                        files = files.size,
+                        bytes = files.sumOf { it.length() },
+                        folderExists = true,
+                    )
+                }
+            } else groups.entries
                 .sortedBy { (_, files) -> files.minOf { it.lastModified().takeIf { m -> m > 0 } ?: Long.MAX_VALUE } }
                 .map { (label, files) ->
                     MonthPlan(
@@ -186,11 +213,17 @@ object ArrangeRunner {
                 months = monthPlans,
                 totalFiles = monthPlans.sumOf { it.files },
                 totalBytes = monthPlans.sumOf { it.bytes },
-                message = if (monthPlans.isEmpty()) {
-                    "Nothing to arrange — every photo and video is already in place."
-                } else {
-                    "Scanned $folderCount folders. ${monthPlans.sumOf { it.files }} files will move into " +
-                        "${monthPlans.size} month folders (${monthPlans.count { !it.folderExists }} to create)."
+                message = when {
+                    monthPlans.isEmpty() && mode == ArrangeMode.FLATTEN ->
+                        "Nothing to move — every file already sits directly in this folder."
+                    monthPlans.isEmpty() ->
+                        "Nothing to arrange — every photo and video is already in place."
+                    mode == ArrangeMode.FLATTEN ->
+                        "Scanned $folderCount folders. ${monthPlans.sumOf { it.files }} file(s) will be " +
+                            "brought into this one folder."
+                    else ->
+                        "Scanned $folderCount folders. ${monthPlans.sumOf { it.files }} files will move into " +
+                            "${monthPlans.size} month folders (${monthPlans.count { !it.folderExists }} to create)."
                 },
             )
         }
@@ -227,15 +260,19 @@ object ArrangeRunner {
         }
 
         val errors = mutableListOf<String>()
+        val flatten = _state.value.mode == ArrangeMode.FLATTEN
         for ((label, files) in planned) {
             if (cancelled) break
-            val monthDir = File(rootDir, label)
+            val monthDir = if (flatten) rootDir else File(rootDir, label)
             val existed = monthDir.isDirectory
             val ready = existed || monthDir.mkdirs()
             _state.value = _state.value.copy(
-                currentMonth = label,
-                message = if (existed) "Adding to existing folder $label…"
-                else "Created folder $label, moving files in…",
+                currentMonth = if (flatten) rootDir.name else label,
+                message = when {
+                    flatten -> "Bringing files into ${rootDir.name.ifEmpty { "this folder" }}…"
+                    existed -> "Adding to existing folder $label…"
+                    else -> "Created folder $label, moving files in…"
+                },
             )
             if (!ready) {
                 _state.value = _state.value.copy(
@@ -348,7 +385,11 @@ object ArrangeRunner {
             deletedFolders = deletedFolders,
             finishedAt = System.currentTimeMillis(),
             message = buildString {
-                append("Done. ${s.movedFiles} file(s) arranged into ${s.months.size} month folder(s)")
+                if (s.mode == ArrangeMode.FLATTEN) {
+                    append("Done. ${s.movedFiles} file(s) brought into one folder")
+                } else {
+                    append("Done. ${s.movedFiles} file(s) arranged into ${s.months.size} month folder(s)")
+                }
                 if (s.skippedFiles > 0) append(", ${s.skippedFiles} already in place")
                 if (s.failedFiles > 0) append(", ${s.failedFiles} failed")
                 if (deletedFolders > 0) append(", $deletedFolders empty folder(s) removed")

@@ -132,12 +132,14 @@ object Prefs {
 object FolderViews {
     private lateinit var sp: SharedPreferences
     private val modes = androidx.compose.runtime.mutableStateMapOf<String, ViewMode>()
+    private val columns = androidx.compose.runtime.mutableStateMapOf<String, Int>()
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm_folder_views", Context.MODE_PRIVATE)
         sp.all.forEach { (key, value) ->
-            if (value is String) {
-                runCatching { modes[key] = ViewMode.valueOf(value) }
+            when {
+                key.startsWith("cols:") && value is Int -> columns[key.removePrefix("cols:")] = value
+                value is String -> runCatching { modes[key] = ViewMode.valueOf(value) }
             }
         }
     }
@@ -149,6 +151,21 @@ object FolderViews {
     fun setView(key: String, mode: ViewMode) {
         modes[key] = mode
         sp.edit().putString(key, mode.name).apply()
+    }
+
+    /** Tile columns for grid-like views, adjusted by pinching. */
+    fun columnsFor(key: String, mode: ViewMode): Int {
+        val stored = columns["$key|${mode.name}"]
+        return stored ?: when (mode) {
+            ViewMode.GALLERY -> 2
+            else -> 3
+        }
+    }
+
+    fun setColumns(key: String, mode: ViewMode, value: Int) {
+        val clamped = value.coerceIn(1, if (mode == ViewMode.GALLERY) 4 else 6)
+        columns["$key|${mode.name}"] = clamped
+        sp.edit().putInt("cols:$key|${mode.name}", clamped).apply()
     }
 
     /** Drops this folder's override so it follows the app default again. */

@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.MoveToInbox
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SwapVert
@@ -183,7 +184,8 @@ fun ViewModeMenu(
 fun BrowserScreen(
     onExit: () -> Unit,
     onOpenTransfer: () -> Unit,
-    onArrange: (String) -> Unit,
+    onArrange: (String, com.shahabcodes.filestorm.data.arrange.ArrangeMode) -> Unit,
+    onOpenViewer: (List<String>, Int) -> Unit,
 ) {
     val tabs = BrowserTabs.tabs
     if (tabs.isEmpty()) {
@@ -204,6 +206,7 @@ fun BrowserScreen(
     var selectionMode by remember(path) { mutableStateOf(false) }
     var selected by remember(path) { mutableStateOf(setOf<String>()) }
     var menuOpen by remember { mutableStateOf(false) }
+    var pinchAccumulator by remember { mutableStateOf(1f) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var viewMenuOpen by remember { mutableStateOf(false) }
     var showDateSheet by remember { mutableStateOf(false) }
@@ -460,7 +463,15 @@ fun BrowserScreen(
                             leadingIcon = { Icon(Icons.Rounded.AutoAwesomeMosaic, null, tint = fsColors.accent) },
                             onClick = {
                                 menuOpen = false
-                                onArrange(path)
+                                onArrange(path, com.shahabcodes.filestorm.data.arrange.ArrangeMode.MONTHLY)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Gather all files into this folder…", color = fsColors.label) },
+                            leadingIcon = { Icon(Icons.Rounded.MoveToInbox, null, tint = fsColors.accent) },
+                            onClick = {
+                                menuOpen = false
+                                onArrange(path, com.shahabcodes.filestorm.data.arrange.ArrangeMode.FLATTEN)
                             },
                         )
                         DropdownMenuItem(
@@ -579,6 +590,8 @@ fun BrowserScreen(
                     selected = selected,
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
                     viewMode = viewMode,
+                    columns = com.shahabcodes.filestorm.data.FolderViews.columnsFor(path, viewMode),
+                    onZoom = { zoom -> pinchAccumulator = applyPinch(path, viewMode, pinchAccumulator * zoom) },
                     onClick = { entry ->
                         if (selectionMode) {
                             selected = if (entry.path in selected) selected - entry.path
@@ -586,7 +599,14 @@ fun BrowserScreen(
                         } else if (entry.isDirectory) {
                             openEntryFolder(entry)
                         } else {
-                            openFile(context, entry)
+                            val media = visibleEntries.filter {
+                                !it.isDirectory &&
+                                    (it.kind == com.shahabcodes.filestorm.data.FileKind.IMAGE ||
+                                        it.kind == com.shahabcodes.filestorm.data.FileKind.VIDEO)
+                            }
+                            val index = media.indexOfFirst { it.path == entry.path }
+                            if (index >= 0) onOpenViewer(media.map { it.path }, index)
+                            else openFile(context, entry)
                         }
                     },
                     onLongClick = { entry ->
@@ -705,7 +725,12 @@ fun BrowserScreen(
                     }
                 }
             } else null,
-            onArrange = if (target.isDirectory) ({ onArrange(target.path) }) else null,
+            onArrange = if (target.isDirectory) ({
+                onArrange(target.path, com.shahabcodes.filestorm.data.arrange.ArrangeMode.MONTHLY)
+            }) else null,
+            onFlatten = if (target.isDirectory) ({
+                onArrange(target.path, com.shahabcodes.filestorm.data.arrange.ArrangeMode.FLATTEN)
+            }) else null,
             onProperties = { infoTarget = target },
             onRename = { renameTarget = target },
             onEditDate = {

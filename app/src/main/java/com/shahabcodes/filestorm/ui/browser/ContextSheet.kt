@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.MoveToInbox
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Schedule
@@ -67,6 +68,7 @@ fun EntryContextSheet(
     onOpen: () -> Unit,
     onOpenInNewTab: (() -> Unit)? = null,
     onArrange: (() -> Unit)? = null,
+    onFlatten: (() -> Unit)? = null,
     onProperties: () -> Unit,
     onRename: () -> Unit,
     onEditDate: (() -> Unit)? = null,
@@ -128,6 +130,12 @@ fun EntryContextSheet(
                     RowSeparator(startIndent = 54.dp)
                     ContextRow(Icons.Rounded.AutoAwesomeMosaic, "Auto arrange into months…") {
                         onDismiss(); onArrange()
+                    }
+                }
+                if (isFolder && onFlatten != null) {
+                    RowSeparator(startIndent = 54.dp)
+                    ContextRow(Icons.Rounded.MoveToInbox, "Gather all files into this folder…") {
+                        onDismiss(); onFlatten()
                     }
                 }
                 RowSeparator(startIndent = 54.dp)

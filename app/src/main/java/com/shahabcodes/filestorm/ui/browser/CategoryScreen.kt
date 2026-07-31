@@ -72,6 +72,7 @@ fun CategoryScreen(
     kind: FileKind,
     onBack: () -> Unit,
     onOpenTransfer: () -> Unit,
+    onOpenViewer: (List<String>, Int) -> Unit,
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -89,6 +90,7 @@ fun CategoryScreen(
     var reloadKey by remember { mutableStateOf(0) }
     val viewKey = "category:" + kind.name
     val viewMode = com.shahabcodes.filestorm.data.FolderViews.viewFor(viewKey)
+    var pinchAccumulator by remember { mutableStateOf(1f) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var viewMenuOpen by remember { mutableStateOf(false) }
 
@@ -243,12 +245,19 @@ fun CategoryScreen(
                         start = 16.dp, end = 16.dp, bottom = 120.dp
                     ),
                     viewMode = viewMode,
+                    columns = com.shahabcodes.filestorm.data.FolderViews.columnsFor(viewKey, viewMode),
+                    onZoom = { zoom -> pinchAccumulator = applyPinch(viewKey, viewMode, pinchAccumulator * zoom) },
                     onClick = { entry ->
                         if (selectionMode) {
                             selected = if (entry.path in selected) selected - entry.path
                             else selected + entry.path
                         } else {
-                            openFile(context, entry)
+                            val media = visible.filter {
+                                it.kind == FileKind.IMAGE || it.kind == FileKind.VIDEO
+                            }
+                            val index = media.indexOfFirst { it.path == entry.path }
+                            if (index >= 0) onOpenViewer(media.map { it.path }, index)
+                            else openFile(context, entry)
                         }
                     },
                     onLongClick = { entry ->

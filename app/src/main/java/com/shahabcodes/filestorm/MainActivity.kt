@@ -151,7 +151,13 @@ private fun AppNav() {
             BrowserScreen(
                 onExit = { nav.popBackStack() },
                 onOpenTransfer = { showTransferSheet = true },
-                onArrange = { p -> nav.navigate("arrange?path=" + Uri.encode(p)) },
+                onArrange = { p, mode ->
+                    nav.navigate("arrange?path=" + Uri.encode(p) + "&mode=" + mode.name)
+                },
+                onOpenViewer = { paths, index ->
+                    com.shahabcodes.filestorm.ui.viewer.ViewerState.open(paths, index)
+                    nav.navigate("viewer")
+                },
             )
         }
         composable("category/{kind}") { backStack ->
@@ -160,6 +166,10 @@ private fun AppNav() {
                 kind = kind,
                 onBack = { nav.popBackStack() },
                 onOpenTransfer = { showTransferSheet = true },
+                onOpenViewer = { paths, index ->
+                    com.shahabcodes.filestorm.ui.viewer.ViewerState.open(paths, index)
+                    nav.navigate("viewer")
+                },
             )
         }
         composable("transfer") {
@@ -184,12 +194,21 @@ private fun AppNav() {
         composable("verify") {
             com.shahabcodes.filestorm.ui.jobs.VerifyScreen(onBack = { nav.popBackStack() })
         }
-        composable("arrange?path={path}") { backStack ->
+        composable("arrange?path={path}&mode={mode}") { backStack ->
             val target = Uri.decode(backStack.arguments?.getString("path") ?: FileRepository.rootPath)
+            val mode = runCatching {
+                com.shahabcodes.filestorm.data.arrange.ArrangeMode.valueOf(
+                    backStack.arguments?.getString("mode") ?: "MONTHLY"
+                )
+            }.getOrDefault(com.shahabcodes.filestorm.data.arrange.ArrangeMode.MONTHLY)
             com.shahabcodes.filestorm.ui.arrange.ArrangeScreen(
                 path = target,
+                mode = mode,
                 onBack = { nav.popBackStack() },
             )
+        }
+        composable("viewer") {
+            com.shahabcodes.filestorm.ui.viewer.ViewerScreen(onBack = { nav.popBackStack() })
         }
         composable("duplicates") {
             com.shahabcodes.filestorm.ui.dup.DuplicatesScreen(onBack = { nav.popBackStack() })

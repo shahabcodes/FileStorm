@@ -34,6 +34,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -66,12 +70,14 @@ fun FileListView(
     selected: Set<String>,
     contentPadding: PaddingValues,
     viewMode: ViewMode,
+    columns: Int = 3,
+    onZoom: (Float) -> Unit = {},
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
 ) {
     when (viewMode) {
         ViewMode.LIST, ViewMode.DETAILED -> LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().pinchToZoom(onZoom),
             contentPadding = contentPadding,
         ) {
             itemsIndexed(entries, key = { _, e -> e.path }) { index, entry ->
@@ -107,8 +113,8 @@ fun FileListView(
         }
 
         ViewMode.GRID -> LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            modifier = Modifier.fillMaxSize(),
+            columns = GridCells.Fixed(columns.coerceIn(1, 6)),
+            modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -131,7 +137,7 @@ fun FileListView(
                 ordered.groupBy { monthLabel(it.lastModified) }
             }
             LazyColumn(
-                Modifier.fillMaxSize(),
+                Modifier.fillMaxSize().pinchToZoom(onZoom),
                 contentPadding = contentPadding,
             ) {
                 groups.forEach { (label, groupEntries) ->
@@ -163,8 +169,8 @@ fun FileListView(
         }
 
         ViewMode.GALLERY -> LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxSize(),
+            columns = GridCells.Fixed(columns.coerceIn(1, 4)),
+            modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -179,6 +185,64 @@ fun FileListView(
                 )
             }
         }
+    }
+}
+
+
+/**
+ * Maps an accumulated pinch factor onto the folder's view: pinching out grows
+ * the tiles (fewer columns) and eventually reaches the list; pinching in shrinks
+ * them, the way the iOS photo grid behaves. Returns the reset accumulator.
+ */
+fun applyPinch(key: String, mode: ViewMode, accumulated: Float): Float {
+    val grid = mode == ViewMode.GRID || mode == ViewMode.GALLERY
+    val maxColumns = if (mode == ViewMode.GALLERY) 4 else 6
+    when {
+        accumulated > 1.35f -> {
+            if (grid) {
+                val cols = com.shahabcodes.filestorm.data.FolderViews.columnsFor(key, mode)
+                if (cols <= 1) {
+                    com.shahabcodes.filestorm.data.FolderViews.setView(key, ViewMode.GALLERY)
+                } else {
+                    com.shahabcodes.filestorm.data.FolderViews.setColumns(key, mode, cols - 1)
+                }
+            } else {
+                com.shahabcodes.filestorm.data.FolderViews.setView(key, ViewMode.GRID)
+            }
+            return 1f
+        }
+        accumulated < 0.74f -> {
+            if (grid) {
+                val cols = com.shahabcodes.filestorm.data.FolderViews.columnsFor(key, mode)
+                if (cols >= maxColumns) {
+                    com.shahabcodes.filestorm.data.FolderViews.setView(key, ViewMode.LIST)
+                } else {
+                    com.shahabcodes.filestorm.data.FolderViews.setColumns(key, mode, cols + 1)
+                }
+            }
+            return 1f
+        }
+    }
+    return accumulated
+}
+
+/**
+ * Two-finger pinch reporting the accumulated zoom factor. Single-finger events
+ * are left untouched so normal scrolling still works.
+ */
+private fun Modifier.pinchToZoom(onZoom: (Float) -> Unit): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        do {
+            val event = awaitPointerEvent()
+            if (event.changes.size >= 2) {
+                val zoom = event.calculateZoom()
+                if (zoom != 1f) {
+                    onZoom(zoom)
+                    event.changes.forEach { it.consume() }
+                }
+            }
+        } while (event.changes.any { it.pressed })
     }
 }
 

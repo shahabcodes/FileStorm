@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.shahabcodes.filestorm.data.FileRepository
+import com.shahabcodes.filestorm.data.arrange.ArrangeMode
 import com.shahabcodes.filestorm.data.arrange.ArrangePhase
 import com.shahabcodes.filestorm.data.arrange.ArrangeRunner
 import com.shahabcodes.filestorm.ui.components.GroupedCard
@@ -61,7 +62,7 @@ private fun phaseNumber(phase: ArrangePhase): Int = when (phase) {
 }
 
 private fun phaseTitle(phase: ArrangePhase): String = when (phase) {
-    ArrangePhase.IDLE -> "Auto Arrange"
+    ArrangePhase.IDLE -> "Organize"
     ArrangePhase.SCANNING -> "Scanning"
     ArrangePhase.REVIEW_PLAN -> "Review the plan"
     ArrangePhase.MOVING -> "Moving files"
@@ -73,13 +74,13 @@ private fun phaseTitle(phase: ArrangePhase): String = when (phase) {
 }
 
 @Composable
-fun ArrangeScreen(path: String, onBack: () -> Unit) {
+fun ArrangeScreen(path: String, mode: ArrangeMode, onBack: () -> Unit) {
     val s by ArrangeRunner.state.collectAsState()
 
-    LaunchedEffect(path) {
-        if (s.phase == ArrangePhase.IDLE || s.root != path) {
+    LaunchedEffect(path, mode) {
+        if (s.phase == ArrangePhase.IDLE || s.root != path || s.mode != mode) {
             ArrangeRunner.reset()
-            ArrangeRunner.scan(path)
+            ArrangeRunner.scan(path, mode)
         }
     }
 
@@ -131,7 +132,8 @@ fun ArrangeScreen(path: String, onBack: () -> Unit) {
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         Text(
-            File(path).name.ifEmpty { "Internal storage" } + " · all subfolders",
+            File(path).name.ifEmpty { "Internal storage" } +
+                if (mode == ArrangeMode.FLATTEN) " · gather into one folder" else " · into month folders",
             style = MaterialTheme.typography.bodySmall,
             color = fsColors.secondaryLabel,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
@@ -254,7 +256,7 @@ fun ArrangeScreen(path: String, onBack: () -> Unit) {
             if (s.months.isNotEmpty() && s.phase != ArrangePhase.DONE) {
                 item {
                     Text(
-                        "MONTH FOLDERS",
+                        if (mode == ArrangeMode.FLATTEN) "DESTINATION" else "MONTH FOLDERS",
                         style = MaterialTheme.typography.labelMedium,
                         color = fsColors.secondaryLabel,
                         modifier = Modifier.padding(start = 4.dp),
@@ -308,7 +310,10 @@ fun ArrangeScreen(path: String, onBack: () -> Unit) {
                 }
                 item {
                     Text(
-                        "Existing month folders are reused; only missing ones are created. " +
+                        if (mode == ArrangeMode.FLATTEN)
+                            "Every file from the subfolders moves into this one folder. " +
+                                "Name clashes are renamed automatically, and files already here stay put."
+                        else "Existing month folders are reused; only missing ones are created. " +
                             "Files already in the right month folder are left untouched.",
                         style = MaterialTheme.typography.labelSmall,
                         color = fsColors.secondaryLabel,
