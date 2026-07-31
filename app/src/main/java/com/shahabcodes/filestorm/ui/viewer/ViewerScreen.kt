@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -62,6 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -100,16 +102,27 @@ object ViewerState {
     fun remove(path: String) {
         paths = paths.filterNot { it == path }
     }
+
+    fun clear() {
+        paths = emptyList()
+        startIndex = 0
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ViewerScreen(onBack: () -> Unit) {
     val items = ViewerState.paths
+    // Closing always wipes the shared state, so a stale list can never be shown.
+    val close = {
+        ViewerState.clear()
+        onBack()
+    }
     if (items.isEmpty()) {
         LaunchedEffect(Unit) { onBack() }
         return
     }
+    androidx.activity.compose.BackHandler { close() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = ViewerState.startIndex) { items.size }
@@ -154,7 +167,7 @@ fun ViewerScreen(onBack: () -> Unit) {
                     .padding(horizontal = 6.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BarIcon(Icons.Rounded.Close, "Close") { onBack() }
+                BarIcon(Icons.Rounded.Close, "Close") { close() }
                 Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
                     Text(
                         currentFile.name,
@@ -227,7 +240,7 @@ fun ViewerScreen(onBack: () -> Unit) {
                         if (file.exists()) TrashManager.moveToTrash(listOf(FsEntry.from(file)))
                         FileRepository.invalidate(file.parent)
                         ViewerState.remove(file.absolutePath)
-                        if (ViewerState.paths.isEmpty()) onBack()
+                        if (ViewerState.paths.isEmpty()) close()
                     }
                 }) { Text("Move to Trash", color = fsColors.red) }
             },
@@ -247,11 +260,14 @@ private fun BarIcon(
     tint: Color = Color.White,
     onClick: () -> Unit,
 ) {
+    // A plain clickable always invokes the current lambda; pointerInput keyed on
+    // a constant would freeze the very first one and act on the wrong file.
     Icon(
         icon, label,
         tint = tint,
         modifier = Modifier
-            .pointerInput(label) { detectTapGestures { onClick() } }
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .clickable(onClick = onClick)
             .padding(12.dp)
             .size(22.dp),
     )
@@ -281,6 +297,7 @@ private fun share(context: android.content.Context, file: File) {
  */
 @Composable
 private fun ImagePage(file: File, onToggleChrome: () -> Unit) {
+    val toggle by androidx.compose.runtime.rememberUpdatedState(onToggleChrome)
     var scale by remember(file) { mutableFloatStateOf(1f) }
     var offsetX by remember(file) { mutableFloatStateOf(0f) }
     var offsetY by remember(file) { mutableFloatStateOf(0f) }
@@ -290,7 +307,7 @@ private fun ImagePage(file: File, onToggleChrome: () -> Unit) {
             .fillMaxSize()
             .pointerInput(file) {
                 detectTapGestures(
-                    onTap = { onToggleChrome() },
+                    onTap = { toggle() },
                     onDoubleTap = {
                         if (scale > 1.05f) {
                             scale = 1f
@@ -366,6 +383,7 @@ private fun VideoPage(
     chromeVisible: Boolean,
     onToggleChrome: () -> Unit,
 ) {
+    val toggle by androidx.compose.runtime.rememberUpdatedState(onToggleChrome)
     var player by remember(file) { mutableStateOf<android.media.MediaPlayer?>(null) }
     var playing by remember(file) { mutableStateOf(false) }
     var muted by remember(file) { mutableStateOf(false) }
@@ -384,7 +402,7 @@ private fun VideoPage(
             .fillMaxSize()
             .pointerInput(file) {
                 detectTapGestures(
-                    onTap = { onToggleChrome() },
+                    onTap = { toggle() },
                     onDoubleTap = {
                         if (scale > 1.05f) {
                             scale = 1f

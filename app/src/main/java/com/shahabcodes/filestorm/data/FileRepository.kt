@@ -96,7 +96,23 @@ object FileRepository {
             results
         }
 
-    suspend fun filesByKind(kind: FileKind, limit: Int = 2000): List<FsEntry> =
+    private val kindCache = java.util.concurrent.ConcurrentHashMap<FileKind, Pair<Long, List<FsEntry>>>()
+
+    fun invalidateKinds() = kindCache.clear()
+
+    /** Category scans walk the whole tree, so results are reused for a while. */
+    suspend fun filesByKind(
+        kind: FileKind,
+        limit: Int = 2000,
+        maxAgeMillis: Long = 5 * 60 * 1000L,
+    ): List<FsEntry> = withContext(Dispatchers.IO) {
+        kindCache[kind]?.let { (stamp, cached) ->
+            if (System.currentTimeMillis() - stamp < maxAgeMillis) return@withContext cached
+        }
+        scanKind(kind, limit).also { kindCache[kind] = System.currentTimeMillis() to it }
+    }
+
+    private suspend fun scanKind(kind: FileKind, limit: Int): List<FsEntry> =
         withContext(Dispatchers.IO) {
             val results = mutableListOf<FsEntry>()
             val showHidden = Prefs.showHidden

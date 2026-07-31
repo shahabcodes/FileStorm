@@ -102,7 +102,9 @@ fun CategoryScreen(
     var sortTick by remember { mutableStateOf(0) }
 
     LaunchedEffect(kind, reloadKey) {
-        loading = true
+        // Only the very first pass shows the loader; later passes reuse the cache
+        // so returning to a category is instant instead of re-walking storage.
+        loading = files.isEmpty()
         files = FileRepository.sortEntries(
             FileRepository.filesByKind(kind), Prefs.sortField, Prefs.sortAscending
         )
@@ -225,15 +227,11 @@ fun CategoryScreen(
 
         Box(Modifier.weight(1f)) {
             when {
-                loading -> Column(
-                    Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    CircularProgressIndicator(color = fsColors.accent)
-                    Spacer(Modifier.height(12.dp))
-                    Text("Scanning storage…", color = fsColors.secondaryLabel, style = MaterialTheme.typography.bodyMedium)
-                }
+                loading -> com.shahabcodes.filestorm.ui.components.FsLoadingState(
+                    title = "Scanning storage",
+                    detail = "Looking through every folder for " +
+                        (kindTitles[kind] ?: "files").lowercase(),
+                )
                 visible.isEmpty() -> Column(
                     Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -393,8 +391,17 @@ fun CategoryScreen(
         )
     }
 
+    // Refresh only when a transfer really finishes while this screen is open.
     val transfer by TransferManager.state.collectAsState()
+    var lastTransferState by remember { mutableStateOf(transfer.state) }
     LaunchedEffect(transfer.state) {
-        if (!transfer.isActive && !loading) reloadKey++
+        if (transfer.state != lastTransferState) {
+            val finished = !transfer.isActive
+            lastTransferState = transfer.state
+            if (finished) {
+                FileRepository.invalidateKinds()
+                reloadKey++
+            }
+        }
     }
 }

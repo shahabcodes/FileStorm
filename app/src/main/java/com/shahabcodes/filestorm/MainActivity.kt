@@ -150,7 +150,9 @@ private fun AppNav() {
         composable("home") {
             HomeScreen(
                 onOpenFolder = { path -> openBrowser(path) },
-                onOpenCategory = { kind -> nav.navigate("category/${kind.name}") },
+                onOpenCategory = { kind ->
+                    nav.navigate("category/${kind.name}") { launchSingleTop = true }
+                },
                 onOpenTransfer = { showTransferSheet = true },
                 onOpenSettings = { nav.navigate("settings") },
                 onOpenTrash = { nav.navigate("trash") },
@@ -167,7 +169,7 @@ private fun AppNav() {
                 },
                 onOpenViewer = { paths, index ->
                     com.shahabcodes.filestorm.ui.viewer.ViewerState.open(paths, index)
-                    nav.navigate("viewer")
+                    nav.navigate("viewer") { launchSingleTop = true }
                 },
             )
         }
@@ -179,7 +181,7 @@ private fun AppNav() {
                 onOpenTransfer = { showTransferSheet = true },
                 onOpenViewer = { paths, index ->
                     com.shahabcodes.filestorm.ui.viewer.ViewerState.open(paths, index)
-                    nav.navigate("viewer")
+                    nav.navigate("viewer") { launchSingleTop = true }
                 },
             )
         }

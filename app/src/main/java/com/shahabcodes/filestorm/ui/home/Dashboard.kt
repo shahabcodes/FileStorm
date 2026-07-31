@@ -77,10 +77,9 @@ fun DashboardCard() {
                     modifier = Modifier.weight(1f),
                 )
                 if (scanning) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = fsColors.accent,
+                    com.shahabcodes.filestorm.ui.components.FsSpinner(
+                        size = 20.dp,
+                        strokeWidth = 2.5.dp,
                     )
                 } else {
                     Icon(

@@ -663,19 +663,10 @@ fun BrowserScreen(
         // ── File list ───────────────────────────────────────────────────
         Box(Modifier.weight(1f)) {
             when {
-                loading -> Column(
-                    Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    CircularProgressIndicator(color = fsColors.accent)
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Loading folder…",
-                        color = fsColors.secondaryLabel,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+                loading -> com.shahabcodes.filestorm.ui.components.FsLoadingState(
+                    title = "Opening folder",
+                    detail = File(path).name.ifEmpty { "Internal storage" },
+                )
                 visibleEntries.isEmpty() -> Column(
                     Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
