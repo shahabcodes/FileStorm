@@ -26,7 +26,6 @@ import androidx.navigation.compose.rememberNavController
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.Prefs
-import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavBackStackEntry
 import com.shahabcodes.filestorm.ui.components.DiagnosticsOverlay
 import com.shahabcodes.filestorm.ui.Biometrics
@@ -177,16 +176,21 @@ private fun AppNav() {
      * Videos on the home screen could open a file from the Images list: the
      * touch landed on the Images grid that had not been torn down yet.
      *
-     * Only the settled destination is RESUMED, so every navigation and every
-     * viewer open is routed through this gate.
+     * The test is top-of-back-stack, not RESUMED. A screen animating *in* is
+     * already the top entry but is not RESUMED until the transition ends, so a
+     * lifecycle check would swallow real taps for the length of that animation.
+     * The back stack updates the instant we navigate, so the incoming screen
+     * accepts taps immediately and the outgoing one stops accepting them
+     * immediately, which is exactly the split we want.
      */
     fun NavBackStackEntry.ifCurrent(action: () -> Unit) {
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+        if (nav.currentBackStackEntry?.id == id) {
             action()
         } else {
             com.shahabcodes.filestorm.data.Diagnostics.log(
                 "BLOCKED",
-                "stale tap on ${destination.route} state=${lifecycle.currentState}",
+                "stale tap on ${destination.route}, top is " +
+                    "${nav.currentBackStackEntry?.destination?.route}",
             )
         }
     }
