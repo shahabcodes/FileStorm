@@ -27,27 +27,39 @@ enum class SortField(val label: String, val defaultAscending: Boolean) {
  * decorated ones, so the settings list can show what a theme looks like
  * instead of only naming it.
  */
+/**
+ * How bright the app is. Independent of [ThemePalette]: every palette has a
+ * light and a dark form, so there is no "Blossom Night" to pick separately —
+ * choosing Blossom and Dark gets you exactly that.
+ */
 enum class Appearance(
     val label: String,
     val blurb: String,
-    val swatchStart: Long = 0L,
-    val swatchEnd: Long = 0L,
+    val swatchStart: Long,
+    val swatchEnd: Long,
 ) {
-    SYSTEM("Automatic", "Follows the system light/dark setting"),
-    LIGHT("Light", "Classic bright surfaces"),
-    DARK("Dark", "True black, easy at night"),
-    BLOSSOM("Blossom", "Frosted rose and violet, drawn from the Glass icon", 0xFF7A5AF0, 0xFFDB3E90),
-    BLOSSOM_NIGHT("Blossom Night", "The same rose and violet over deep plum", 0xFF9F87FF, 0xFFFF74B4),
-    SAKURA("Sakura", "Cherry petals on cream, with sage and apricot", 0xFFEE6F9C, 0xFFE8A860),
-    SAKURA_NIGHT("Sakura Night", "Petal pink over warm charcoal", 0xFFFF92B6, 0xFFFFC08C),
+    SYSTEM("Automatic", "Follows the system light/dark setting", 0xFFFFFFFF, 0xFF1C1C1E),
+    LIGHT("Light", "Bright surfaces all day", 0xFFFFFFFF, 0xFFDDDDE2),
+    DARK("Dark", "Deep surfaces, easy at night", 0xFF48484A, 0xFF000000),
     ;
 
-    /** Whether this appearance renders dark surfaces right now. */
     fun isDark(systemDark: Boolean): Boolean = when (this) {
         SYSTEM -> systemDark
-        LIGHT, BLOSSOM, SAKURA -> false
-        DARK, BLOSSOM_NIGHT, SAKURA_NIGHT -> true
+        LIGHT -> false
+        DARK -> true
     }
+}
+
+/** Which colour family the app wears. Each one has a light and a dark form. */
+enum class ThemePalette(
+    val label: String,
+    val blurb: String,
+    val swatchStart: Long,
+    val swatchEnd: Long,
+) {
+    DEFAULT("Classic", "The iOS-style palette File Storm ships with", 0xFF007AFF, 0xFF34C759),
+    BLOSSOM("Blossom", "Frosted rose and violet, drawn from the Glass icon", 0xFF7A5AF0, 0xFFDB3E90),
+    SAKURA("Sakura", "Cherry petals on cream, with sage and apricot", 0xFFEE6F9C, 0xFFE8A860),
 }
 
 enum class Accent(val label: String, val light: Long, val dark: Long) {
@@ -82,6 +94,8 @@ object Prefs {
     var biometricLock by mutableStateOf(false)
         private set
     var appearance by mutableStateOf(Appearance.SYSTEM)
+        private set
+    var palette by mutableStateOf(ThemePalette.DEFAULT)
         private set
     var accent by mutableStateOf(Accent.BLUE)
         private set
@@ -120,9 +134,22 @@ object Prefs {
         loaderStyle = runCatching {
             LoaderStyle.valueOf(sp.getString("loader_style", LoaderStyle.ARC.name)!!)
         }.getOrDefault(LoaderStyle.ARC)
-        appearance = runCatching {
-            Appearance.valueOf(sp.getString("appearance", Appearance.SYSTEM.name)!!)
+        // Brightness and palette used to be one setting, so older saves hold
+        // names like BLOSSOM_NIGHT. Split them rather than silently resetting.
+        val storedAppearance = sp.getString("appearance", Appearance.SYSTEM.name)!!
+        val legacy = legacyAppearance(storedAppearance)
+        appearance = legacy?.first ?: runCatching {
+            Appearance.valueOf(storedAppearance)
         }.getOrDefault(Appearance.SYSTEM)
+        palette = legacy?.second ?: runCatching {
+            ThemePalette.valueOf(sp.getString("palette", ThemePalette.DEFAULT.name)!!)
+        }.getOrDefault(ThemePalette.DEFAULT)
+        if (legacy != null) {
+            sp.edit()
+                .putString("appearance", appearance.name)
+                .putString("palette", palette.name)
+                .apply()
+        }
         accent = runCatching {
             Accent.valueOf(sp.getString("accent", Accent.BLUE.name)!!)
         }.getOrDefault(Accent.BLUE)
@@ -136,6 +163,19 @@ object Prefs {
     fun updateBiometricLock(value: Boolean) {
         biometricLock = value
         sp.edit().putBoolean("biometric_lock", value).apply()
+    }
+
+    private fun legacyAppearance(stored: String): Pair<Appearance, ThemePalette>? = when (stored) {
+        "BLOSSOM" -> Appearance.LIGHT to ThemePalette.BLOSSOM
+        "BLOSSOM_NIGHT" -> Appearance.DARK to ThemePalette.BLOSSOM
+        "SAKURA" -> Appearance.LIGHT to ThemePalette.SAKURA
+        "SAKURA_NIGHT" -> Appearance.DARK to ThemePalette.SAKURA
+        else -> null
+    }
+
+    fun updatePalette(value: ThemePalette) {
+        palette = value
+        sp.edit().putString("palette", value.name).apply()
     }
 
     fun updateAppearance(value: Appearance) {

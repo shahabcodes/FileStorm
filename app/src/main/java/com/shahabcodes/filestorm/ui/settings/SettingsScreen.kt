@@ -47,6 +47,7 @@ import com.shahabcodes.filestorm.data.Accent
 import com.shahabcodes.filestorm.data.Appearance
 import com.shahabcodes.filestorm.data.LoaderStyle
 import com.shahabcodes.filestorm.data.Prefs
+import com.shahabcodes.filestorm.data.ThemePalette
 import com.shahabcodes.filestorm.ui.Biometrics
 import com.shahabcodes.filestorm.ui.components.FsSpinner
 import com.shahabcodes.filestorm.ui.components.GroupedCard
@@ -94,51 +95,31 @@ fun SettingsScreen(onBack: () -> Unit) {
         SectionHeader("Appearance")
         GroupedCard(Modifier.padding(horizontal = 16.dp)) {
             Appearance.entries.forEachIndexed { i, mode ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .pressScale { Prefs.updateAppearance(mode) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (mode.swatchStart != 0L) {
-                        // A little of the theme itself, so the name is not the
-                        // only clue to what it looks like.
-                        Box(
-                            Modifier
-                                .size(26.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(
-                                            Color(mode.swatchStart),
-                                            Color(mode.swatchEnd),
-                                        )
-                                    )
-                                )
-                        )
-                        Spacer(Modifier.width(12.dp))
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            mode.label,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = fsColors.label,
-                        )
-                        Text(
-                            mode.blurb,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = fsColors.secondaryLabel,
-                        )
-                    }
-                    if (Prefs.appearance == mode) {
-                        Icon(
-                            Icons.Rounded.Check, null,
-                            tint = fsColors.accent, modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-                if (i != Appearance.entries.lastIndex) RowSeparator(startIndent = 16.dp)
+                ChoiceRow(
+                    label = mode.label,
+                    blurb = mode.blurb,
+                    swatchStart = mode.swatchStart,
+                    swatchEnd = mode.swatchEnd,
+                    selected = Prefs.appearance == mode,
+                ) { Prefs.updateAppearance(mode) }
+                if (i != Appearance.entries.lastIndex) RowSeparator(startIndent = 54.dp)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // Palette is a separate axis from brightness: every one of these has a
+        // light and a dark form, so there is no "Blossom Night" to pick.
+        SectionHeader("Theme")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            ThemePalette.entries.forEachIndexed { i, theme ->
+                ChoiceRow(
+                    label = theme.label,
+                    blurb = theme.blurb,
+                    swatchStart = theme.swatchStart,
+                    swatchEnd = theme.swatchEnd,
+                    selected = Prefs.palette == theme,
+                ) { Prefs.updatePalette(theme) }
+                if (i != ThemePalette.entries.lastIndex) RowSeparator(startIndent = 54.dp)
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -537,6 +518,45 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
         Spacer(Modifier.height(40.dp))
+    }
+}
+
+/** A settings row that previews its option as a gradient dot. */
+@Composable
+private fun ChoiceRow(
+    label: String,
+    blurb: String,
+    swatchStart: Long,
+    swatchEnd: Long,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .pressScale(onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(Brush.linearGradient(listOf(Color(swatchStart), Color(swatchEnd))))
+                // Pale swatches would vanish against a white card without this.
+                .border(1.dp, fsColors.separator, CircleShape)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = fsColors.label)
+            Text(blurb, style = MaterialTheme.typography.bodySmall, color = fsColors.secondaryLabel)
+        }
+        if (selected) {
+            Icon(
+                Icons.Rounded.Check, null,
+                tint = fsColors.accent, modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 

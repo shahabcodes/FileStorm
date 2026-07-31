@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.jobs
 
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -265,10 +266,7 @@ fun VerifyScreen(onBack: () -> Unit) {
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     if (s.cleaning) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(20.dp),
-                                            strokeWidth = 2.5.dp, color = fsColors.accent,
-                                        )
+                                        FsSpinner(size = 20.dp, strokeWidth = 2.5.dp)
                                     } else {
                                         Text(
                                             "Move ${s.verifiedPaths.size} Verified Files to Trash",

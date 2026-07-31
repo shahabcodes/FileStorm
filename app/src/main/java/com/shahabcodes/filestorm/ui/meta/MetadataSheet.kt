@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.meta
 
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -502,11 +503,7 @@ fun BatchDateSheet(
                         Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = fsColors.accent,
-                        )
+                        FsSpinner(size = 18.dp, strokeWidth = 2.dp)
                         Spacer(Modifier.width(12.dp))
                         Text(
                             if (folderRoot != null) "Scanning folder… $scanCount file(s)"
@@ -1017,7 +1014,7 @@ private fun BusyDialog(label: String) {
                 .padding(horizontal = 28.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            CircularProgressIndicator(color = fsColors.accent)
+            FsSpinner()
             Spacer(Modifier.height(14.dp))
             Text(label, color = fsColors.label, style = MaterialTheme.typography.bodyMedium)
         }

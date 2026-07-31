@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.trash
 
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -321,7 +322,7 @@ fun TrashScreen(onBack: () -> Unit) {
                     .padding(horizontal = 28.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                androidx.compose.material3.CircularProgressIndicator(color = fsColors.accent)
+                FsSpinner()
                 Spacer(Modifier.height(14.dp))
                 Text(label, color = fsColors.label, style = MaterialTheme.typography.bodyMedium)
             }

@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.transfer
 
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -343,9 +344,7 @@ private fun TransferItemRow(item: TransferItem) {
                     Icons.Rounded.HourglassEmpty, null,
                     tint = fsColors.secondaryLabel.copy(alpha = 0.5f), modifier = Modifier.size(20.dp),
                 )
-                ItemStatus.IN_PROGRESS -> CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp), strokeWidth = 2.5.dp, color = fsColors.accent,
-                )
+                ItemStatus.IN_PROGRESS -> FsSpinner(size = 20.dp, strokeWidth = 2.5.dp)
                 ItemStatus.DONE -> Icon(
                     Icons.Rounded.CheckCircle, null, tint = fsColors.green, modifier = Modifier.size(22.dp),
                 )

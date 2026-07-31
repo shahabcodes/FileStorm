@@ -264,11 +264,27 @@ fun FileStormTheme(content: @Composable () -> Unit) {
     val accentChoice = com.shahabcodes.filestorm.data.Prefs.accent
     // The decorated themes ship with their own accent, but a deliberate accent
     // choice still wins — only the untouched default blue gets replaced.
-    val useThemeAccent = accentChoice == com.shahabcodes.filestorm.data.Accent.BLUE
+    val useThemeAccent = accentChoice == com.shahabcodes.filestorm.data.Accent.BLUE &&
+        com.shahabcodes.filestorm.data.Prefs.palette !=
+        com.shahabcodes.filestorm.data.ThemePalette.DEFAULT
     val plainAccent = Color(if (dark) accentChoice.dark else accentChoice.light)
 
-    val fs = when (appearance) {
-        com.shahabcodes.filestorm.data.Appearance.BLOSSOM -> FsColors(
+    val fs = when (com.shahabcodes.filestorm.data.Prefs.palette) {
+        com.shahabcodes.filestorm.data.ThemePalette.BLOSSOM -> if (dark) FsColors(
+            accent = if (useThemeAccent) Blossom.RoseNight else plainAccent,
+            groupedBackground = Blossom.BackgroundNight,
+            card = Blossom.CardNight,
+            cardSecondary = Blossom.CardSecondaryNight,
+            label = Blossom.LabelNight,
+            secondaryLabel = Blossom.SecondaryLabelNight,
+            separator = Blossom.SeparatorNight,
+            fill = Blossom.FillNight,
+            green = Blossom.GreenNight,
+            red = Blossom.RedNight,
+            orange = Blossom.OrangeNight,
+            isDark = true,
+            kinds = Blossom.kindsNight,
+        ) else FsColors(
             accent = if (useThemeAccent) Blossom.Rose else plainAccent,
             groupedBackground = Blossom.Background,
             card = Blossom.Card,
@@ -284,39 +300,7 @@ fun FileStormTheme(content: @Composable () -> Unit) {
             kinds = Blossom.kinds,
         )
 
-        com.shahabcodes.filestorm.data.Appearance.BLOSSOM_NIGHT -> FsColors(
-            accent = if (useThemeAccent) Blossom.RoseNight else plainAccent,
-            groupedBackground = Blossom.BackgroundNight,
-            card = Blossom.CardNight,
-            cardSecondary = Blossom.CardSecondaryNight,
-            label = Blossom.LabelNight,
-            secondaryLabel = Blossom.SecondaryLabelNight,
-            separator = Blossom.SeparatorNight,
-            fill = Blossom.FillNight,
-            green = Blossom.GreenNight,
-            red = Blossom.RedNight,
-            orange = Blossom.OrangeNight,
-            isDark = true,
-            kinds = Blossom.kindsNight,
-        )
-
-        com.shahabcodes.filestorm.data.Appearance.SAKURA -> FsColors(
-            accent = if (useThemeAccent) Sakura.Pink else plainAccent,
-            groupedBackground = Sakura.Background,
-            card = Sakura.Card,
-            cardSecondary = Sakura.CardSecondary,
-            label = Sakura.Label,
-            secondaryLabel = Sakura.SecondaryLabel,
-            separator = Sakura.Separator,
-            fill = Sakura.Fill,
-            green = Sakura.Green,
-            red = Sakura.Red,
-            orange = Sakura.Orange,
-            isDark = false,
-            kinds = Sakura.kinds,
-        )
-
-        com.shahabcodes.filestorm.data.Appearance.SAKURA_NIGHT -> FsColors(
+        com.shahabcodes.filestorm.data.ThemePalette.SAKURA -> if (dark) FsColors(
             accent = if (useThemeAccent) Sakura.PinkNight else plainAccent,
             groupedBackground = Sakura.BackgroundNight,
             card = Sakura.CardNight,
@@ -330,6 +314,20 @@ fun FileStormTheme(content: @Composable () -> Unit) {
             orange = Sakura.OrangeNight,
             isDark = true,
             kinds = Sakura.kindsNight,
+        ) else FsColors(
+            accent = if (useThemeAccent) Sakura.Pink else plainAccent,
+            groupedBackground = Sakura.Background,
+            card = Sakura.Card,
+            cardSecondary = Sakura.CardSecondary,
+            label = Sakura.Label,
+            secondaryLabel = Sakura.SecondaryLabel,
+            separator = Sakura.Separator,
+            fill = Sakura.Fill,
+            green = Sakura.Green,
+            red = Sakura.Red,
+            orange = Sakura.Orange,
+            isDark = false,
+            kinds = Sakura.kinds,
         )
 
         else -> if (dark) FsColors(

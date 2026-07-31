@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.jobs
 
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -382,11 +383,7 @@ fun JobProgressScreen(onBack: () -> Unit) {
                                     tint = fsColors.secondaryLabel.copy(alpha = 0.5f),
                                     modifier = Modifier.size(20.dp),
                                 )
-                                MonthState.RUNNING -> CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.5.dp,
-                                    color = fsColors.accent,
-                                )
+                                MonthState.RUNNING -> FsSpinner(size = 20.dp, strokeWidth = 2.5.dp)
                                 MonthState.DONE -> Icon(
                                     if (month.failedFiles > 0) Icons.Rounded.Error else Icons.Rounded.CheckCircle,
                                     null,

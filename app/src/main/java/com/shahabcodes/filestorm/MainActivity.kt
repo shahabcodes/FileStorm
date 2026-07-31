@@ -84,6 +84,7 @@ class MainActivity : FragmentActivity() {
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                         if (hasAccess) AppNav() else PermissionScreen(onGrantClick = { requestAccess() })
                         if (locked) LockScreen(onRequestUnlock = { promptUnlock() })
+                        com.shahabcodes.filestorm.ui.components.TrashProgressDialog()
                         if (Prefs.diagnostics) {
                             DiagnosticsOverlay(onDisable = { Prefs.updateDiagnostics(false) })
                         }

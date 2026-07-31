@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.browser
 
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -145,11 +146,7 @@ fun InfoSheet(entry: FsEntry, onDismiss: () -> Unit) {
 
 @Composable
 private fun ScanSpinner() {
-    CircularProgressIndicator(
-        modifier = Modifier.size(14.dp),
-        strokeWidth = 1.8.dp,
-        color = fsColors.secondaryLabel,
-    )
+    FsSpinner(size = 14.dp, strokeWidth = 1.8.dp)
 }
 
 @Composable

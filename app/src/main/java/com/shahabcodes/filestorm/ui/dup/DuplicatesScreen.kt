@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.dup
 
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -296,21 +297,8 @@ fun DuplicatesScreen(onBack: () -> Unit) {
         )
     }
 
-    if (s.cleaning) {
-        Dialog(onDismissRequest = {}) {
-            Column(
-                Modifier
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(fsColors.card)
-                    .padding(horizontal = 28.dp, vertical = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                CircularProgressIndicator(color = fsColors.accent)
-                Spacer(Modifier.height(14.dp))
-                Text("Moving duplicates to Trash…", color = fsColors.label, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-    }
+    // The live trash progress dialog is rendered app-wide, so nothing extra is
+    // needed here — it appears the moment the move starts.
 }
 
 @Composable

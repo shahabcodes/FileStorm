@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.arrange
 
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -153,11 +154,7 @@ fun ArrangeScreen(path: String, mode: ArrangeMode, onBack: () -> Unit) {
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             when {
-                                s.isBusy -> CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.5.dp,
-                                    color = fsColors.accent,
-                                )
+                                s.isBusy -> FsSpinner(size = 20.dp, strokeWidth = 2.5.dp)
                                 s.phase == ArrangePhase.DONE -> Icon(
                                     Icons.Rounded.CheckCircle, null, tint = fsColors.green,
                                 )
