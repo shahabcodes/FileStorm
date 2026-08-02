@@ -66,7 +66,7 @@ private val kindLabels = mapOf(
 
 /** Colourful storage dashboard: donut of used/free, category bar, per-type stats. */
 @Composable
-fun DashboardCard() {
+fun StorageCard() {
     val stats = FileRepository.storageStats()
     val snapshot = StorageAnalyzer.snapshot
     val scanning = StorageAnalyzer.scanning

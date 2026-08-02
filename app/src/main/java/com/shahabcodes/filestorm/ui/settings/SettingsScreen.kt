@@ -1,5 +1,7 @@
 package com.shahabcodes.filestorm.ui.settings
 
+import com.shahabcodes.filestorm.data.DashboardPrefs
+import com.shahabcodes.filestorm.data.DashboardCard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -400,6 +402,46 @@ fun SettingsScreen(onBack: () -> Unit) {
                         uncheckedBorderColor = Color.Transparent,
                     ),
                 )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // Anything switched off here is never composed and never scanned for,
+        // so turning a card off actually removes its cost.
+        SectionHeader("Dashboard")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            DashboardCard.entries.forEachIndexed { i, card ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            card.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        Text(
+                            card.blurb,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                        )
+                    }
+                    Switch(
+                        checked = DashboardPrefs.isEnabled(card),
+                        onCheckedChange = { DashboardPrefs.setEnabled(card, it) },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = fsColors.accent,
+                            checkedThumbColor = Color.White,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = fsColors.fill,
+                            uncheckedBorderColor = Color.Transparent,
+                        ),
+                    )
+                }
+                if (i != DashboardCard.entries.lastIndex) RowSeparator(startIndent = 16.dp)
             }
         }
         Spacer(Modifier.height(24.dp))

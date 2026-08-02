@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,6 +40,7 @@ fun LockScreen(onRequestUnlock: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
             .background(fsColors.groupedBackground)
             // Consume all touches so the app underneath can't be poked while locked.
             .clickable(

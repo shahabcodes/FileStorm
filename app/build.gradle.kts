@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.shahabcodes.filestorm"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.shahabcodes.filestorm"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 42
-        versionName = "1.41"
+        targetSdk = 36
+        versionCode = 43
+        versionName = "1.42"
     }
 
     // CI signs every build with the same keystore (from GitHub secrets) so updates

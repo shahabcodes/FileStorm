@@ -1,5 +1,11 @@
 package com.shahabcodes.filestorm.ui.home
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import com.shahabcodes.filestorm.data.StorageInsights
+import com.shahabcodes.filestorm.data.DashboardPrefs
+import com.shahabcodes.filestorm.data.DashboardCard
 import android.os.Environment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -86,6 +92,16 @@ fun HomeScreen(
     onOpenApps: () -> Unit,
 ) {
     LaunchedEffect(Unit) { TrashManager.refresh() }
+
+    // Only the enabled cards drive the walk, and if none of them need it the
+    // walk never starts at all.
+    val scanningCards = DashboardPrefs.scanningCards()
+    LaunchedEffect(scanningCards) {
+        if (StorageInsights.needsRefresh(scanningCards)) StorageInsights.refresh(scanningCards)
+    }
+
+    var confirmClean by remember { mutableStateOf<CleanTarget?>(null) }
+    val scope = rememberCoroutineScope()
     val stats = remember { FileRepository.storageStats() }
     val transfer by TransferManager.state.collectAsState()
 
@@ -169,11 +185,27 @@ fun HomeScreen(
             }
         }
 
-        // Storage dashboard
-        item { DashboardCard() }
-
-        // What the installed apps are taking up
-        item { AppStorageCard(onSeeAll = onOpenApps) }
+        // Dashboard cards, in the order they are declared and only the ones
+        // switched on. A card that is off is never composed, so nothing it
+        // would have needed is ever computed.
+        DashboardPrefs.enabled.sortedBy { it.ordinal }.forEach { card ->
+            item(key = card.key) {
+                when (card) {
+                    DashboardCard.STORAGE -> StorageCard()
+                    DashboardCard.RECLAIM -> ReclaimCard(
+                        onOpenTrash = onOpenTrash,
+                        onOpenDuplicates = onOpenDuplicates,
+                        onCleanEmptyFolders = { confirmClean = CleanTarget.EMPTY_FOLDERS },
+                        onCleanZeroByte = { confirmClean = CleanTarget.ZERO_BYTE },
+                    )
+                    DashboardCard.BIGGEST_FILES -> BiggestFilesCard(onOpenFolder = onOpenFolder)
+                    DashboardCard.LARGEST_FOLDERS -> LargestFoldersCard(onOpenFolder = onOpenFolder)
+                    DashboardCard.GROWTH -> GrowthCard()
+                    DashboardCard.RECENT -> RecentFilesCard(onOpenFolder = onOpenFolder)
+                    DashboardCard.APPS -> AppStorageCard(onSeeAll = onOpenApps)
+                }
+            }
+        }
 
         // Favorites
         if (Favorites.paths.isNotEmpty()) {
@@ -470,6 +502,89 @@ fun HomeScreen(
             }
         }
     }
+
+    confirmClean?.let { target ->
+        CleanConfirmDialog(
+            target = target,
+            onDismiss = { confirmClean = null },
+            onConfirm = {
+                val snapshot = StorageInsights.snapshot
+                confirmClean = null
+                scope.launch {
+                    when (target) {
+                        CleanTarget.EMPTY_FOLDERS ->
+                            StorageInsights.deleteEmptyFolders(snapshot?.emptyFolders.orEmpty())
+                        CleanTarget.ZERO_BYTE -> {
+                            val entries = snapshot?.zeroByteFiles.orEmpty()
+                                .map { java.io.File(it.path) }
+                                .filter { it.isFile }
+                                .map { com.shahabcodes.filestorm.data.FsEntry.from(it) }
+                            if (entries.isNotEmpty()) TrashManager.moveToTrash(entries)
+                        }
+                    }
+                    StorageInsights.refresh(DashboardPrefs.scanningCards())
+                }
+            },
+        )
+    }
+}
+
+/** The two cleanups the Reclaim card can perform. */
+private enum class CleanTarget { EMPTY_FOLDERS, ZERO_BYTE }
+
+@Composable
+private fun CleanConfirmDialog(
+    target: CleanTarget,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val snapshot = StorageInsights.snapshot
+    val count = when (target) {
+        CleanTarget.EMPTY_FOLDERS -> snapshot?.emptyFolderCount ?: 0
+        CleanTarget.ZERO_BYTE -> snapshot?.zeroByteCount ?: 0
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = fsColors.card,
+        title = {
+            Text(
+                when (target) {
+                    CleanTarget.EMPTY_FOLDERS -> "Delete $count empty folder(s)?"
+                    CleanTarget.ZERO_BYTE -> "Move $count empty file(s) to Trash?"
+                },
+                color = fsColors.label,
+            )
+        },
+        text = {
+            Text(
+                when (target) {
+                    // Folders hold nothing, so there is nothing to recover and
+                    // no reason to route them through the Trash.
+                    CleanTarget.EMPTY_FOLDERS ->
+                        "These folders contain no files at all. They are deleted outright " +
+                            "rather than sent to the Trash, since there is nothing inside to " +
+                            "recover. Hidden folders were never scanned and are left alone."
+                    CleanTarget.ZERO_BYTE ->
+                        "These files are 0 bytes. They go to the Trash, so you can restore " +
+                            "any of them if one turns out to matter."
+                },
+                color = fsColors.secondaryLabel,
+            )
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onConfirm) {
+                Text(
+                    if (target == CleanTarget.EMPTY_FOLDERS) "Delete" else "Move to Trash",
+                    color = fsColors.red,
+                )
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Cancel", color = fsColors.secondaryLabel)
+            }
+        },
+    )
 }
 
 @Composable
