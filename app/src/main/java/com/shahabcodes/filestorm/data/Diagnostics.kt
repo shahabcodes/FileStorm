@@ -24,7 +24,9 @@ object Diagnostics {
 
     fun log(tag: String, message: String) {
         val line = "${stamp.format(Date())}  $tag  $message"
-        android.util.Log.d("FileStormDiag", line)
+        // Only mirror to logcat while diagnostics are on, so a shipped build
+        // never writes file paths to the system log.
+        if (Prefs.diagnostics) android.util.Log.d("FileStormDiag", line)
         events.add(line)
         while (events.size > MAX_EVENTS) events.removeAt(0)
     }

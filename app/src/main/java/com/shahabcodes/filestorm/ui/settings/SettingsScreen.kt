@@ -1,5 +1,11 @@
 package com.shahabcodes.filestorm.ui.settings
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.getValue
+import android.widget.Toast
 import com.shahabcodes.filestorm.data.ChartStyle
 import com.shahabcodes.filestorm.data.DashboardPrefs
 import com.shahabcodes.filestorm.data.DashboardCard
@@ -60,7 +66,11 @@ import com.shahabcodes.filestorm.ui.theme.fsColors
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    val activity = LocalContext.current as? FragmentActivity
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+    // Session-only: closing the app puts the tools away again.
+    var versionTaps by remember { mutableIntStateOf(0) }
+    var devUnlocked by remember { mutableStateOf(Prefs.diagnostics) }
 
     Column(
         Modifier
@@ -527,8 +537,12 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
 
-        SectionHeader("Troubleshooting")
-        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+        // Hidden until the version number is tapped several times, the usual
+        // way developer tools stay out of a shipped build without being cut
+        // from it — a real trace is still one gesture away if a bug appears.
+        if (devUnlocked) {
+            SectionHeader("Troubleshooting")
+            GroupedCard(Modifier.padding(horizontal = 16.dp)) {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -564,9 +578,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                         uncheckedBorderColor = Color.Transparent,
                     ),
                 )
+                }
             }
+            Spacer(Modifier.height(24.dp))
         }
-        Spacer(Modifier.height(24.dp))
 
         SectionHeader("About")
         GroupedCard(Modifier.padding(horizontal = 16.dp)) {
@@ -586,6 +601,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                     "Version ${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
                     color = fsColors.secondaryLabel,
+                    modifier = Modifier.pressScale {
+                        if (devUnlocked) return@pressScale
+                        versionTaps++
+                        if (versionTaps >= 7) {
+                            devUnlocked = true
+                            Toast.makeText(
+                                context,
+                                "Diagnostics unlocked",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
