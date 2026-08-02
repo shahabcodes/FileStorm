@@ -11,8 +11,8 @@ android {
         applicationId = "com.shahabcodes.filestorm"
         minSdk = 26
         targetSdk = 34
-        versionCode = 40
-        versionName = "1.39"
+        versionCode = 41
+        versionName = "1.40"
     }
 
     // CI signs every build with the same keystore (from GitHub secrets) so updates

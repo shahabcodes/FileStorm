@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.browser
 
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -472,20 +473,27 @@ private fun GroupedByMonth(
     val firstVisible = if (tiled) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
     val topSlot = slots.getOrNull(firstVisible)
     val pinnedLabel = topSlot?.month ?: groups.firstOrNull()?.first
-    // While a month's own heading is on screen there is no need to repeat it.
-    val showPinned = pinnedLabel != null && topSlot !is GroupSlot.MonthRow
 
-    Column(Modifier.fillMaxSize()) {
-        if (showPinned && pinnedLabel != null) {
+    Box(Modifier.fillMaxSize()) {
+        // The pinned heading floats over the list instead of sitting above it.
+        // Stacked in a column it had to be hidden whenever the month's own
+        // heading reached the top, and that appearing and disappearing resized
+        // the list on every crossing — the jiggle, most obvious with few files
+        // because the boundary is crossed constantly. As an overlay it is
+        // always present, so it can never move anything, and it covers the
+        // inline heading exactly (identical padding) rather than duplicating it.
+        if (pinnedLabel != null) {
             MonthHeader(
                 label = pinnedLabel,
                 summary = summaries[pinnedLabel],
                 collapsed = pinnedLabel in collapsedMonths,
-                pinned = true,
                 sort = monthSorts[pinnedLabel],
                 onClick = { onToggleMonth(pinnedLabel) },
                 onSortPicked = { field, asc -> onMonthSort(pinnedLabel, field, asc) },
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(1f)
+                    .padding(horizontal = 16.dp),
             )
         }
 
@@ -521,7 +529,6 @@ private fun GroupedByMonth(
                                 label = slot.month,
                                 summary = summaries[slot.month],
                                 collapsed = slot.month in collapsedMonths,
-                                pinned = false,
                                 sort = monthSorts[slot.month],
                                 onClick = { onToggleMonth(slot.month) },
                                 onSortPicked = { f, a -> onMonthSort(slot.month, f, a) },
@@ -569,7 +576,6 @@ private fun GroupedByMonth(
                                 label = slot.month,
                                 summary = summaries[slot.month],
                                 collapsed = slot.month in collapsedMonths,
-                                pinned = false,
                                 sort = monthSorts[slot.month],
                                 onClick = { onToggleMonth(slot.month) },
                                 onSortPicked = { f, a -> onMonthSort(slot.month, f, a) },
@@ -638,7 +644,6 @@ private fun MonthHeader(
     label: String,
     summary: MonthSummary?,
     collapsed: Boolean,
-    pinned: Boolean,
     sort: Pair<SortField, Boolean>?,
     onClick: () -> Unit,
     onSortPicked: (SortField, Boolean) -> Unit,
@@ -655,7 +660,7 @@ private fun MonthHeader(
                     onClick = onClick,
                     onLongClick = { menuOpen = true },
                 )
-                .padding(vertical = if (pinned) 10.dp else 8.dp, horizontal = 4.dp),
+                .padding(vertical = 9.dp, horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
