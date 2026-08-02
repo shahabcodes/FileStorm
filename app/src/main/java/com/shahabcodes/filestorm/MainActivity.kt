@@ -220,6 +220,7 @@ private fun AppNav() {
                 onOpenJobs = { entry.ifCurrent { nav.navigate("jobs") } },
                 onOpenDuplicates = { entry.ifCurrent { nav.navigate("duplicates") } },
                 onOpenApps = { entry.ifCurrent { nav.navigate("apps") } },
+                onOpenViewer = { paths, index -> entry.ifCurrent { openViewer(paths, index) } },
             )
         }
         composable("browse") { entry ->

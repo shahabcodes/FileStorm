@@ -76,6 +76,14 @@ enum class Accent(val label: String, val light: Long, val dark: Long) {
     GRAPHITE("Graphite", 0xFF5B6572, 0xFF98A2B3),
 }
 
+/** How the ranked dashboard cards draw their data. */
+enum class ChartStyle(val label: String, val blurb: String) {
+    BARS("Bars", "Ranked rows with a proportional bar"),
+    DONUT("Donut", "A ring showing each share of the total"),
+    TREEMAP("Treemap", "Rectangles sized by share — the classic disk-usage view"),
+    LIST("Plain list", "Just names and sizes, no graphics"),
+}
+
 /** Which animation the app shows while it waits on the filesystem. */
 enum class LoaderStyle(val label: String, val blurb: String) {
     ARC("Storm Arc", "Sweeping arc with a breathing core"),
@@ -115,6 +123,8 @@ object Prefs {
         private set
     var loaderStyle by mutableStateOf(LoaderStyle.ARC)
         private set
+    var chartStyle by mutableStateOf(ChartStyle.BARS)
+        private set
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm", Context.MODE_PRIVATE)
@@ -131,6 +141,9 @@ object Prefs {
         appName = sp.getString("app_name", "storm") ?: "storm"
         secureScreen = sp.getBoolean("secure_screen", false)
         diagnostics = sp.getBoolean("diagnostics", false)
+        chartStyle = runCatching {
+            ChartStyle.valueOf(sp.getString("chart_style", ChartStyle.BARS.name)!!)
+        }.getOrDefault(ChartStyle.BARS)
         loaderStyle = runCatching {
             LoaderStyle.valueOf(sp.getString("loader_style", LoaderStyle.ARC.name)!!)
         }.getOrDefault(LoaderStyle.ARC)
@@ -196,6 +209,11 @@ object Prefs {
     fun updateAppIcon(key: String) {
         appIcon = key
         sp.edit().putString("app_icon", key).apply()
+    }
+
+    fun updateChartStyle(value: ChartStyle) {
+        chartStyle = value
+        sp.edit().putString("chart_style", value.name).apply()
     }
 
     fun updateLoaderStyle(value: LoaderStyle) {

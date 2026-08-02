@@ -1,5 +1,6 @@
 package com.shahabcodes.filestorm.ui.settings
 
+import com.shahabcodes.filestorm.data.ChartStyle
 import com.shahabcodes.filestorm.data.DashboardPrefs
 import com.shahabcodes.filestorm.data.DashboardCard
 import androidx.compose.foundation.background
@@ -444,6 +445,47 @@ fun SettingsScreen(onBack: () -> Unit) {
                 if (i != DashboardCard.entries.lastIndex) RowSeparator(startIndent = 16.dp)
             }
         }
+        Spacer(Modifier.height(24.dp))
+
+        SectionHeader("Chart Style")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            ChartStyle.entries.forEachIndexed { i, style ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .pressScale { Prefs.updateChartStyle(style) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            style.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        Text(
+                            style.blurb,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                        )
+                    }
+                    if (Prefs.chartStyle == style) {
+                        Icon(
+                            Icons.Rounded.Check, null,
+                            tint = fsColors.accent, modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                if (i != ChartStyle.entries.lastIndex) RowSeparator(startIndent = 16.dp)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Applies to Biggest Files and Largest Folders.",
+            style = MaterialTheme.typography.labelSmall,
+            color = fsColors.secondaryLabel,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
         Spacer(Modifier.height(24.dp))
 
         SectionHeader("Loading Indicator")

@@ -62,6 +62,8 @@ object StorageInsights {
         val zeroByteCount: Int = 0,
         /** Which cards this snapshot actually has data for. */
         val covered: Set<String> = emptySet(),
+        /** Whether hidden files counted, so the cards can say so. */
+        val includedHidden: Boolean = false,
         val scannedAt: Long = 0L,
     )
 
@@ -92,6 +94,8 @@ object StorageInsights {
         if (wanted.isEmpty()) return false
         val current = snapshot ?: return true
         if (System.currentTimeMillis() - current.scannedAt > maxAgeMillis) return true
+        // Flipping Show Hidden changes the totals, so the old numbers are wrong.
+        if (current.includedHidden != Prefs.showHidden) return true
         return wanted.any { it.key !in current.covered }
     }
 
@@ -127,6 +131,11 @@ object StorageInsights {
         var emptyFolderCount = 0
         var zeroByteCount = 0
 
+        // Hidden files are real files taking real space — a .thumbnails folder
+        // holding gigabytes is exactly what these cards exist to surface — so
+        // the walk follows the app's Show Hidden setting rather than always
+        // skipping them.
+        val includeHidden = Prefs.showHidden
         val recentCutoff = System.currentTimeMillis() - RECENT_WINDOW_MS
         val root = File(FileRepository.rootPath)
         val rootPath = root.absolutePath.trimEnd(File.separatorChar)
@@ -145,7 +154,8 @@ object StorageInsights {
             }
             for (child in children) {
                 val name = child.name
-                if (name == ".FileStorm" || name.startsWith(".")) continue
+                if (name == ".FileStorm") continue
+                if (!includeHidden && name.startsWith(".")) continue
                 if (child.isDirectory) {
                     // Android/data and Android/obb are app-private and unreadable;
                     // Android/media is not, and holds real user files.
@@ -189,7 +199,10 @@ object StorageInsights {
                     monthBytes[key] = (monthBytes[key] ?: 0L) + size
                     monthCount[key] = (monthCount[key] ?: 0) + 1
                 }
-                if (wantReclaim && size == 0L) {
+                // Never offer a dotfile for cleanup even when hidden files are
+                // being counted: .nomedia is 0 bytes and deleting it would
+                // change how the gallery treats the whole folder.
+                if (wantReclaim && size == 0L && !name.startsWith(".")) {
                     zeroByteCount++
                     if (zeroByte.size < CLEANUP_LIMIT) {
                         zeroByte.add(FileEntry(child.absolutePath, name, 0L, modified))
@@ -255,6 +268,7 @@ object StorageInsights {
             emptyFolderCount = emptyFolderCount,
             zeroByteCount = zeroByteCount,
             covered = wanted.map { it.key }.toSet(),
+            includedHidden = includeHidden,
             scannedAt = System.currentTimeMillis(),
         )
     }
@@ -279,6 +293,7 @@ object StorageInsights {
             val o = JSONObject()
                 .put("scannedAt", s.scannedAt)
                 .put("covered", JSONArray(s.covered.toList()))
+                .put("includedHidden", s.includedHidden)
                 .put("emptyFolderCount", s.emptyFolderCount)
                 .put("zeroByteCount", s.zeroByteCount)
                 .put("biggest", filesToJson(s.biggestFiles))
@@ -383,6 +398,7 @@ object StorageInsights {
                     )
                 }
             },
+            includedHidden = o.optBoolean("includedHidden"),
             emptyFolderCount = o.optInt("emptyFolderCount"),
             zeroByteCount = o.optInt("zeroByteCount"),
             covered = buildList {
