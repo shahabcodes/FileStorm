@@ -28,12 +28,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -108,6 +110,28 @@ fun InsightCard(
     }
 }
 
+/**
+ * Drives the grow-in animation. Charts read far better when the eye can follow
+ * the bars or arcs settling, and it also disguises the frame or two a treemap
+ * takes to lay out.
+ */
+@Composable
+private fun rememberReveal(key: Any?): Float {
+    var shown by androidx.compose.runtime.remember(key) {
+        androidx.compose.runtime.mutableStateOf(false)
+    }
+    androidx.compose.runtime.LaunchedEffect(key) { shown = true }
+    val value by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(
+            durationMillis = 620,
+            easing = androidx.compose.animation.core.FastOutSlowInEasing,
+        ),
+        label = "reveal",
+    )
+    return value
+}
+
 /** Draws a ranked list in whichever style Settings asks for. */
 @Composable
 fun RankedChart(slices: List<Slice>) {
@@ -131,57 +155,76 @@ fun sliceColor(index: Int): Color {
 
 @Composable
 private fun BarsChart(slices: List<Slice>) {
-    val biggest = slices.firstOrNull()?.bytes?.coerceAtLeast(1L) ?: 1L
+    val biggest = slices.maxOfOrNull { it.bytes }?.coerceAtLeast(1L) ?: 1L
+    val total = slices.sumOf { it.bytes }.coerceAtLeast(1L)
+    val reveal = rememberReveal(slices.size to biggest)
     Column {
-        slices.forEach { slice ->
+        slices.forEachIndexed { index, slice ->
+            // Each row keeps the colour it has in the donut and treemap, so the
+            // same item is recognisable whichever style is selected.
+            val color = sliceColor(index)
             Row(
-                Modifier.fillMaxWidth().pressScale(slice.onClick).padding(vertical = 6.dp),
+                Modifier.fillMaxWidth().pressScale(slice.onClick).padding(vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(
-                        slice.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = fsColors.label,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        slice.subtitle,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = fsColors.secondaryLabel,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(5.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier
+                                .size(7.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(color)
+                        )
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            slice.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = fsColors.label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            Formatters.bytes(slice.bytes),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = fsColors.label,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(3.dp))
+                            .height(7.dp)
+                            .clip(RoundedCornerShape(4.dp))
                             .background(fsColors.fill),
                     ) {
                         Box(
                             Modifier
                                 .fillMaxWidth(
-                                    (slice.bytes.toFloat() / biggest).coerceIn(0.02f, 1f)
+                                    ((slice.bytes.toFloat() / biggest) * reveal)
+                                        .coerceIn(0.02f, 1f)
                                 )
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(3.dp))
+                                .clip(RoundedCornerShape(4.dp))
                                 .background(
                                     Brush.horizontalGradient(
-                                        listOf(fsColors.accent, fsColors.green)
+                                        listOf(color.copy(alpha = 0.75f), color)
                                     )
                                 ),
                         )
                     }
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        "${(100f * slice.bytes / total).coerceAtLeast(0.1f).let {
+                            if (it < 1f) "<1" else it.toInt().toString()
+                        }}% · ${slice.subtitle}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fsColors.secondaryLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    Formatters.bytes(slice.bytes),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = fsColors.label,
-                )
             }
         }
     }
@@ -231,91 +274,120 @@ private fun DonutChart(slices: List<Slice>) {
     val tailBytes = tail.sumOf { it.bytes }
     val total = (shown.sumOf { it.bytes } + tailBytes).coerceAtLeast(1L)
     val colors = shown.indices.map { sliceColor(it) }
-    val tailColor = fsColors.secondaryLabel.copy(alpha = 0.45f)
+    val tailColor = fsColors.secondaryLabel.copy(alpha = 0.35f)
+    val reveal = rememberReveal(slices.size to total)
+    val trackColor = fsColors.fill
 
     Column {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(contentAlignment = Alignment.Center) {
-                Canvas(Modifier.size(150.dp)) {
-                    val stroke = Stroke(width = 26.dp.toPx(), cap = StrokeCap.Butt)
+                Canvas(Modifier.size(168.dp)) {
+                    val width = 30.dp.toPx()
+                    val stroke = Stroke(width = width, cap = StrokeCap.Round)
+                    drawArc(
+                        color = trackColor,
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        style = Stroke(width = width),
+                    )
+                    // A small gap between segments reads as separate pieces
+                    // rather than one continuous smear of colour.
+                    val gap = 2.2f
                     var start = -90f
                     shown.forEachIndexed { index, slice ->
-                        val sweep = 360f * (slice.bytes.toFloat() / total)
-                        drawArc(
-                            color = colors[index],
-                            startAngle = start,
-                            sweepAngle = sweep,
-                            useCenter = false,
-                            style = stroke,
-                        )
-                        start += sweep
+                        val full = 360f * (slice.bytes.toFloat() / total)
+                        val sweep = ((full - gap) * reveal).coerceAtLeast(0f)
+                        if (sweep > 0f) {
+                            drawArc(
+                                color = colors[index],
+                                startAngle = start + gap / 2f,
+                                sweepAngle = sweep,
+                                useCenter = false,
+                                style = stroke,
+                            )
+                        }
+                        start += full
                     }
                     if (tailBytes > 0) {
-                        drawArc(
-                            color = tailColor,
-                            startAngle = start,
-                            sweepAngle = 360f * (tailBytes.toFloat() / total),
-                            useCenter = false,
-                            style = stroke,
-                        )
+                        val full = 360f * (tailBytes.toFloat() / total)
+                        val sweep = ((full - gap) * reveal).coerceAtLeast(0f)
+                        if (sweep > 0f) {
+                            drawArc(
+                                color = tailColor,
+                                startAngle = start + gap / 2f,
+                                sweepAngle = sweep,
+                                useCenter = false,
+                                style = stroke,
+                            )
+                        }
                     }
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         Formatters.bytes(total),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = fsColors.label,
                     )
                     Text(
-                        "total",
+                        "${slices.size} entries",
                         style = MaterialTheme.typography.labelSmall,
                         color = fsColors.secondaryLabel,
                     )
                 }
             }
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(16.dp))
         shown.forEachIndexed { index, slice ->
             Row(
-                Modifier.fillMaxWidth().pressScale(slice.onClick).padding(vertical = 5.dp),
+                Modifier.fillMaxWidth().pressScale(slice.onClick).padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
                     Modifier
-                        .size(9.dp)
+                        .size(10.dp)
                         .clip(RoundedCornerShape(50))
                         .background(colors[index])
                 )
-                Spacer(Modifier.width(9.dp))
-                Text(
-                    slice.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = fsColors.label,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        slice.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = fsColors.label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        slice.subtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fsColors.secondaryLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    "${(100f * slice.bytes / total).toInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = fsColors.secondaryLabel,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    Formatters.bytes(slice.bytes),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = fsColors.label,
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        Formatters.bytes(slice.bytes),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = fsColors.label,
+                    )
+                    Text(
+                        "${(100f * slice.bytes / total).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                }
             }
         }
         if (tail.isNotEmpty()) {
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                Modifier.fillMaxWidth().padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.size(9.dp).clip(RoundedCornerShape(50)).background(tailColor))
-                Spacer(Modifier.width(9.dp))
+                Box(Modifier.size(10.dp).clip(RoundedCornerShape(50)).background(tailColor))
+                Spacer(Modifier.width(10.dp))
                 Text(
                     "${tail.size} more",
                     style = MaterialTheme.typography.bodyMedium,
@@ -401,7 +473,8 @@ private fun squarify(values: List<Long>, width: Float, height: Float): List<Tile
 @Composable
 private fun TreemapChart(slices: List<Slice>) {
     val shown = slices.take(14)
-    BoxWithConstraints(Modifier.fillMaxWidth().height(220.dp)) {
+    val reveal = rememberReveal(shown.size)
+    BoxWithConstraints(Modifier.fillMaxWidth().height(230.dp)) {
         val tiles = squarify(shown.map { it.bytes }, maxWidth.value, maxHeight.value)
         tiles.forEach { tile ->
             val slice = shown[tile.index]
@@ -409,14 +482,27 @@ private fun TreemapChart(slices: List<Slice>) {
             Box(
                 Modifier
                     .offset(x = tile.x.dp, y = tile.y.dp)
-                    .size(width = (tile.w - 2f).coerceAtLeast(1f).dp, height = (tile.h - 2f).coerceAtLeast(1f).dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(color.copy(alpha = 0.85f))
+                    .size(
+                        width = (tile.w - 3f).coerceAtLeast(1f).dp,
+                        height = (tile.h - 3f).coerceAtLeast(1f).dp,
+                    )
+                    .graphicsLayer {
+                        // Settle into place rather than snapping in fully formed.
+                        scaleX = 0.82f + 0.18f * reveal
+                        scaleY = 0.82f + 0.18f * reveal
+                        alpha = reveal
+                    }
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(color.copy(alpha = 0.95f), color.copy(alpha = 0.68f))
+                        )
+                    )
                     .pressScale(slice.onClick)
-                    .padding(5.dp),
+                    .padding(7.dp),
             ) {
                 // Only label tiles with room for it; the rest stay clean blocks.
-                if (tile.w > 62f && tile.h > 34f) {
+                if (tile.w > 66f && tile.h > 38f) {
                     Column {
                         Text(
                             slice.title,
@@ -425,10 +511,11 @@ private fun TreemapChart(slices: List<Slice>) {
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        Spacer(Modifier.height(1.dp))
                         Text(
                             Formatters.bytes(slice.bytes),
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.85f),
+                            color = Color.White.copy(alpha = 0.9f),
                             maxLines = 1,
                         )
                     }
@@ -438,10 +525,6 @@ private fun TreemapChart(slices: List<Slice>) {
     }
 }
 
-/**
- * What the app can actually give back: the trash, confirmed duplicates, empty
- * folders and zero-byte files, each with the action that reclaims it.
- */
 @Composable
 fun ReclaimCard(
     onOpenTrash: () -> Unit,
@@ -616,19 +699,24 @@ fun GrowthCard(onViewMore: () -> Unit) {
     val all = StorageInsights.snapshot?.months.orEmpty()
     val months = all.reversed().takeLast(8)
     val peak = months.maxOfOrNull { it.bytes }?.coerceAtLeast(1L) ?: 1L
+    val reveal = rememberReveal(months.size to peak)
     InsightCard(
-        title = "Storage Growth",
+        title = "Monthly Footprint",
         subtitle = if (months.isEmpty()) null
-        else "${Formatters.bytes(months.sumOf { it.bytes })} across ${months.size} months",
+        else "From file dates · deleted files aren't counted",
         hasData = months.isNotEmpty(),
     ) {
         Column {
             Row(
-                Modifier.fillMaxWidth().height(120.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                Modifier.fillMaxWidth().height(126.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
                 months.forEach { month ->
+                    // The heaviest month carries the accent; the rest sit back
+                    // so the shape of the year reads at a glance.
+                    val isPeak = month.bytes == peak
+                    val color = if (isPeak) fsColors.accent else fsColors.accent.copy(alpha = 0.34f)
                     Column(
                         Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -637,31 +725,34 @@ fun GrowthCard(onViewMore: () -> Unit) {
                         Text(
                             Formatters.bytes(month.bytes).substringBefore(" "),
                             style = MaterialTheme.typography.labelSmall,
-                            color = fsColors.secondaryLabel,
+                            color = if (isPeak) fsColors.label else fsColors.secondaryLabel,
                             maxLines = 1,
                         )
-                        Spacer(Modifier.height(3.dp))
+                        Spacer(Modifier.height(4.dp))
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .height((78 * (month.bytes.toFloat() / peak)).coerceAtLeast(4f).dp)
-                                .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
+                                .height(
+                                    (84f * (month.bytes.toFloat() / peak) * reveal)
+                                        .coerceAtLeast(4f).dp
+                                )
+                                .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                 .background(
                                     Brush.verticalGradient(
-                                        listOf(fsColors.accent, fsColors.accent.copy(alpha = 0.45f))
+                                        listOf(color, color.copy(alpha = 0.35f))
                                     )
                                 ),
                         )
                     }
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Spacer(Modifier.height(7.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 months.forEach { month ->
                     Text(
                         month.label.take(3),
                         style = MaterialTheme.typography.labelSmall,
-                        color = fsColors.secondaryLabel,
+                        color = if (month.bytes == peak) fsColors.label else fsColors.secondaryLabel,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         modifier = Modifier.weight(1f),
@@ -673,7 +764,6 @@ fun GrowthCard(onViewMore: () -> Unit) {
     }
 }
 
-/** The newest changes, opening the file itself rather than its folder. */
 @Composable
 fun RecentFilesCard(onOpenViewer: (List<String>, Int) -> Unit, onViewMore: () -> Unit) {
     val context = LocalContext.current

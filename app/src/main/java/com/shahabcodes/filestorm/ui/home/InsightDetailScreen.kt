@@ -62,7 +62,7 @@ fun InsightDetailScreen(
     val title = when (card) {
         DashboardCard.BIGGEST_FILES -> "Biggest Files"
         DashboardCard.LARGEST_FOLDERS -> "Largest Folders"
-        DashboardCard.GROWTH -> "Storage Growth"
+        DashboardCard.GROWTH -> "Monthly Footprint"
         DashboardCard.RECENT -> "Recent Files"
         else -> card.label
     }
@@ -153,7 +153,7 @@ fun InsightDetailScreen(
                             )
                             Text(
                                 when (card) {
-                                    DashboardCard.GROWTH -> "added across $count months"
+                                    DashboardCard.GROWTH -> "dated across $count months"
                                     DashboardCard.RECENT -> "changed in the last 7 days"
                                     DashboardCard.LARGEST_FOLDERS -> "held by the top $count folders"
                                     else -> "held by the top $count files"
