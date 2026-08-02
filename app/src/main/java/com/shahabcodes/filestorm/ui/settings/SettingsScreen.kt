@@ -1,5 +1,7 @@
 package com.shahabcodes.filestorm.ui.settings
 
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -421,18 +423,37 @@ fun SettingsScreen(onBack: () -> Unit) {
         // so turning a card off actually removes its cost.
         SectionHeader("Dashboard")
         GroupedCard(Modifier.padding(horizontal = 16.dp)) {
-            DashboardCard.entries.forEachIndexed { i, card ->
+            DashboardPrefs.order.forEachIndexed { i, card ->
+                val on = DashboardPrefs.isEnabled(card)
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // Arrows rather than drag: this list lives inside a
+                    // scrolling page, where a drag gesture would fight the
+                    // scroll and end up moving neither reliably.
+                    Column {
+                        MoveButton(Icons.Rounded.KeyboardArrowUp, i > 0) {
+                            DashboardPrefs.move(card, up = true)
+                        }
+                        MoveButton(Icons.Rounded.KeyboardArrowDown, i < DashboardPrefs.order.lastIndex) {
+                            DashboardPrefs.move(card, up = false)
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "${i + 1}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (on) fsColors.accent else fsColors.secondaryLabel,
+                        modifier = Modifier.width(18.dp),
+                    )
                     Column(Modifier.weight(1f)) {
                         Text(
                             card.label,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = fsColors.label,
+                            color = if (on) fsColors.label else fsColors.secondaryLabel,
                         )
                         Text(
                             card.blurb,
@@ -441,7 +462,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     }
                     Switch(
-                        checked = DashboardPrefs.isEnabled(card),
+                        checked = on,
                         onCheckedChange = { DashboardPrefs.setEnabled(card, it) },
                         colors = SwitchDefaults.colors(
                             checkedTrackColor = fsColors.accent,
@@ -452,8 +473,23 @@ fun SettingsScreen(onBack: () -> Unit) {
                         ),
                     )
                 }
-                if (i != DashboardCard.entries.lastIndex) RowSeparator(startIndent = 16.dp)
+                if (i != DashboardPrefs.order.lastIndex) RowSeparator(startIndent = 16.dp)
             }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Cards appear on the dashboard in this order.",
+                style = MaterialTheme.typography.labelSmall,
+                color = fsColors.secondaryLabel,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "Reset",
+                style = MaterialTheme.typography.labelMedium,
+                color = fsColors.accent,
+                modifier = Modifier.pressScale { DashboardPrefs.resetOrder() }.padding(4.dp),
+            )
         }
         Spacer(Modifier.height(24.dp))
 
@@ -669,6 +705,24 @@ private fun ChoiceRow(
             )
         }
     }
+}
+
+/** A compact chevron for nudging a dashboard card up or down the list. */
+@Composable
+private fun MoveButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Icon(
+        icon,
+        null,
+        tint = if (enabled) fsColors.accent else fsColors.secondaryLabel.copy(alpha = 0.3f),
+        modifier = Modifier
+            .then(if (enabled) Modifier.pressScale(onClick) else Modifier)
+            .padding(2.dp)
+            .size(20.dp),
+    )
 }
 
 @Composable

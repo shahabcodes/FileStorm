@@ -190,7 +190,7 @@ fun HomeScreen(
         // Dashboard cards, in the order they are declared and only the ones
         // switched on. A card that is off is never composed, so nothing it
         // would have needed is ever computed.
-        DashboardPrefs.enabled.sortedBy { it.ordinal }.forEach { card ->
+        DashboardPrefs.visibleInOrder().forEach { card ->
             item(key = card.key) {
                 when (card) {
                     DashboardCard.STORAGE -> StorageCard()
