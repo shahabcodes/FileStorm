@@ -221,6 +221,9 @@ private fun AppNav() {
                 onOpenDuplicates = { entry.ifCurrent { nav.navigate("duplicates") } },
                 onOpenApps = { entry.ifCurrent { nav.navigate("apps") } },
                 onOpenViewer = { paths, index -> entry.ifCurrent { openViewer(paths, index) } },
+                onOpenInsight = { card ->
+                    entry.ifCurrent { nav.navigate("insight/${card.name}") }
+                },
             )
         }
         composable("browse") { entry ->
@@ -290,6 +293,19 @@ private fun AppNav() {
                 path = target,
                 mode = mode,
                 onBack = { goBack() },
+            )
+        }
+        composable("insight/{card}") { entry ->
+            val card = runCatching {
+                com.shahabcodes.filestorm.data.DashboardCard.valueOf(
+                    entry.arguments?.getString("card") ?: "BIGGEST_FILES"
+                )
+            }.getOrDefault(com.shahabcodes.filestorm.data.DashboardCard.BIGGEST_FILES)
+            com.shahabcodes.filestorm.ui.home.InsightDetailScreen(
+                card = card,
+                onBack = { entry.ifCurrent { goBack() } },
+                onOpenFolder = { path -> entry.ifCurrent { openBrowser(path) } },
+                onOpenViewer = { paths, index -> entry.ifCurrent { openViewer(paths, index) } },
             )
         }
         composable("apps") { entry ->

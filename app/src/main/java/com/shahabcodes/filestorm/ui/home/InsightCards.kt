@@ -56,8 +56,11 @@ import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.util.Formatters
 import java.io.File
 
+/** Cards stay glanceable at three rows; everything else lives behind View all. */
+const val CARD_PREVIEW = 3
+
 /** One entry in a ranked card, independent of how it ends up being drawn. */
-private data class Slice(
+data class Slice(
     val title: String,
     val subtitle: String,
     val bytes: Long,
@@ -66,7 +69,7 @@ private data class Slice(
 
 /** Shared shell so every insight card has the same header and empty state. */
 @Composable
-private fun InsightCard(
+fun InsightCard(
     title: String,
     subtitle: String?,
     hasData: Boolean,
@@ -107,7 +110,7 @@ private fun InsightCard(
 
 /** Draws a ranked list in whichever style Settings asks for. */
 @Composable
-private fun RankedChart(slices: List<Slice>) {
+fun RankedChart(slices: List<Slice>) {
     when (Prefs.chartStyle) {
         ChartStyle.BARS -> BarsChart(slices)
         ChartStyle.DONUT -> DonutChart(slices)
@@ -117,7 +120,7 @@ private fun RankedChart(slices: List<Slice>) {
 }
 
 @Composable
-private fun sliceColor(index: Int): Color {
+fun sliceColor(index: Int): Color {
     val kinds = fsColors.kinds
     val wheel = listOf(
         fsColors.accent, kinds.image, kinds.video, fsColors.orange,
@@ -549,32 +552,35 @@ private fun ReclaimRow(
 
 /** The largest files anywhere on the device; tapping one opens its folder. */
 @Composable
-fun BiggestFilesCard(onOpenFolder: (String) -> Unit) {
+fun BiggestFilesCard(onOpenFolder: (String) -> Unit, onViewMore: () -> Unit) {
     val snapshot = StorageInsights.snapshot
     val files = snapshot?.biggestFiles.orEmpty()
     InsightCard(
         title = "Biggest Files",
         subtitle = if (files.isEmpty()) null
-        else "Top ${files.size} · ${Formatters.bytes(files.sumOf { it.size })}" +
+        else "${Formatters.bytes(files.sumOf { it.size })} across ${files.size}" +
             hiddenNote(snapshot?.includedHidden),
         hasData = files.isNotEmpty(),
     ) {
-        RankedChart(
-            files.map { file ->
-                Slice(
-                    title = file.name,
-                    subtitle = prettyPath(file.folder),
-                    bytes = file.size,
-                    onClick = { onOpenFolder(file.folder) },
-                )
-            }
-        )
+        Column {
+            RankedChart(
+                files.take(CARD_PREVIEW).map { file ->
+                    Slice(
+                        title = file.name,
+                        subtitle = prettyPath(file.folder),
+                        bytes = file.size,
+                        onClick = { onOpenFolder(file.folder) },
+                    )
+                }
+            )
+            if (files.size > CARD_PREVIEW) ViewMoreRow("View all ${files.size} files", onViewMore)
+        }
     }
 }
 
 /** Where the space actually sits: folder totals including everything beneath. */
 @Composable
-fun LargestFoldersCard(onOpenFolder: (String) -> Unit) {
+fun LargestFoldersCard(onOpenFolder: (String) -> Unit, onViewMore: () -> Unit) {
     val snapshot = StorageInsights.snapshot
     val folders = snapshot?.largestFolders.orEmpty()
     InsightCard(
@@ -583,24 +589,32 @@ fun LargestFoldersCard(onOpenFolder: (String) -> Unit) {
         else "Including everything nested inside" + hiddenNote(snapshot?.includedHidden),
         hasData = folders.isNotEmpty(),
     ) {
-        RankedChart(
-            folders.map { folder ->
-                Slice(
-                    title = folder.name.ifEmpty { "Internal storage" },
-                    subtitle = "${Formatters.compactCount(folder.files)} files · " +
-                        prettyPath(folder.path.substringBeforeLast(File.separatorChar, "")),
-                    bytes = folder.bytes,
-                    onClick = { onOpenFolder(folder.path) },
-                )
+        Column {
+            RankedChart(folders.take(CARD_PREVIEW).map { folderSlice(it, onOpenFolder) })
+            if (folders.size > CARD_PREVIEW) {
+                ViewMoreRow("View all ${folders.size} folders", onViewMore)
             }
-        )
+        }
     }
 }
 
+/** Shared so the card and the detail screen describe a folder identically. */
+fun folderSlice(
+    folder: StorageInsights.FolderEntry,
+    onOpenFolder: (String) -> Unit,
+): Slice = Slice(
+    title = folder.name.ifEmpty { "Internal storage" },
+    subtitle = "${Formatters.compactCount(folder.files)} files · " +
+        prettyPath(folder.path.substringBeforeLast(File.separatorChar, "")),
+    bytes = folder.bytes,
+    onClick = { onOpenFolder(folder.path) },
+)
+
 /** How much was added each month, oldest to newest. */
 @Composable
-fun GrowthCard() {
-    val months = StorageInsights.snapshot?.months.orEmpty().reversed().takeLast(8)
+fun GrowthCard(onViewMore: () -> Unit) {
+    val all = StorageInsights.snapshot?.months.orEmpty()
+    val months = all.reversed().takeLast(8)
     val peak = months.maxOfOrNull { it.bytes }?.coerceAtLeast(1L) ?: 1L
     InsightCard(
         title = "Storage Growth",
@@ -654,15 +668,17 @@ fun GrowthCard() {
                     )
                 }
             }
+            if (all.size > months.size) ViewMoreRow("View all ${all.size} months", onViewMore)
         }
     }
 }
 
-/** The four newest changes, opening the file itself rather than its folder. */
+/** The newest changes, opening the file itself rather than its folder. */
 @Composable
-fun RecentFilesCard(onOpenViewer: (List<String>, Int) -> Unit) {
+fun RecentFilesCard(onOpenViewer: (List<String>, Int) -> Unit, onViewMore: () -> Unit) {
     val context = LocalContext.current
-    val files = StorageInsights.snapshot?.recent.orEmpty().take(4)
+    val all = StorageInsights.snapshot?.recent.orEmpty()
+    val files = all.take(CARD_PREVIEW)
     InsightCard(
         title = "Recent Files",
         subtitle = if (files.isEmpty()) "Nothing changed in the last week"
@@ -727,12 +743,36 @@ fun RecentFilesCard(onOpenViewer: (List<String>, Int) -> Unit) {
                 }
                 if (index != files.lastIndex) RowSeparator(startIndent = 50.dp)
             }
+            if (all.size > CARD_PREVIEW) ViewMoreRow("View all ${all.size} files", onViewMore)
         }
     }
 }
 
-private fun hiddenNote(included: Boolean?): String =
+@Composable
+private fun ViewMoreRow(label: String, onClick: () -> Unit) {
+    Column {
+        Spacer(Modifier.height(4.dp))
+        RowSeparator(startIndent = 0.dp)
+        Row(
+            Modifier.fillMaxWidth().pressScale(onClick).padding(top = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = fsColors.accent,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                Icons.Rounded.ChevronRight, null,
+                tint = fsColors.accent, modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+fun hiddenNote(included: Boolean?): String =
     if (included == true) " · hidden included" else ""
 
-private fun prettyPath(path: String): String =
+fun prettyPath(path: String): String =
     path.replace(FileRepository.rootPath, "Internal storage")

@@ -91,6 +91,7 @@ fun HomeScreen(
     onOpenDuplicates: () -> Unit,
     onOpenApps: () -> Unit,
     onOpenViewer: (List<String>, Int) -> Unit,
+    onOpenInsight: (DashboardCard) -> Unit,
 ) {
     LaunchedEffect(Unit) { TrashManager.refresh() }
 
@@ -199,10 +200,21 @@ fun HomeScreen(
                         onCleanEmptyFolders = { confirmClean = CleanTarget.EMPTY_FOLDERS },
                         onCleanZeroByte = { confirmClean = CleanTarget.ZERO_BYTE },
                     )
-                    DashboardCard.BIGGEST_FILES -> BiggestFilesCard(onOpenFolder = onOpenFolder)
-                    DashboardCard.LARGEST_FOLDERS -> LargestFoldersCard(onOpenFolder = onOpenFolder)
-                    DashboardCard.GROWTH -> GrowthCard()
-                    DashboardCard.RECENT -> RecentFilesCard(onOpenViewer = onOpenViewer)
+                    DashboardCard.BIGGEST_FILES -> BiggestFilesCard(
+                        onOpenFolder = onOpenFolder,
+                        onViewMore = { onOpenInsight(DashboardCard.BIGGEST_FILES) },
+                    )
+                    DashboardCard.LARGEST_FOLDERS -> LargestFoldersCard(
+                        onOpenFolder = onOpenFolder,
+                        onViewMore = { onOpenInsight(DashboardCard.LARGEST_FOLDERS) },
+                    )
+                    DashboardCard.GROWTH -> GrowthCard(
+                        onViewMore = { onOpenInsight(DashboardCard.GROWTH) },
+                    )
+                    DashboardCard.RECENT -> RecentFilesCard(
+                        onOpenViewer = onOpenViewer,
+                        onViewMore = { onOpenInsight(DashboardCard.RECENT) },
+                    )
                     DashboardCard.APPS -> AppStorageCard(onSeeAll = onOpenApps)
                 }
             }
