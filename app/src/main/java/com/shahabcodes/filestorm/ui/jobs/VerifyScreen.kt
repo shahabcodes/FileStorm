@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.VerifiedUser
@@ -70,7 +70,7 @@ fun VerifyScreen(onBack: () -> Unit) {
                 modifier = Modifier.pressScale(onBack).padding(horizontal = 6.dp, vertical = 6.dp),
             ) {
                 Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBackIos, null,
+                    Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null,
                     tint = fsColors.accent, modifier = Modifier.size(18.dp),
                 )
                 Text("Back", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge)

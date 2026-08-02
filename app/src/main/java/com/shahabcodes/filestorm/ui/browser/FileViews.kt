@@ -741,7 +741,7 @@ private fun MonthHeader(
 /**
  * Maps an accumulated pinch factor onto the folder's view: pinching out grows
  * the tiles (fewer columns) and eventually reaches the list; pinching in shrinks
- * them, the way the iOS photo grid behaves. Returns the reset accumulator.
+ * them, the way a gallery grid behaves. Returns the reset accumulator.
  */
 fun applyPinch(key: String, mode: ViewMode, accumulated: Float): Float {
     // Timeline is a deliberate grouping, not a zoom level - leave it alone.

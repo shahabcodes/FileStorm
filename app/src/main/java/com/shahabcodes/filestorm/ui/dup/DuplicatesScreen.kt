@@ -26,7 +26,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Folder
@@ -111,7 +111,7 @@ fun DuplicatesScreen(onBack: () -> Unit) {
                 modifier = Modifier.pressScale(onBack).padding(horizontal = 6.dp, vertical = 6.dp),
             ) {
                 Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBackIos, null,
+                    Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null,
                     tint = fsColors.accent, modifier = Modifier.size(18.dp),
                 )
                 Text("Back", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge)
@@ -388,7 +388,7 @@ private fun SetupView(
                     checked = deep,
                     onCheckedChange = onDeepChange,
                     colors = SwitchDefaults.colors(
-                        checkedTrackColor = fsColors.green,
+                        checkedTrackColor = fsColors.accent,
                         checkedThumbColor = Color.White,
                         uncheckedThumbColor = Color.White,
                         uncheckedTrackColor = fsColors.fill,
@@ -413,7 +413,7 @@ private fun SetupView(
                     checked = hidden,
                     onCheckedChange = onHiddenChange,
                     colors = SwitchDefaults.colors(
-                        checkedTrackColor = fsColors.green,
+                        checkedTrackColor = fsColors.accent,
                         checkedThumbColor = Color.White,
                         uncheckedThumbColor = Color.White,
                         uncheckedTrackColor = fsColors.fill,

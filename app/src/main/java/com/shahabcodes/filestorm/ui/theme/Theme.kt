@@ -15,8 +15,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// iOS system palette
-object Ios {
+// The app's core system palette.
+object Palette {
     val Blue = Color(0xFF007AFF)
     val BlueDark = Color(0xFF0A84FF)
     val Green = Color(0xFF34C759)
@@ -48,7 +48,7 @@ object Ios {
 }
 
 /**
- * The colour of each file type's icon. These used to be hard-coded to the iOS
+ * The colour of each file type's icon. These used to be hard-coded to one
  * palette, which is why folders stayed blue whichever theme was picked; owning
  * them here lets a theme restyle every icon in the app at once.
  */
@@ -63,25 +63,25 @@ data class KindColors(
     val other: Color,
 )
 
-private val IosKinds = KindColors(
-    folder = Ios.Blue,
-    image = Ios.Green,
-    video = Ios.Purple,
-    audio = Ios.Pink,
-    document = Ios.Orange,
-    archive = Ios.Indigo,
-    apk = Ios.Teal,
+private val ClassicKinds = KindColors(
+    folder = Palette.Blue,
+    image = Palette.Green,
+    video = Palette.Purple,
+    audio = Palette.Pink,
+    document = Palette.Orange,
+    archive = Palette.Indigo,
+    apk = Palette.Teal,
     other = Color(0xFF8E8E93),
 )
 
-private val IosKindsDark = KindColors(
-    folder = Ios.BlueDark,
-    image = Ios.GreenDark,
-    video = Ios.PurpleDark,
-    audio = Ios.Pink,
-    document = Ios.OrangeDark,
-    archive = Ios.Indigo,
-    apk = Ios.Teal,
+private val ClassicKindsDark = KindColors(
+    folder = Palette.BlueDark,
+    image = Palette.GreenDark,
+    video = Palette.PurpleDark,
+    audio = Palette.Pink,
+    document = Palette.OrangeDark,
+    archive = Palette.Indigo,
+    apk = Palette.Teal,
     other = Color(0xFF98989D),
 )
 
@@ -208,31 +208,31 @@ data class FsColors(
     val red: Color,
     val orange: Color,
     val isDark: Boolean,
-    val kinds: KindColors = IosKinds,
+    val kinds: KindColors = ClassicKinds,
 )
 
 val LocalFsColors = staticCompositionLocalOf {
     FsColors(
-        accent = Ios.Blue,
-        groupedBackground = Ios.GroupedBgLight,
-        card = Ios.CardLight,
-        cardSecondary = Ios.CardLight,
-        label = Ios.LabelLight,
-        secondaryLabel = Ios.SecondaryLabelLight,
-        separator = Ios.SeparatorLight,
-        fill = Ios.FillLight,
-        green = Ios.Green,
-        red = Ios.Red,
-        orange = Ios.Orange,
+        accent = Palette.Blue,
+        groupedBackground = Palette.GroupedBgLight,
+        card = Palette.CardLight,
+        cardSecondary = Palette.CardLight,
+        label = Palette.LabelLight,
+        secondaryLabel = Palette.SecondaryLabelLight,
+        separator = Palette.SeparatorLight,
+        fill = Palette.FillLight,
+        green = Palette.Green,
+        red = Palette.Red,
+        orange = Palette.Orange,
         isDark = false,
-        kinds = IosKinds,
+        kinds = ClassicKinds,
     )
 }
 
 val fsColors: FsColors
     @Composable get() = LocalFsColors.current
 
-private val iosTypography = Typography(
+private val appTypography = Typography(
     headlineLarge = TextStyle(
         fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.2.sp
     ),
@@ -247,7 +247,7 @@ private val iosTypography = Typography(
     labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium),
 )
 
-private val iosShapes = Shapes(
+private val appShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
     medium = RoundedCornerShape(16.dp),
@@ -332,32 +332,32 @@ fun FileStormTheme(content: @Composable () -> Unit) {
 
         else -> if (dark) FsColors(
             accent = plainAccent,
-            groupedBackground = Ios.GroupedBgDark,
-            card = Ios.CardDark,
-            cardSecondary = Ios.Card2Dark,
-            label = Ios.LabelDark,
-            secondaryLabel = Ios.SecondaryLabelDark,
-            separator = Ios.SeparatorDark,
-            fill = Ios.FillDark,
-            green = Ios.GreenDark,
-            red = Ios.RedDark,
-            orange = Ios.OrangeDark,
+            groupedBackground = Palette.GroupedBgDark,
+            card = Palette.CardDark,
+            cardSecondary = Palette.Card2Dark,
+            label = Palette.LabelDark,
+            secondaryLabel = Palette.SecondaryLabelDark,
+            separator = Palette.SeparatorDark,
+            fill = Palette.FillDark,
+            green = Palette.GreenDark,
+            red = Palette.RedDark,
+            orange = Palette.OrangeDark,
             isDark = true,
-            kinds = IosKindsDark,
+            kinds = ClassicKindsDark,
         ) else FsColors(
             accent = plainAccent,
-            groupedBackground = Ios.GroupedBgLight,
-            card = Ios.CardLight,
-            cardSecondary = Ios.CardLight,
-            label = Ios.LabelLight,
-            secondaryLabel = Ios.SecondaryLabelLight,
-            separator = Ios.SeparatorLight,
-            fill = Ios.FillLight,
-            green = Ios.Green,
-            red = Ios.Red,
-            orange = Ios.Orange,
+            groupedBackground = Palette.GroupedBgLight,
+            card = Palette.CardLight,
+            cardSecondary = Palette.CardLight,
+            label = Palette.LabelLight,
+            secondaryLabel = Palette.SecondaryLabelLight,
+            separator = Palette.SeparatorLight,
+            fill = Palette.FillLight,
+            green = Palette.Green,
+            red = Palette.Red,
+            orange = Palette.Orange,
             isDark = false,
-            kinds = IosKinds,
+            kinds = ClassicKinds,
         )
     }
 
@@ -391,6 +391,6 @@ fun FileStormTheme(content: @Composable () -> Unit) {
     }
 
     androidx.compose.runtime.CompositionLocalProvider(LocalFsColors provides fs) {
-        MaterialTheme(colorScheme = scheme, typography = iosTypography, shapes = iosShapes, content = content)
+        MaterialTheme(colorScheme = scheme, typography = appTypography, shapes = appShapes, content = content)
     }
 }

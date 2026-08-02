@@ -57,7 +57,7 @@ enum class ThemePalette(
     val swatchStart: Long,
     val swatchEnd: Long,
 ) {
-    DEFAULT("Classic", "The iOS-style palette File Storm ships with", 0xFF007AFF, 0xFF34C759),
+    DEFAULT("Classic", "The palette File Storm ships with", 0xFF007AFF, 0xFF34C759),
     BLOSSOM("Blossom", "Frosted rose and violet, drawn from the Glass icon", 0xFF7A5AF0, 0xFFDB3E90),
     SAKURA("Sakura", "Cherry petals on cream, with sage and apricot", 0xFFEE6F9C, 0xFFE8A860),
 }

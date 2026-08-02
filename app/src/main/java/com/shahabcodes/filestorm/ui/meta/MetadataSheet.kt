@@ -890,7 +890,7 @@ private fun WriteOptions(
 
 @Composable
 private fun switchColors() = SwitchDefaults.colors(
-    checkedTrackColor = fsColors.green,
+    checkedTrackColor = fsColors.accent,
     checkedThumbColor = Color.White,
     uncheckedThumbColor = Color.White,
     uncheckedTrackColor = fsColors.fill,

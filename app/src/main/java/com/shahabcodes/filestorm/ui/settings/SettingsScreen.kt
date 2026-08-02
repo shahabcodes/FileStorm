@@ -19,7 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Fingerprint
@@ -77,7 +77,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier.pressScale(onBack).padding(horizontal = 6.dp, vertical = 6.dp),
             ) {
                 Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBackIos, null,
+                    Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null,
                     tint = fsColors.accent, modifier = Modifier.size(18.dp),
                 )
                 Text("Back", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge)
@@ -315,7 +315,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     },
                     colors = SwitchDefaults.colors(
-                        checkedTrackColor = fsColors.green,
+                        checkedTrackColor = fsColors.accent,
                         checkedThumbColor = Color.White,
                         uncheckedThumbColor = Color.White,
                         uncheckedTrackColor = fsColors.fill,
@@ -356,7 +356,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     checked = Prefs.secureScreen,
                     onCheckedChange = { Prefs.updateSecureScreen(it) },
                     colors = SwitchDefaults.colors(
-                        checkedTrackColor = fsColors.green,
+                        checkedTrackColor = fsColors.accent,
                         checkedThumbColor = Color.White,
                         uncheckedThumbColor = Color.White,
                         uncheckedTrackColor = fsColors.fill,
@@ -393,7 +393,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     checked = Prefs.showHidden,
                     onCheckedChange = { Prefs.updateShowHidden(it) },
                     colors = SwitchDefaults.colors(
-                        checkedTrackColor = fsColors.green,
+                        checkedTrackColor = fsColors.accent,
                         checkedThumbColor = Color.White,
                         uncheckedThumbColor = Color.White,
                         uncheckedTrackColor = fsColors.fill,
@@ -473,7 +473,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     checked = Prefs.diagnostics,
                     onCheckedChange = { Prefs.updateDiagnostics(it) },
                     colors = SwitchDefaults.colors(
-                        checkedTrackColor = fsColors.green,
+                        checkedTrackColor = fsColors.accent,
                         checkedThumbColor = Color.White,
                         uncheckedThumbColor = Color.White,
                         uncheckedTrackColor = fsColors.fill,

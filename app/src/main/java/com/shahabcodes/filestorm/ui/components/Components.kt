@@ -54,11 +54,11 @@ import androidx.compose.ui.text.font.FontWeight
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FolderStyles
 import com.shahabcodes.filestorm.data.FsEntry
-import com.shahabcodes.filestorm.ui.theme.Ios
+import com.shahabcodes.filestorm.ui.theme.Palette
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import java.io.File
 
-/** iOS-style press feedback: element shrinks slightly while pressed. */
+/** Press feedback: the element shrinks slightly while pressed. */
 fun Modifier.pressScale(onClick: () -> Unit): Modifier = composed {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -72,7 +72,7 @@ fun Modifier.pressScale(onClick: () -> Unit): Modifier = composed {
         .clickable(interactionSource = interaction, indication = null, onClick = onClick)
 }
 
-/** Inset-grouped card, the iOS Settings look. */
+/** Inset-grouped settings card. */
 @Composable
 fun GroupedCard(
     modifier: Modifier = Modifier,
@@ -175,7 +175,7 @@ fun FileIconView(entry: FsEntry, size: Dp = 40.dp, cornerRadius: Dp = 10.dp) {
 fun entryNameWeight(entry: FsEntry): FontWeight =
     if (entry.isDirectory && FolderStyles.isBold(entry.path)) FontWeight.Bold else FontWeight.Normal
 
-/** iOS-style round selection checkmark. */
+/** Round selection checkmark. */
 @Composable
 fun SelectionCircle(selected: Boolean, size: Dp = 24.dp) {
     if (selected) {
@@ -204,7 +204,7 @@ fun SelectionCircle(selected: Boolean, size: Dp = 24.dp) {
 }
 
 @Composable
-fun IosSearchField(
+fun SearchField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String = "Search",
@@ -232,7 +232,7 @@ fun IosSearchField(
     )
 }
 
-/** Pill-shaped filled action button, iOS style. */
+/** Pill-shaped filled action button. */
 @Composable
 fun RowScope.ActionPill(
     icon: ImageVector,

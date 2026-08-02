@@ -21,7 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Delete
@@ -96,7 +96,7 @@ fun JobsScreen(onBack: () -> Unit, onOpenProgress: () -> Unit, onOpenVerify: () 
                 modifier = Modifier.pressScale(onBack).padding(horizontal = 6.dp, vertical = 6.dp),
             ) {
                 Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBackIos, null,
+                    Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null,
                     tint = fsColors.accent, modifier = Modifier.size(18.dp),
                 )
                 Text("Back", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge)
@@ -539,7 +539,7 @@ private fun JobEditorSheet(existing: OrganizeJob?, onDismiss: () -> Unit) {
                         checked = includeSub,
                         onCheckedChange = { includeSub = it },
                         colors = SwitchDefaults.colors(
-                            checkedTrackColor = fsColors.green,
+                            checkedTrackColor = fsColors.accent,
                             checkedThumbColor = Color.White,
                             uncheckedThumbColor = Color.White,
                             uncheckedTrackColor = fsColors.fill,

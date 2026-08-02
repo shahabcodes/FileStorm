@@ -1,10 +1,10 @@
 # FileStorm ⚡
 
-A beautiful, iOS-styled file manager for Android — smooth, premium, and built for moving files in bulk with total visibility.
+A beautiful file manager for Android — smooth, premium, and built for moving files in bulk with total visibility.
 
 ## Features
 
-- **iOS-style UI** — inset-grouped cards, large titles, SF-style typography, spring press animations, full light/dark mode.
+- **Refined UI** — inset-grouped cards, large titles, clean typography, spring press animations, full light/dark mode.
 - **Date-to-date selection** — pick a date range and every file modified in that window is selected instantly.
 - **Bulk transfers with full visibility** — move or copy any number of files/folders and watch:
   - overall completion percentage with an animated progress ring
@@ -29,4 +29,4 @@ Requires JDK 17 and the Android SDK (compileSdk 34). Release builds are signed i
 
 ## Stack
 
-Kotlin · Jetpack Compose (Material 3, iOS-flavored theme) · Coil (thumbnails) · single-activity Navigation Compose · foreground service + StateFlow transfer engine.
+Kotlin · Jetpack Compose (Material 3, custom theme) · Coil (thumbnails) · single-activity Navigation Compose · foreground service + StateFlow transfer engine.

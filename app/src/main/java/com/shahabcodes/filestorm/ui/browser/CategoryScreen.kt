@@ -21,7 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
@@ -52,7 +52,7 @@ import com.shahabcodes.filestorm.data.Prefs
 import com.shahabcodes.filestorm.transfer.TransferManager
 import com.shahabcodes.filestorm.transfer.TransferOp
 import com.shahabcodes.filestorm.transfer.TransferService
-import com.shahabcodes.filestorm.ui.components.IosSearchField
+import com.shahabcodes.filestorm.ui.components.SearchField
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
@@ -199,7 +199,7 @@ fun CategoryScreen(
                     modifier = Modifier.pressScale(onBack).padding(horizontal = 6.dp, vertical = 6.dp),
                 ) {
                     Icon(
-                        Icons.AutoMirrored.Rounded.ArrowBackIos, null,
+                        Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null,
                         tint = fsColors.accent, modifier = Modifier.size(18.dp),
                     )
                     Text("Back", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge)
@@ -253,7 +253,7 @@ fun CategoryScreen(
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         Spacer(Modifier.height(10.dp))
-        IosSearchField(
+        SearchField(
             value = query, onValueChange = { query = it },
             modifier = Modifier.padding(horizontal = 16.dp),
         )

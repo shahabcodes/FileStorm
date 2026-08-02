@@ -319,7 +319,7 @@ fun FolderStyleSheet(entry: FsEntry, onDismiss: () -> Unit) {
                         checked = FolderStyles.isBold(entry.path),
                         onCheckedChange = { FolderStyles.setBold(entry.path, it) },
                         colors = SwitchDefaults.colors(
-                            checkedTrackColor = fsColors.green,
+                            checkedTrackColor = fsColors.accent,
                             checkedThumbColor = Color.White,
                             uncheckedThumbColor = Color.White,
                             uncheckedTrackColor = fsColors.fill,

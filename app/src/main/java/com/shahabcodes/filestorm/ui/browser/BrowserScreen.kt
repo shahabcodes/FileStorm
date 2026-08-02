@@ -27,7 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
@@ -89,7 +89,7 @@ import com.shahabcodes.filestorm.data.ViewMode
 import com.shahabcodes.filestorm.transfer.TransferManager
 import com.shahabcodes.filestorm.transfer.TransferOp
 import com.shahabcodes.filestorm.transfer.TransferService
-import com.shahabcodes.filestorm.ui.components.IosSearchField
+import com.shahabcodes.filestorm.ui.components.SearchField
 import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -446,7 +446,7 @@ fun BrowserScreen(
                         .padding(horizontal = 6.dp, vertical = 6.dp),
                 ) {
                     Icon(
-                        Icons.AutoMirrored.Rounded.ArrowBackIos, null,
+                        Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null,
                         tint = fsColors.accent, modifier = Modifier.size(18.dp),
                     )
                     Text("Back", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge)
@@ -611,7 +611,7 @@ fun BrowserScreen(
             }
         }
         Spacer(Modifier.height(10.dp))
-        IosSearchField(
+        SearchField(
             value = query,
             onValueChange = { query = it },
             placeholder = "Search this folder",

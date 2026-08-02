@@ -90,7 +90,7 @@ object ThumbRatios {
 /**
  * Photo-wall tile: the image fills the frame with no text on top. Videos get a
  * small glyph, non-media get a tinted card, and selection shrinks the tile
- * behind an accent ring the way the iOS photo grid does.
+ * behind an accent ring.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -206,7 +206,7 @@ fun PhotoTile(
                 }
             }
 
-            // Selection tick, iOS style: filled circle bottom-right of the frame.
+            // Selection tick: filled circle bottom-right of the frame.
             if (selectionMode) {
                 Box(
                     Modifier

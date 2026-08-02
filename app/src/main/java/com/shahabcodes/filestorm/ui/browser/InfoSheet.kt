@@ -49,7 +49,7 @@ private val kindLabels = mapOf(
     FileKind.OTHER to "File",
 )
 
-/** iOS "Get Info" style sheet: kind, contents, total size, location, modified. */
+/** Properties sheet: kind, contents, total size, location, modified. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InfoSheet(entry: FsEntry, onDismiss: () -> Unit) {

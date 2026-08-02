@@ -66,7 +66,7 @@ import com.shahabcodes.filestorm.transfer.TransferManager
 import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.pressScale
-import com.shahabcodes.filestorm.ui.theme.Ios
+import com.shahabcodes.filestorm.ui.theme.Palette
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.util.Formatters
 
@@ -90,7 +90,7 @@ fun HomeScreen(
     val transfer by TransferManager.state.collectAsState()
 
     // Tile colours follow the active theme's file-type palette, so the
-    // dashboard restyles with everything else rather than staying iOS blue.
+    // dashboard restyles with everything else rather than staying a fixed blue.
     val kinds = fsColors.kinds
     val categories = listOf(
         Category(FileKind.IMAGE, "Images", Icons.Rounded.Image, kinds.image),

@@ -171,7 +171,7 @@ fun SelectionActionBar(
     }
 }
 
-/** Modal sheet with an iOS-styled Material date-range picker used for date-to-date selection. */
+/** Modal sheet with a themed Material date-range picker used for date-to-date selection. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateRangeSheet(

@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,7 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.shahabcodes.filestorm.data.AppStorageAnalyzer
 import com.shahabcodes.filestorm.ui.components.GroupedCard
-import com.shahabcodes.filestorm.ui.components.IosSearchField
+import com.shahabcodes.filestorm.ui.components.SearchField
 import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.util.Formatters
@@ -88,7 +88,7 @@ fun AppStorageScreen(onBack: () -> Unit) {
                 modifier = Modifier.pressScale(onBack).padding(horizontal = 6.dp, vertical = 6.dp),
             ) {
                 Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBackIos, null,
+                    Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null,
                     tint = fsColors.accent, modifier = Modifier.size(18.dp),
                 )
                 Text("Back", color = fsColors.accent, style = MaterialTheme.typography.bodyLarge)
@@ -108,7 +108,7 @@ fun AppStorageScreen(onBack: () -> Unit) {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
         Spacer(Modifier.height(8.dp))
-        IosSearchField(
+        SearchField(
             value = query,
             onValueChange = { query = it },
             placeholder = "Search apps",
