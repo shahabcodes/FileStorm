@@ -34,8 +34,9 @@ fun PermissionScreen(onGrantClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .systemBarsPadding()
+            // Fill the whole window, then inset only the content.
             .background(fsColors.groupedBackground)
+            .systemBarsPadding()
             .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

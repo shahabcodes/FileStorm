@@ -40,13 +40,17 @@ fun LockScreen(onRequestUnlock: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .systemBarsPadding()
+            // The fill and the touch blocker cover the whole window, including
+            // under the system bars; only the content is inset. Insetting first
+            // would leave transparent strips top and bottom showing the app —
+            // and, worse, taps in those strips would reach it while locked.
             .background(fsColors.groupedBackground)
             // Consume all touches so the app underneath can't be poked while locked.
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
             ) {}
+            .systemBarsPadding()
             .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
