@@ -44,6 +44,8 @@ import com.shahabcodes.filestorm.ui.transfer.TransferSheet
 import java.io.File
 
 private const val ACTION_PIP_TOGGLE = "com.shahabcodes.filestorm.PIP_TOGGLE"
+private const val VIDEO_CHANNEL_ID = "filestorm_video"
+private const val VIDEO_NOTIFICATION_ID = 4412
 
 class MainActivity : FragmentActivity() {
 
@@ -74,6 +76,7 @@ class MainActivity : FragmentActivity() {
         // button keeps showing the action that has already happened.
         VideoController.onStateChanged = {
             if (VideoController.inPip) runCatching { setPictureInPictureParams(pipParams()) }
+            updateVideoNotification()
         }
 
         if (Build.VERSION.SDK_INT >= 33) {
@@ -180,6 +183,71 @@ class MainActivity : FragmentActivity() {
             .build()
     }
 
+    /**
+     * Video playing in the floating window had nothing in the status bar, so
+     * there was no sign it was running and no way to control it once the window
+     * was tucked away. This posts the usual media entry while that is the case
+     * and takes it down as soon as the video comes back into the app.
+     */
+    private fun updateVideoNotification() {
+        val manager = getSystemService(android.content.Context.NOTIFICATION_SERVICE)
+            as android.app.NotificationManager
+        if (!VideoController.inPip || !VideoController.available) {
+            runCatching { manager.cancel(VIDEO_NOTIFICATION_ID) }
+            return
+        }
+        if (manager.getNotificationChannel(VIDEO_CHANNEL_ID) == null) {
+            manager.createNotificationChannel(
+                android.app.NotificationChannel(
+                    VIDEO_CHANNEL_ID,
+                    "Video playback",
+                    android.app.NotificationManager.IMPORTANCE_LOW,
+                ).apply { setShowBadge(false) }
+            )
+        }
+        val name = VideoController.activePath?.let { java.io.File(it).name } ?: "Video"
+        val playing = VideoController.playing
+        val toggle = android.app.PendingIntent.getBroadcast(
+            this,
+            1,
+            android.content.Intent(ACTION_PIP_TOGGLE).setPackage(packageName),
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val open = android.app.PendingIntent.getActivity(
+            this,
+            1,
+            android.content.Intent(this, MainActivity::class.java)
+                .setFlags(
+                    android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                ),
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = android.app.Notification.Builder(this, VIDEO_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(name)
+            .setContentText(if (playing) "Playing" else "Paused")
+            .setContentIntent(open)
+            .setOnlyAlertOnce(true)
+            .setOngoing(playing)
+            .setVisibility(android.app.Notification.VISIBILITY_PUBLIC)
+            .addAction(
+                android.app.Notification.Action.Builder(
+                    android.graphics.drawable.Icon.createWithResource(
+                        this,
+                        if (playing) android.R.drawable.ic_media_pause
+                        else android.R.drawable.ic_media_play,
+                    ),
+                    if (playing) "Pause" else "Play",
+                    toggle,
+                ).build()
+            )
+            .build()
+        runCatching { manager.notify(VIDEO_NOTIFICATION_ID, notification) }
+    }
+
     fun enterPipIfPlaying() {
         if (!VideoController.available) return
         if (locked) return
@@ -198,9 +266,14 @@ class MainActivity : FragmentActivity() {
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         VideoController.inPip = isInPictureInPictureMode
+        updateVideoNotification()
     }
 
     override fun onDestroy() {
+        runCatching {
+            (getSystemService(android.content.Context.NOTIFICATION_SERVICE)
+                as android.app.NotificationManager).cancel(VIDEO_NOTIFICATION_ID)
+        }
         runCatching { unregisterReceiver(pipReceiver) }
         VideoController.onStateChanged = null
         super.onDestroy()

@@ -69,6 +69,9 @@ object AudioPlayer {
     private var ticker: kotlinx.coroutines.Job? = null
     /** Set when focus was lost while playing, so it can resume when handed back. */
     private var resumeOnFocus = false
+    /** MediaPlayer only accepts start() once prepared; these bridge the gap. */
+    private var prepared = false
+    private var pendingPlay = false
 
     /** Notified whenever playback state changes, so the service can re-notify. */
     var onStateChanged: (() -> Unit)? = null
@@ -187,6 +190,8 @@ object AudioPlayer {
     private fun openCurrent(autoPlay: Boolean) {
         val track = _state.value.current ?: return
         releasePlayer()
+        prepared = false
+        pendingPlay = autoPlay
         val created = runCatching {
             MediaPlayer().apply {
                 setAudioAttributes(
@@ -201,7 +206,24 @@ object AudioPlayer {
                     _state.value = _state.value.copy(error = "Could not play ${track.name}")
                     true
                 }
-                prepare()
+                setOnPreparedListener { mp ->
+                    prepared = true
+                    _state.value = _state.value.copy(
+                        durationMs = mp.duration.toLong().coerceAtLeast(0L),
+                        positionMs = 0,
+                    )
+                    applySpeed(_state.value.speed, restartIfPlaying = false)
+                    if (pendingPlay) {
+                        pendingPlay = false
+                        resume()
+                    } else {
+                        onStateChanged?.invoke()
+                    }
+                }
+                // Asynchronous on purpose: prepare() blocks the caller while the
+                // file is opened and decoded, and on the main thread that ate
+                // any tap made in the moment right after skipping a track.
+                prepareAsync()
             }
         }.getOrNull()
 
@@ -210,12 +232,9 @@ object AudioPlayer {
             return
         }
         player = created
-        _state.value = _state.value.copy(
-            durationMs = created.duration.toLong().coerceAtLeast(0L),
-            positionMs = 0,
-        )
-        applySpeed(_state.value.speed, restartIfPlaying = false)
-        if (autoPlay) resume() else onStateChanged?.invoke()
+        // Reflect the intent straight away; playback follows once prepared.
+        if (autoPlay) _state.value = _state.value.copy(playing = true, error = null)
+        onStateChanged?.invoke()
     }
 
     private fun onCompletion() {
@@ -250,6 +269,14 @@ object AudioPlayer {
             openCurrent(autoPlay = false)
         }
         val player = player ?: return
+        // Still opening: remember the intent and let the prepared callback
+        // start it, so the button reacts now rather than being ignored.
+        if (!prepared) {
+            pendingPlay = true
+            _state.value = _state.value.copy(playing = true, error = null)
+            onStateChanged?.invoke()
+            return
+        }
         if (!requestFocus()) {
             _state.value = _state.value.copy(
                 error = "Another app is using the audio right now",
@@ -264,6 +291,8 @@ object AudioPlayer {
     }
 
     fun pause() {
+        // Cancels a play that was waiting on prepare, or it would start anyway.
+        pendingPlay = false
         runCatching { player?.pause() }
         _state.value = _state.value.copy(playing = false)
         stopTicker()
@@ -369,6 +398,7 @@ object AudioPlayer {
     }
 
     private fun releasePlayer() {
+        prepared = false
         runCatching {
             player?.setOnCompletionListener(null)
             player?.release()

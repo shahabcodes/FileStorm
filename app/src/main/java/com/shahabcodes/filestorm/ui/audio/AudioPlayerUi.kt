@@ -170,9 +170,10 @@ fun BoxScope.MiniPlayer(onExpand: () -> Unit) {
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
                     .pressScale(onExpand)
-                    .pointerInput(track.path) {
+                    .pointerInput(Unit) {
                         var drag = 0f
                         detectHorizontalDragGestures(
+                            onDragStart = { drag = 0f },
                             onDragEnd = {
                                 if (drag < -60f) AudioPlayer.next()
                                 else if (drag > 60f) AudioPlayer.previous()
@@ -343,7 +344,7 @@ fun AudioPlayerScreen(onCollapse: () -> Unit) {
                     ) { AudioPlayer.previous() }
                     RoundControl(
                         icon = if (state.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        size = 72.dp,
+                        size = 88.dp,
                         filled = true,
                     ) { AudioPlayer.togglePlay() }
                     RoundControl(
