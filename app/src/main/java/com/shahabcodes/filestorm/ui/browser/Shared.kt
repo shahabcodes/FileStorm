@@ -676,6 +676,9 @@ private const val MAX_SHARE_ITEMS = 100
 /** Set by the navigation host so a tapped archive can open its own screen. */
 var onOpenArchive: ((String) -> Unit)? = null
 
+/** Set by the navigation host so a folder can open the vault screen. */
+var onOpenVault: ((String) -> Unit)? = null
+
 fun openFile(context: android.content.Context, entry: FsEntry) {
     val opener = onOpenArchive
     if (opener != null && com.shahabcodes.filestorm.data.archive.ArchiveReader

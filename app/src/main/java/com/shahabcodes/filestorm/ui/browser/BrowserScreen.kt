@@ -897,6 +897,9 @@ fun BrowserScreen(
                 { extractTarget = target }
             } else null,
             onCompress = { compressTargets = listOf(target) },
+            onEncrypt = if (target.isDirectory) {
+                { com.shahabcodes.filestorm.ui.browser.onOpenVault?.invoke(target.path) }
+            } else null,
         )
     }
 

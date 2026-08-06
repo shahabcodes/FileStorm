@@ -1,5 +1,11 @@
 package com.shahabcodes.filestorm.ui.settings
 
+import com.shahabcodes.filestorm.util.Formatters
+import com.shahabcodes.filestorm.data.vault.VaultPrefs
+import com.shahabcodes.filestorm.data.vault.VaultLogLevel
+import com.shahabcodes.filestorm.data.vault.VaultLog
+import com.shahabcodes.filestorm.data.vault.VaultCrypto
+import com.shahabcodes.filestorm.data.vault.AutoLock
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.runtime.setValue
@@ -493,6 +499,101 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
 
+        SectionHeader("Vault")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            VaultToggle(
+                "Verify after encrypting",
+                "Reads every encrypted file back and checks it against the original before " +
+                    "the original is removed. Turning this off is about a third faster.",
+                VaultPrefs.verifyAfterWrite,
+            ) { VaultPrefs.updateVerify(it) }
+            RowSeparator(startIndent = 16.dp)
+            VaultToggle(
+                "Include hidden files",
+                "Encrypt files and folders whose names start with a dot.",
+                VaultPrefs.includeHidden,
+            ) { VaultPrefs.updateIncludeHidden(it) }
+            RowSeparator(startIndent = 16.dp)
+            VaultToggle(
+                "Send originals to Trash",
+                "Recoverable, but the space is not freed until the Trash is emptied - which " +
+                    "matters when the folder is larger than the space left.",
+                VaultPrefs.originalsToTrash,
+            ) { VaultPrefs.updateToTrash(it) }
+        }
+        Spacer(Modifier.height(14.dp))
+
+        SectionHeader("Vault Locking")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            AutoLock.entries.forEachIndexed { i, mode ->
+                ChoicePlainRow(mode.label, VaultPrefs.autoLock == mode) {
+                    VaultPrefs.updateAutoLock(mode)
+                }
+                if (i != AutoLock.entries.lastIndex) RowSeparator(startIndent = 16.dp)
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+
+        SectionHeader("Vault Key Strength")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            VaultCrypto.Strength.entries.forEachIndexed { i, level ->
+                ChoicePlainRow(level.label, VaultPrefs.strength == level) {
+                    VaultPrefs.updateStrength(level)
+                }
+                if (i != VaultCrypto.Strength.entries.lastIndex) RowSeparator(startIndent = 16.dp)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "A stronger setting makes unlocking slower and guessing far slower. Applies to " +
+                "vaults made from now on; an existing vault keeps what it was made with.",
+            style = MaterialTheme.typography.labelSmall,
+            color = fsColors.secondaryLabel,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+        Spacer(Modifier.height(24.dp))
+
+        SectionHeader("Vault Log")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            VaultLogLevel.entries.forEachIndexed { i, level ->
+                ChoicePlainRow(level.label + " - " + level.blurb, VaultPrefs.logLevel == level) {
+                    VaultPrefs.updateLogLevel(level)
+                }
+                if (i != VaultLogLevel.entries.lastIndex) RowSeparator(startIndent = 16.dp)
+            }
+            RowSeparator(startIndent = 16.dp)
+            VaultToggle(
+                "Include filenames in the log",
+                "Off by default: a log naming your files gives away what the vault is hiding. " +
+                    "Files are identified by a short code instead.",
+                VaultPrefs.logFilenames,
+            ) { VaultPrefs.updateLogFilenames(it) }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Log is " + Formatters.bytes(VaultLog.sizeBytes()),
+                style = MaterialTheme.typography.labelSmall,
+                color = fsColors.secondaryLabel,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "Share",
+                style = MaterialTheme.typography.labelMedium,
+                color = fsColors.accent,
+                modifier = Modifier
+                    .pressScale { shareVaultLog(context) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+            Text(
+                "Clear",
+                style = MaterialTheme.typography.labelMedium,
+                color = fsColors.red,
+                modifier = Modifier.pressScale { VaultLog.clear() }.padding(4.dp),
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+
         SectionHeader("Chart Style")
         GroupedCard(Modifier.padding(horizontal = 16.dp)) {
             ChartStyle.entries.forEachIndexed { i, style ->
@@ -723,6 +824,81 @@ private fun MoveButton(
             .padding(2.dp)
             .size(20.dp),
     )
+}
+
+/** A vault switch with room for the explanation each one needs. */
+@Composable
+private fun VaultToggle(
+    label: String,
+    blurb: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = fsColors.label)
+            Text(blurb, style = MaterialTheme.typography.bodySmall, color = fsColors.secondaryLabel)
+        }
+        Spacer(Modifier.width(10.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = fsColors.accent,
+                checkedThumbColor = Color.White,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = fsColors.fill,
+                uncheckedBorderColor = Color.Transparent,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun ChoicePlainRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .pressScale(onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = fsColors.label,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Icon(
+                Icons.Rounded.Check, null,
+                tint = fsColors.accent, modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+/** Shares the log file. It carries no names unless the user turned them on. */
+private fun shareVaultLog(context: android.content.Context) {
+    val file = VaultLog.file() ?: return
+    if (!file.isFile) return
+    runCatching {
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context, context.packageName + ".fileprovider", file,
+        )
+        context.startActivity(
+            android.content.Intent.createChooser(
+                android.content.Intent(android.content.Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                "Share vault log",
+            )
+        )
+    }
 }
 
 @Composable

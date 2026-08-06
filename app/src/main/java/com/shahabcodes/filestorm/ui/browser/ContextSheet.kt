@@ -82,6 +82,7 @@ fun EntryContextSheet(
     onSelect: () -> Unit,
     onShare: (() -> Unit)? = null,
     onExtract: (() -> Unit)? = null,
+    onEncrypt: (() -> Unit)? = null,
     onCompress: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -197,6 +198,9 @@ fun EntryContextSheet(
             Spacer(Modifier.height(14.dp))
 
             GroupedCard {
+                if (onEncrypt != null) {
+                    ContextRow(Icons.Rounded.Lock, "Encrypt folder…") { onDismiss(); onEncrypt() }
+                }
                 if (onExtract != null) {
                     ContextRow(Icons.Rounded.Unarchive, "Extract archive…") { onDismiss(); onExtract() }
                     RowSeparator(startIndent = 54.dp)

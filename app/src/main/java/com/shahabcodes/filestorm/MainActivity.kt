@@ -137,6 +137,7 @@ class MainActivity : FragmentActivity() {
         // does not call this, so floating playback is unaffected.
         VideoController.pause()
         updateVideoNotification()
+        com.shahabcodes.filestorm.data.vault.VaultSession.lockAllIfLeaving()
         // Re-lock whenever the app leaves the foreground.
         if (Prefs.biometricLock) locked = true
         com.shahabcodes.filestorm.data.FolderLocks.clearSession()
@@ -363,6 +364,12 @@ private fun AppNav() {
     }
 
     fun openBrowser(path: String) {
+        // A locked folder holds nothing but opaque containers, so browsing it
+        // as an ordinary folder would only ever show scrambled names.
+        if (com.shahabcodes.filestorm.data.vault.VaultFolder.isVault(File(path))) {
+            nav.navigate("vault?path=" + Uri.encode(path))
+            return
+        }
         val safe = if (File(path).exists()) path else FileRepository.rootPath
         com.shahabcodes.filestorm.ui.browser.openFolderGated(context, safe, File(safe).name) {
             com.shahabcodes.filestorm.data.BrowserTabs.open(safe)
@@ -376,7 +383,13 @@ private fun AppNav() {
         com.shahabcodes.filestorm.ui.browser.onOpenArchive = { path ->
             nav.navigate("archive?path=" + Uri.encode(path))
         }
-        onDispose { com.shahabcodes.filestorm.ui.browser.onOpenArchive = null }
+        com.shahabcodes.filestorm.ui.browser.onOpenVault = { path ->
+            nav.navigate("vault?path=" + Uri.encode(path))
+        }
+        onDispose {
+            com.shahabcodes.filestorm.ui.browser.onOpenArchive = null
+            com.shahabcodes.filestorm.ui.browser.onOpenVault = null
+        }
     }
 
     NavHost(navController = nav, startDestination = "home") {
@@ -481,6 +494,14 @@ private fun AppNav() {
                 onBack = { entry.ifCurrent { goBack() } },
                 onOpenFolder = { path -> entry.ifCurrent { openBrowser(path) } },
                 onOpenViewer = { paths, index -> entry.ifCurrent { openViewer(paths, index) } },
+            )
+        }
+        composable("vault?path={path}") { entry ->
+            val target = Uri.decode(entry.arguments?.getString("path").orEmpty())
+            com.shahabcodes.filestorm.ui.vault.VaultScreen(
+                path = target,
+                onBack = { entry.ifCurrent { goBack() } },
+                onOpenFolder = { path -> entry.ifCurrent { openBrowser(path) } },
             )
         }
         composable("archive?path={path}") { entry ->
