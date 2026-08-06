@@ -668,7 +668,16 @@ fun shareFiles(context: android.content.Context, entries: List<FsEntry>) {
 
 private const val MAX_SHARE_ITEMS = 100
 
+/**
+ * Opens a file the way the app knows best. Audio is handled in-app so playback
+ * survives leaving the folder; everything the app has no viewer for is handed
+ * to whichever app the user has for it.
+ */
 fun openFile(context: android.content.Context, entry: FsEntry) {
+    if (entry.kind == com.shahabcodes.filestorm.data.FileKind.AUDIO) {
+        com.shahabcodes.filestorm.data.audio.AudioPlayer.playFolderOf(entry.path)
+        return
+    }
     com.shahabcodes.filestorm.data.Diagnostics.log(
         "EXTERNAL",
         "openFile " + com.shahabcodes.filestorm.data.Diagnostics.describe(entry),

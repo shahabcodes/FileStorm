@@ -27,6 +27,7 @@ import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.Prefs
 import androidx.navigation.NavBackStackEntry
+import com.shahabcodes.filestorm.ui.audio.MiniPlayer
 import com.shahabcodes.filestorm.ui.components.DiagnosticsOverlay
 import com.shahabcodes.filestorm.ui.Biometrics
 import com.shahabcodes.filestorm.ui.LockScreen
@@ -147,6 +148,7 @@ private fun AppNav() {
     // The viewer is an overlay, not a destination. As a route it could be left on
     // the back stack and re-shown later with whatever the shared state happened to
     // hold, which is how tapping one category could surface a file from another.
+    var showPlayer by remember { mutableStateOf(false) }
     var viewerItems by remember { mutableStateOf<List<String>>(emptyList()) }
     var viewerStart by remember { mutableStateOf("") }
 
@@ -316,6 +318,18 @@ private fun AppNav() {
         composable("duplicates") {
             com.shahabcodes.filestorm.ui.dup.DuplicatesScreen(onBack = { goBack() })
         }
+    }
+
+    // The bar rides above every screen so playback is always reachable, and
+    // steps aside while the image/video viewer or the full player is up.
+    if (viewerItems.isEmpty() && !showPlayer) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+            MiniPlayer(onExpand = { showPlayer = true })
+        }
+    }
+    if (showPlayer) {
+        androidx.activity.compose.BackHandler { showPlayer = false }
+        com.shahabcodes.filestorm.ui.audio.AudioPlayerScreen(onCollapse = { showPlayer = false })
     }
 
     if (viewerItems.isNotEmpty()) {
