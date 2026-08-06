@@ -74,4 +74,8 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("io.coil-kt:coil-video:2.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // The vault's crypto core is deliberately free of Android APIs so it can be
+    // proven on a desktop JVM before any of it is reachable from the app.
+    testImplementation("junit:junit:4.13.2")
 }
