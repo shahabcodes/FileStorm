@@ -42,9 +42,9 @@ object ArchiveManager {
         val error: String? = null,
     )
 
-    val supportedArchives = setOf("zip")
+    val supportedArchives = setOf("zip", "jar", "apk", "aab", "epub", "tar", "gz", "tgz")
 
-    fun isArchive(file: File): Boolean = file.extension.lowercase() in supportedArchives
+    fun isArchive(file: File): Boolean = ArchiveReader.isSupported(file)
 
     @Volatile
     private var cancelled = false

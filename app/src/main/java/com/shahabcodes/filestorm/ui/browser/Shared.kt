@@ -673,7 +673,17 @@ private const val MAX_SHARE_ITEMS = 100
  * survives leaving the folder; everything the app has no viewer for is handed
  * to whichever app the user has for it.
  */
+/** Set by the navigation host so a tapped archive can open its own screen. */
+var onOpenArchive: ((String) -> Unit)? = null
+
 fun openFile(context: android.content.Context, entry: FsEntry) {
+    val opener = onOpenArchive
+    if (opener != null && com.shahabcodes.filestorm.data.archive.ArchiveReader
+            .isSupported(entry.toFile())
+    ) {
+        opener(entry.path)
+        return
+    }
     if (entry.kind == com.shahabcodes.filestorm.data.FileKind.AUDIO) {
         com.shahabcodes.filestorm.data.audio.AudioPlayer.playFolderOf(entry.path)
         return

@@ -370,6 +370,15 @@ private fun AppNav() {
         }
     }
 
+    // Any screen that opens a file can now hand an archive to its own screen
+    // without every one of them needing a navigation callback threaded in.
+    androidx.compose.runtime.DisposableEffect(nav) {
+        com.shahabcodes.filestorm.ui.browser.onOpenArchive = { path ->
+            nav.navigate("archive?path=" + Uri.encode(path))
+        }
+        onDispose { com.shahabcodes.filestorm.ui.browser.onOpenArchive = null }
+    }
+
     NavHost(navController = nav, startDestination = "home") {
         composable("home") { entry ->
             HomeScreen(
@@ -472,6 +481,14 @@ private fun AppNav() {
                 onBack = { entry.ifCurrent { goBack() } },
                 onOpenFolder = { path -> entry.ifCurrent { openBrowser(path) } },
                 onOpenViewer = { paths, index -> entry.ifCurrent { openViewer(paths, index) } },
+            )
+        }
+        composable("archive?path={path}") { entry ->
+            val target = Uri.decode(entry.arguments?.getString("path").orEmpty())
+            com.shahabcodes.filestorm.ui.browser.ArchiveScreen(
+                path = target,
+                onBack = { entry.ifCurrent { goBack() } },
+                onOpenFolder = { path -> entry.ifCurrent { openBrowser(path) } },
             )
         }
         composable("apps") { entry ->
