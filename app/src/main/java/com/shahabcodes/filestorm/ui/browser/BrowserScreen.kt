@@ -900,6 +900,9 @@ fun BrowserScreen(
             onEncrypt = if (target.isDirectory) {
                 { com.shahabcodes.filestorm.ui.browser.onOpenVault?.invoke(target.path) }
             } else null,
+            encryptLabel = if (
+                com.shahabcodes.filestorm.data.vault.VaultFolder.isVault(target.toFile())
+            ) "Open vault…" else "Encrypt folder…",
         )
     }
 

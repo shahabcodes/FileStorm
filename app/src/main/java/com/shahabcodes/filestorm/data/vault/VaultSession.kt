@@ -85,6 +85,9 @@ object VaultSession {
     }
 
     fun lock(root: File) {
+        // Anything opened for viewing was decrypted into cache; locking has to
+        // take those with it or the lock is theatre.
+        VaultMedia.clearCache()
         VaultCrypto.wipe(unlocked.remove(root.absolutePath))
         unlockedAt.remove(root.absolutePath)
         revision++
@@ -97,6 +100,7 @@ object VaultSession {
     }
 
     fun lockAll() {
+        VaultMedia.clearCache()
         unlocked.values.forEach { VaultCrypto.wipe(it) }
         unlocked.clear()
         unlockedAt.clear()
@@ -113,6 +117,7 @@ object VaultSession {
             VaultCrypto.wipe(unlocked.remove(it))
             unlockedAt.remove(it)
         }
+        VaultMedia.clearCache()
         revision++
     }
 
@@ -140,6 +145,7 @@ object VaultSession {
                     VaultEngine.shortId(root.absolutePath)
             )
             val options = VaultPrefs.options { original -> disposeOriginal(original) }
+                .copy(thumbnailFor = { file -> VaultMedia.thumbnailFor(file) })
             val listener = VaultEngine.Listener { progress ->
                 _run.value = _run.value.copy(progress = progress)
             }

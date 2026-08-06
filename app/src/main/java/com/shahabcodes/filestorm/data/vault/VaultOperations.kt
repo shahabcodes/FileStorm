@@ -55,6 +55,7 @@ object VaultOperations {
         chunkSize: Int = VaultContainer.DEFAULT_CHUNK_SIZE,
         created: Long = 0L,
         accessed: Long = 0L,
+        thumbnail: ByteArray? = null,
         progress: VaultContainer.Progress? = null,
         onStep: ((VaultStep) -> Unit)? = null,
     ): VaultOutcome {
@@ -75,6 +76,7 @@ object VaultOperations {
                 relativePath = relativePath,
                 created = created,
                 accessed = accessed,
+                thumbnail = thumbnail,
                 chunkSize = chunkSize,
                 progress = progress,
             )

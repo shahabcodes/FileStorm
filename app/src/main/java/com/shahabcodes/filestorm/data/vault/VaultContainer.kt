@@ -20,7 +20,17 @@ data class VaultFileInfo(
     val created: Long,
     val accessed: Long,
     val sha256: String,
-)
+    /**
+     * A small JPEG of the original, encrypted along with the rest, so an
+     * unlocked vault can be browsed as a gallery without decrypting whole
+     * videos. Written after the other fields, and absent in files made before
+     * it existed — readers check for it rather than assuming it.
+     */
+    val thumbnail: ByteArray? = null,
+) {
+    override fun equals(other: Any?): Boolean = this === other
+    override fun hashCode(): Int = System.identityHashCode(this)
+}
 
 /** The parts of a container readable without any key, used to open a vault cold. */
 data class VaultPreamble(
@@ -80,6 +90,7 @@ object VaultContainer {
         relativePath: String,
         created: Long = 0L,
         accessed: Long = 0L,
+        thumbnail: ByteArray? = null,
         chunkSize: Int = DEFAULT_CHUNK_SIZE,
         progress: Progress? = null,
     ): VaultFileInfo {
@@ -108,6 +119,7 @@ object VaultContainer {
                     created = created,
                     accessed = accessed,
                     sha256 = hash,
+                    thumbnail = thumbnail,
                 )
                 writeHeader(out, info, masterKey)
 
@@ -175,6 +187,13 @@ object VaultContainer {
             fields.writeLong(info.created)
             fields.writeLong(info.accessed)
             fields.writeUTF(info.sha256)
+            // Optional trailer. Older readers stop after the hash and simply
+            // ignore what follows, so both directions stay compatible.
+            val thumb = info.thumbnail
+            if (thumb != null && thumb.isNotEmpty()) {
+                fields.writeInt(thumb.size)
+                fields.write(thumb)
+            }
         }
         val nonce = VaultCrypto.randomBytes(VaultCrypto.NONCE_BYTES)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -296,9 +315,18 @@ object VaultContainer {
                 created = fields.readLong(),
                 accessed = fields.readLong(),
                 sha256 = fields.readUTF(),
+                thumbnail = readOptionalThumbnail(fields),
             )
         }
     }
+
+    /** Absent on files written before thumbnails existed, which is fine. */
+    private fun readOptionalThumbnail(fields: DataInputStream): ByteArray? = runCatching {
+        if (fields.available() < 4) return null
+        val length = fields.readInt()
+        if (length <= 0 || length > 4 shl 20 || fields.available() < length) return null
+        ByteArray(length).also { fields.readFully(it) }
+    }.getOrNull()
 
     /**
      * Decrypts into [target] and checks the result against the hash recorded at

@@ -83,6 +83,8 @@ fun EntryContextSheet(
     onShare: (() -> Unit)? = null,
     onExtract: (() -> Unit)? = null,
     onEncrypt: (() -> Unit)? = null,
+    /** Wording differs once the folder is already a vault. */
+    encryptLabel: String = "Encrypt folder…",
     onCompress: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -199,7 +201,7 @@ fun EntryContextSheet(
 
             GroupedCard {
                 if (onEncrypt != null) {
-                    ContextRow(Icons.Rounded.Lock, "Encrypt folder…") { onDismiss(); onEncrypt() }
+                    ContextRow(Icons.Rounded.Lock, encryptLabel) { onDismiss(); onEncrypt() }
                 }
                 if (onExtract != null) {
                     ContextRow(Icons.Rounded.Unarchive, "Extract archive…") { onDismiss(); onExtract() }

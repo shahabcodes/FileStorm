@@ -1,5 +1,16 @@
 package com.shahabcodes.filestorm.ui.vault
 
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.shahabcodes.filestorm.data.vault.VaultMedia
+import com.shahabcodes.filestorm.data.FsEntry
+import com.shahabcodes.filestorm.data.FileKind
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,11 +84,13 @@ import java.io.File
  * The vault, in whichever state the folder happens to be: not yet a vault,
  * locked, unlocked and browsable, or mid-run.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun VaultScreen(
     path: String,
     onBack: () -> Unit,
     onOpenFolder: (String) -> Unit,
+    onOpenViewer: (List<String>, Int) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -167,6 +180,7 @@ fun VaultScreen(
                 folder = folder,
                 onLockRemaining = { confirmLock = true },
                 onUnlockAll = { confirmUnlockAll = true },
+                onOpenViewer = onOpenViewer,
             )
         }
     }
@@ -397,126 +411,133 @@ private fun UnlockedView(
     folder: VaultFolder,
     onLockRemaining: () -> Unit,
     onUnlockAll: () -> Unit,
+    onOpenViewer: (List<String>, Int) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val key = VaultSession.keyFor(folder.root)
     var entries by remember { mutableStateOf<List<Pair<File, VaultFileInfo>>?>(null) }
-    var restoring by remember { mutableStateOf<String?>(null) }
+    var busyWith by remember { mutableStateOf<String?>(null) }
     var stragglers by remember { mutableStateOf(0) }
+    var gallery by remember { mutableStateOf(true) }
+    var sheetFor by remember { mutableStateOf<Pair<File, VaultFileInfo>?>(null) }
 
     androidx.compose.runtime.LaunchedEffect(folder.root.path, key) {
         if (key == null) return@LaunchedEffect
-        entries = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        entries = withContext(Dispatchers.IO) {
             VaultEngine.listContents(folder, key).sortedBy { it.second.relativePath.lowercase() }
         }
-        stragglers = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        stragglers = withContext(Dispatchers.IO) {
             folder.plaintextStragglers(VaultPrefs.includeHidden).size
         }
     }
 
+    /** Media opens in the app's viewer; anything else is restored instead. */
+    fun open(entry: Pair<File, VaultFileInfo>) {
+        val master = key ?: return
+        val all = entries.orEmpty()
+        val media = all.filter {
+            val kind = FsEntry.kindOf(it.second.name, false)
+            kind == FileKind.IMAGE || kind == FileKind.VIDEO
+        }
+        val at = media.indexOfFirst { it.first == entry.first }
+        if (at < 0) {
+            sheetFor = entry
+            return
+        }
+        busyWith = entry.second.name
+        scope.launch {
+            // The whole run of media is decrypted so swiping works, which is
+            // also why the cache is wiped the moment the vault locks.
+            val paths = ArrayList<String>()
+            var index = 0
+            media.forEachIndexed { i, item ->
+                val copy = VaultMedia.openCopy(item.first, master, item.second)
+                if (copy != null) {
+                    if (i == at) index = paths.size
+                    paths.add(copy.absolutePath)
+                }
+            }
+            busyWith = null
+            if (paths.isNotEmpty()) onOpenViewer(paths, index)
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 16.dp, end = 16.dp, bottom = 150.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            item {
-                GroupedCard {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(
-                            "${entries?.size ?: 0} encrypted file(s)",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = fsColors.label,
-                        )
-                        Text(
-                            "Tap one to bring it back on its own. Everything else stays locked.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = fsColors.secondaryLabel,
-                        )
-                        if (stragglers > 0) {
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                "$stragglers file(s) here are not encrypted yet.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = fsColors.orange,
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                "Encrypt them",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = fsColors.accent,
-                                modifier = Modifier.pressScale(onLockRemaining).padding(vertical = 4.dp),
-                            )
-                        }
-                    }
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "${entries?.size ?: 0} encrypted file(s)",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = fsColors.label,
+                    )
+                    Text(
+                        if (busyWith != null) "Opening $busyWith…"
+                        else "Tap to view · hold to bring one back",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    if (gallery) "List" else "Gallery",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = fsColors.accent,
+                    modifier = Modifier.pressScale { gallery = !gallery }.padding(6.dp),
+                )
+            }
+
+            if (stragglers > 0) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "$stragglers file(s) here are not encrypted yet.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.orange,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "Encrypt",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = fsColors.accent,
+                        modifier = Modifier.pressScale(onLockRemaining).padding(6.dp),
+                    )
                 }
             }
 
-            if (entries == null) {
-                item {
-                    Box(Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
-                        FsSpinner()
+            when {
+                entries == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    FsSpinner()
+                }
+                gallery -> LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 12.dp, end = 12.dp, top = 8.dp, bottom = 150.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(entries!!, key = { it.first.absolutePath }) { entry ->
+                        VaultTile(entry, onOpen = { open(entry) }, onHold = { sheetFor = entry })
                     }
                 }
-            } else {
-                items(entries!!, key = { it.first.absolutePath }) { (file, info) ->
-                    GroupedCard {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .pressScale {
-                                    if (key == null || restoring != null) return@pressScale
-                                    restoring = info.name
-                                    scope.launch {
-                                        val result = kotlinx.coroutines.withContext(
-                                            kotlinx.coroutines.Dispatchers.IO
-                                        ) { VaultEngine.restore(folder, file, key) }
-                                        restoring = null
-                                        if (result.ok) {
-                                            FileRepository.invalidate(folder.root.absolutePath)
-                                            entries = entries?.filterNot { it.first == file }
-                                        }
-                                    }
-                                }
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    info.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = fsColors.label,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    info.relativePath.substringBeforeLast('/', "")
-                                        .ifEmpty { "in this folder" },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = fsColors.secondaryLabel,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    Formatters.bytes(info.size),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = fsColors.label,
-                                )
-                                Text(
-                                    if (restoring == info.name) "Restoring…"
-                                    else Formatters.fileDate(info.modified),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (restoring == info.name) fsColors.accent
-                                    else fsColors.secondaryLabel,
-                                )
-                            }
-                        }
+                else -> LazyColumn(
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 16.dp, end = 16.dp, bottom = 150.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(entries!!, key = { it.first.absolutePath }) { entry ->
+                        VaultRow(entry, onOpen = { open(entry) }, onHold = { sheetFor = entry })
                     }
                 }
             }
@@ -532,6 +553,194 @@ private fun UnlockedView(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             PrimaryButton("Decrypt Whole Folder", onClick = onUnlockAll)
+        }
+    }
+
+    sheetFor?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { sheetFor = null },
+            containerColor = fsColors.card,
+            title = { Text(entry.second.name, color = fsColors.label) },
+            text = {
+                Column {
+                    Text(
+                        entry.second.relativePath,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        Formatters.bytes(entry.second.size) + " · " +
+                            Formatters.fileDate(entry.second.modified),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Bringing it back decrypts it to its original name, place and date, " +
+                            "and removes it from the vault. Everything else stays locked.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val master = key
+                    val file = entry.first
+                    sheetFor = null
+                    if (master != null) {
+                        busyWith = entry.second.name
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                VaultEngine.restore(folder, file, master)
+                            }
+                            busyWith = null
+                            if (result.ok) {
+                                FileRepository.invalidate(folder.root.absolutePath)
+                                entries = entries?.filterNot { it.first == file }
+                            }
+                        }
+                    }
+                }) { Text("Bring It Back", color = fsColors.accent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { sheetFor = null }) {
+                    Text("Cancel", color = fsColors.secondaryLabel)
+                }
+            },
+        )
+    }
+}
+
+/** Grid tile, showing the encrypted thumbnail once the vault is open. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun VaultTile(
+    entry: Pair<File, VaultFileInfo>,
+    onOpen: () -> Unit,
+    onHold: () -> Unit,
+) {
+    val info = entry.second
+    val bitmap = remember(entry.first.path) {
+        VaultMedia.thumbnailBitmap(info.thumbnail)?.asImageBitmap()
+    }
+    Box(
+        Modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(10.dp))
+            .background(fsColors.fill)
+            .combinedClickable(onClick = onOpen, onLongClick = onHold),
+    ) {
+        if (bitmap != null) {
+            androidx.compose.foundation.Image(
+                bitmap = bitmap,
+                contentDescription = info.name,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Column(
+                Modifier.fillMaxSize().padding(8.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    Icons.Rounded.Lock, null,
+                    tint = fsColors.secondaryLabel, modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    info.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.secondaryLabel,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        Text(
+            Formatters.bytes(info.size),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(4.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.Black.copy(alpha = 0.45f))
+                .padding(horizontal = 5.dp, vertical = 1.dp),
+        )
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun VaultRow(
+    entry: Pair<File, VaultFileInfo>,
+    onOpen: () -> Unit,
+    onHold: () -> Unit,
+) {
+    val info = entry.second
+    val bitmap = remember(entry.first.path) {
+        VaultMedia.thumbnailBitmap(info.thumbnail)?.asImageBitmap()
+    }
+    GroupedCard {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(onClick = onOpen, onLongClick = onHold)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(44.dp).clip(RoundedCornerShape(9.dp)).background(fsColors.fill),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (bitmap != null) {
+                    androidx.compose.foundation.Image(
+                        bitmap = bitmap,
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Icon(
+                        Icons.Rounded.Lock, null,
+                        tint = fsColors.secondaryLabel, modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    info.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = fsColors.label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    info.relativePath.substringBeforeLast('/', "").ifEmpty { "in this folder" },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.secondaryLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    Formatters.bytes(info.size),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = fsColors.label,
+                )
+                Text(
+                    Formatters.fileDate(info.modified),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.secondaryLabel,
+                )
+            }
         }
     }
 }

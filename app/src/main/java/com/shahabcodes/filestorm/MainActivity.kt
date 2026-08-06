@@ -305,6 +305,7 @@ class MainActivity : FragmentActivity() {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun AppNav() {
     val nav = rememberNavController()
@@ -502,6 +503,7 @@ private fun AppNav() {
                 path = target,
                 onBack = { entry.ifCurrent { goBack() } },
                 onOpenFolder = { path -> entry.ifCurrent { openBrowser(path) } },
+                onOpenViewer = { paths, index -> entry.ifCurrent { openViewer(paths, index) } },
             )
         }
         composable("archive?path={path}") { entry ->

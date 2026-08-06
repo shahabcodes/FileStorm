@@ -52,6 +52,11 @@ data class VaultOptions(
      * reports it. The app supplies a version of this that moves to Trash.
      */
     val removeOriginal: (File) -> Boolean = { it.delete() },
+    /**
+     * Supplies a small preview for a file, encrypted alongside it. Android
+     * decoding lives outside the core, so it arrives as bytes.
+     */
+    val thumbnailFor: (File) -> ByteArray? = { null },
 )
 
 /**
@@ -136,6 +141,7 @@ object VaultEngine {
                 removeOriginal = false,
                 chunkSize = options.chunkSize,
                 created = 0L, accessed = 0L,
+                thumbnail = options.thumbnailFor(source),
                 progress = { done, total ->
                     listener?.onProgress(
                         VaultProgress(
