@@ -242,10 +242,23 @@ object AudioPlayer {
     }
 
     fun resume() {
+        // The player is released whenever the surface goes away or playback was
+        // stopped, so a queued track with no player must be reopened rather
+        // than leaving the button looking dead.
+        if (player == null) {
+            if (_state.value.current == null) return
+            openCurrent(autoPlay = false)
+        }
         val player = player ?: return
-        if (!requestFocus()) return
+        if (!requestFocus()) {
+            _state.value = _state.value.copy(
+                error = "Another app is using the audio right now",
+            )
+            onStateChanged?.invoke()
+            return
+        }
         runCatching { player.start() }
-        _state.value = _state.value.copy(playing = true)
+        _state.value = _state.value.copy(playing = true, error = null)
         startTicker()
         onStateChanged?.invoke()
     }

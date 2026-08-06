@@ -142,54 +142,9 @@ fun BoxScope.MiniPlayer(onExpand: () -> Unit) {
         Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
             .background(fsColors.cardSecondary)
-            .pressScale(onExpand)
-            .pointerInput(track.path) {
-                var drag = 0f
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        if (drag < -60f) AudioPlayer.next()
-                        else if (drag > 60f) AudioPlayer.previous()
-                        drag = 0f
-                    },
-                ) { _, amount -> drag += amount }
-            },
+            .navigationBarsPadding(),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(40.dp)) { ArtworkOrGlyph(track.path, 10.dp) }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    track.displayTitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = fsColors.label,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    track.displayArtist,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = fsColors.secondaryLabel,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            RoundControl(
-                icon = if (state.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                size = 38.dp,
-                filled = true,
-            ) { AudioPlayer.togglePlay() }
-            Spacer(Modifier.width(4.dp))
-            RoundControl(Icons.Rounded.SkipNext, size = 34.dp) { AudioPlayer.next() }
-            RoundControl(Icons.Rounded.Close, size = 34.dp) { AudioPlayer.stop() }
-        }
         Box(
             Modifier
                 .fillMaxWidth()
@@ -202,6 +157,62 @@ fun BoxScope.MiniPlayer(onExpand: () -> Unit) {
                     .fillMaxHeight()
                     .background(fsColors.accent),
             )
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Only the artwork and titles open the full player. Putting that on
+            // the whole bar meant every near-miss of a control expanded the
+            // player instead of doing what was tapped.
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .pressScale(onExpand)
+                    .pointerInput(track.path) {
+                        var drag = 0f
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                if (drag < -60f) AudioPlayer.next()
+                                else if (drag > 60f) AudioPlayer.previous()
+                                drag = 0f
+                            },
+                        ) { _, amount -> drag += amount }
+                    }
+                    .padding(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(40.dp)) { ArtworkOrGlyph(track.path, 10.dp) }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        track.displayTitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = fsColors.label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        state.error ?: track.displayArtist,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (state.error != null) fsColors.red else fsColors.secondaryLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            // Every control gets a full 48dp target with real space between
+            // them; they were 34-38dp and touching, which is why taps missed.
+            RoundControl(
+                icon = if (state.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                size = 48.dp,
+                filled = true,
+            ) { AudioPlayer.togglePlay() }
+            Spacer(Modifier.width(6.dp))
+            RoundControl(Icons.Rounded.SkipNext, size = 48.dp) { AudioPlayer.next() }
+            Spacer(Modifier.width(6.dp))
+            RoundControl(Icons.Rounded.Close, size = 48.dp) { AudioPlayer.stop() }
         }
     }
 }
