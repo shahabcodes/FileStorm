@@ -68,13 +68,16 @@ fun InsightDetailScreen(
     }
 
     val slices: List<Slice> = when (card) {
-        DashboardCard.BIGGEST_FILES -> snapshot?.biggestFiles.orEmpty().map { file ->
-            Slice(
-                title = file.name,
-                subtitle = prettyPath(file.folder),
-                bytes = file.size,
-                onClick = { onOpenFolder(file.folder) },
-            )
+        DashboardCard.BIGGEST_FILES -> {
+            val files = snapshot?.biggestFiles.orEmpty()
+            files.map { file ->
+                Slice(
+                    title = file.name,
+                    subtitle = prettyPath(file.folder),
+                    bytes = file.size,
+                    onClick = { openInsightFile(context, files, file, onOpenViewer) },
+                )
+            }
         }
         DashboardCard.LARGEST_FOLDERS -> snapshot?.largestFolders.orEmpty()
             .map { folderSlice(it, onOpenFolder) }

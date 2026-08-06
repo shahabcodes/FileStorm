@@ -635,7 +635,11 @@ private fun ReclaimRow(
 
 /** The largest files anywhere on the device; tapping one opens its folder. */
 @Composable
-fun BiggestFilesCard(onOpenFolder: (String) -> Unit, onViewMore: () -> Unit) {
+fun BiggestFilesCard(
+    onOpenViewer: (List<String>, Int) -> Unit,
+    onViewMore: () -> Unit,
+) {
+    val context = LocalContext.current
     val snapshot = StorageInsights.snapshot
     val files = snapshot?.biggestFiles.orEmpty()
     InsightCard(
@@ -652,7 +656,7 @@ fun BiggestFilesCard(onOpenFolder: (String) -> Unit, onViewMore: () -> Unit) {
                         title = file.name,
                         subtitle = prettyPath(file.folder),
                         bytes = file.size,
-                        onClick = { onOpenFolder(file.folder) },
+                        onClick = { openInsightFile(context, files, file, onOpenViewer) },
                     )
                 }
             )
@@ -780,19 +784,7 @@ fun RecentFilesCard(onOpenViewer: (List<String>, Int) -> Unit, onViewMore: () ->
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .pressScale {
-                            val entry = FsEntry.from(File(file.path))
-                            // Photos and video open in the app's own viewer, with
-                            // the other recent media alongside them to swipe
-                            // through; anything else hands off to the system.
-                            val media = files.filter {
-                                val kind = FsEntry.kindOf(it.name, false)
-                                kind == FileKind.IMAGE || kind == FileKind.VIDEO
-                            }
-                            val at = media.indexOfFirst { it.path == file.path }
-                            if (at >= 0) onOpenViewer(media.map { it.path }, at)
-                            else openFile(context, entry)
-                        }
+                        .pressScale { openInsightFile(context, files, file, onOpenViewer) }
                         .padding(vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -859,6 +851,28 @@ private fun ViewMoreRow(label: String, onClick: () -> Unit) {
             )
         }
     }
+}
+
+/**
+ * Opens a file listed by a dashboard card: photos and video in the app's own
+ * viewer with the card's other media alongside to swipe through, anything else
+ * handed to whichever app handles it. Shared so Biggest Files and Recent Files
+ * behave identically — landing in the folder instead of the file was the odd
+ * one out.
+ */
+fun openInsightFile(
+    context: android.content.Context,
+    all: List<StorageInsights.FileEntry>,
+    file: StorageInsights.FileEntry,
+    onOpenViewer: (List<String>, Int) -> Unit,
+) {
+    val media = all.filter {
+        val kind = FsEntry.kindOf(it.name, false)
+        kind == FileKind.IMAGE || kind == FileKind.VIDEO
+    }
+    val at = media.indexOfFirst { it.path == file.path }
+    if (at >= 0) onOpenViewer(media.map { it.path }, at)
+    else openFile(context, FsEntry.from(File(file.path)))
 }
 
 fun hiddenNote(included: Boolean?): String =

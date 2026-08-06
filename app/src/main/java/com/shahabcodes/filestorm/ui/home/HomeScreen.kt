@@ -201,7 +201,7 @@ fun HomeScreen(
                         onCleanZeroByte = { confirmClean = CleanTarget.ZERO_BYTE },
                     )
                     DashboardCard.BIGGEST_FILES -> BiggestFilesCard(
-                        onOpenFolder = onOpenFolder,
+                        onOpenViewer = onOpenViewer,
                         onViewMore = { onOpenInsight(DashboardCard.BIGGEST_FILES) },
                     )
                     DashboardCard.LARGEST_FOLDERS -> LargestFoldersCard(
