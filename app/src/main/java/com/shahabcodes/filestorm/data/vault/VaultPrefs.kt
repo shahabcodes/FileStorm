@@ -38,6 +38,9 @@ object VaultPrefs {
         private set
     var chargingOnly by mutableStateOf(false)
         private set
+    /** 0 means auto: a sensible share of the cores, capped so the phone stays usable. */
+    var workers by mutableStateOf(0)
+        private set
     var pauseBelowBattery by mutableStateOf(15)
         private set
 
@@ -48,6 +51,7 @@ object VaultPrefs {
         chunkSizeKb = sp.getInt("chunk_kb", 1024)
         originalsToTrash = sp.getBoolean("to_trash", false)
         chargingOnly = sp.getBoolean("charging_only", false)
+        workers = sp.getInt("workers", 0)
         pauseBelowBattery = sp.getInt("battery_floor", 15)
         logFilenames = sp.getBoolean("log_names", false)
         logSizeMb = sp.getInt("log_mb", 5)
@@ -64,6 +68,7 @@ object VaultPrefs {
     fun updateIncludeHidden(value: Boolean) { includeHidden = value; sp.edit().putBoolean("hidden", value).apply() }
     fun updateChunkKb(value: Int) { chunkSizeKb = value; sp.edit().putInt("chunk_kb", value).apply() }
     fun updateToTrash(value: Boolean) { originalsToTrash = value; sp.edit().putBoolean("to_trash", value).apply() }
+    fun updateWorkers(value: Int) { workers = value; sp.edit().putInt("workers", value).apply() }
     fun updateChargingOnly(value: Boolean) { chargingOnly = value; sp.edit().putBoolean("charging_only", value).apply() }
     fun updateBatteryFloor(value: Int) { pauseBelowBattery = value; sp.edit().putInt("battery_floor", value).apply() }
     fun updateLogFilenames(value: Boolean) { logFilenames = value; sp.edit().putBoolean("log_names", value).apply() }
@@ -80,5 +85,13 @@ object VaultPrefs {
         includeHidden = includeHidden,
         chunkSize = chunkSizeKb * 1024,
         removeOriginal = removeOriginal,
+        workers = resolvedWorkers(),
     )
+
+    /** Leaves a core free so the phone does not become unusable mid-run. */
+    fun resolvedWorkers(): Int {
+        if (workers > 0) return workers
+        val cores = Runtime.getRuntime().availableProcessors()
+        return (cores - 2).coerceIn(1, 4)
+    }
 }

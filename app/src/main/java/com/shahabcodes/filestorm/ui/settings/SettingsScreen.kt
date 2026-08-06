@@ -523,6 +523,27 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(14.dp))
 
+        SectionHeader("Vault Speed")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            listOf(0 to "Auto", 1 to "One at a time", 2 to "Two", 4 to "Four").forEachIndexed { i, pair ->
+                ChoicePlainRow(
+                    if (pair.first == 0) "Auto (" + VaultPrefs.resolvedWorkers() + " at once)" else pair.second,
+                    VaultPrefs.workers == pair.first,
+                ) { VaultPrefs.updateWorkers(pair.first) }
+                if (i != 3) RowSeparator(startIndent = 16.dp)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Files at once. More is faster on folders full of small files, where opening and " +
+                "flushing each one costs more than the encryption itself. It also warms the " +
+                "phone up more.",
+            style = MaterialTheme.typography.labelSmall,
+            color = fsColors.secondaryLabel,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+        Spacer(Modifier.height(24.dp))
+
         SectionHeader("Vault Locking")
         GroupedCard(Modifier.padding(horizontal = 16.dp)) {
             AutoLock.entries.forEachIndexed { i, mode ->

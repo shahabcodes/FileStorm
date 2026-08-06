@@ -84,7 +84,11 @@ class VaultFolder(val root: File) {
     private fun isShard(dir: File): Boolean =
         dir.parentFile == root && dir.name.length == 2 && dir.name.all { it.isLetterOrDigit() }
 
-    /** A fresh, unused location for one encrypted file. */
+    /**
+     * A fresh, unused location for one encrypted file. Synchronised so two
+     * threads cannot both see the same name as free.
+     */
+    @Synchronized
     fun allocate(): File {
         while (true) {
             val name = VaultCrypto.randomBytes(16).joinToString("") { "%02x".format(it) }
@@ -92,6 +96,8 @@ class VaultFolder(val root: File) {
             val candidate = File(shard, "${name}.${VaultContainer.EXTENSION}")
             if (!candidate.exists()) {
                 shard.mkdirs()
+                // Claim it immediately; existence is what the next caller checks.
+                runCatching { candidate.createNewFile() }
                 return candidate
             }
         }

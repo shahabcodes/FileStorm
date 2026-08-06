@@ -46,6 +46,12 @@ data class VaultRecord(
  */
 class VaultJournal(private val file: File) {
 
+    /**
+     * Synchronised because several files are encrypted at once. Two threads
+     * appending at the same moment would interleave their bytes and produce a
+     * line that survives its own CRC check but describes neither record.
+     */
+    @Synchronized
     fun append(record: VaultRecord) {
         val body = listOf(
             record.id,

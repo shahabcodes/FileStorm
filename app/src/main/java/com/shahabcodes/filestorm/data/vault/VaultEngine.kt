@@ -1,6 +1,11 @@
 package com.shahabcodes.filestorm.data.vault
 
 import java.io.File
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 enum class VaultPhase { SCANNING, RESUMING, ENCRYPTING, DECRYPTING, CLEANING, DONE }
 
@@ -18,6 +23,8 @@ data class VaultProgress(
     val failed: Int = 0,
     val skipped: Int = 0,
     val startedAt: Long = 0,
+    /** More than one means the per-file line is whichever file reported last. */
+    val workers: Int = 1,
 ) {
     val fraction: Float
         get() = if (bytesTotal > 0) (bytesDone.toFloat() / bytesTotal).coerceIn(0f, 1f) else 0f
@@ -57,6 +64,13 @@ data class VaultOptions(
      * decoding lives outside the core, so it arrives as bytes.
      */
     val thumbnailFor: (File) -> ByteArray? = { null },
+    /**
+     * How many files are handled at once. Storage handles more than one request
+     * at a time, and per-file overhead — opening, flushing, renaming — dominates
+     * on folders full of small files, so this is where the real speed is. One
+     * keeps the old behaviour exactly.
+     */
+    val workers: Int = 1,
 )
 
 /**
@@ -99,102 +113,115 @@ object VaultEngine {
         val totalBytes = pending.sumOf { it.length() }
         log?.invoke("locking ${pending.size} file(s), ${totalBytes} bytes")
 
-        var succeeded = 0
-        var failed = 0
-        var skipped = 0
-        var bytesDone = 0L
-        val failures = ArrayList<VaultFailure>()
-        var cancelled = false
+        val succeeded = AtomicInteger()
+        val failed = AtomicInteger()
+        val skipped = AtomicInteger()
+        val started = AtomicInteger()
+        val bytesDone = AtomicLong()
+        val failures = ConcurrentLinkedQueue<VaultFailure>()
+        val cancelled = java.util.concurrent.atomic.AtomicBoolean(false)
 
-        pending.forEachIndexed { index, source ->
-            if (shouldStop()) {
-                cancelled = true
-                return@forEachIndexed
-            }
-            if (!source.isFile) {
-                skipped++
-                return@forEachIndexed
-            }
-            val relative = source.relativeToOrSelf(folder.root).path.replace(File.separatorChar, '/')
-            val target = folder.allocate()
-            val temp = File(target.parentFile, target.name + ".tmp")
-            val scratch = File(target.parentFile, target.name + ".check")
-            val before = bytesDone
-
-            listener?.onProgress(
-                VaultProgress(
-                    phase = VaultPhase.ENCRYPTING,
-                    fileIndex = index + 1, fileCount = pending.size,
-                    currentName = source.name,
-                    fileBytesTotal = source.length(),
-                    bytesDone = bytesDone, bytesTotal = totalBytes,
-                    succeeded = succeeded, failed = failed, skipped = skipped,
-                    startedAt = startedAt,
+        // Progress is published from whichever thread just moved, so the emit
+        // itself is synchronised to keep the numbers self-consistent.
+        val emit = { phase: VaultPhase, name: String, fileDone: Long, fileTotal: Long ->
+            synchronized(failures) {
+                listener?.onProgress(
+                    VaultProgress(
+                        phase = phase,
+                        fileIndex = started.get(), fileCount = pending.size,
+                        currentName = name,
+                        fileBytesDone = fileDone, fileBytesTotal = fileTotal,
+                        bytesDone = bytesDone.get(), bytesTotal = totalBytes,
+                        succeeded = succeeded.get(), failed = failed.get(),
+                        skipped = skipped.get(), startedAt = startedAt,
+                        workers = options.workers,
+                    )
                 )
-            )
-
-            val outcome = VaultOperations.encryptFile(
-                source = source, target = target, temp = temp, scratch = scratch,
-                masterKey = masterKey, preamble = preamble, relativePath = relative,
-                journal = journal,
-                verify = options.verifyAfterWrite,
-                removeOriginal = false,
-                chunkSize = options.chunkSize,
-                created = 0L, accessed = 0L,
-                thumbnail = options.thumbnailFor(source),
-                progress = { done, total ->
-                    listener?.onProgress(
-                        VaultProgress(
-                            phase = VaultPhase.ENCRYPTING,
-                            fileIndex = index + 1, fileCount = pending.size,
-                            currentName = source.name,
-                            fileBytesDone = done, fileBytesTotal = total,
-                            bytesDone = before + done, bytesTotal = totalBytes,
-                            succeeded = succeeded, failed = failed, skipped = skipped,
-                            startedAt = startedAt,
-                        )
-                    )
-                },
-            )
-
-            if (outcome.ok) {
-                // Disposal is the caller's policy — delete, or move to Trash.
-                // Either way it happens only after the copy is verified.
-                if (options.removeOriginal(source)) {
-                    journal.append(
-                        VaultRecord(
-                            id = source.absolutePath.hashCode().toString(16) + "-" + (outcome.info?.size ?: 0),
-                            state = VaultState.DONE,
-                            source = source.absolutePath,
-                            temp = temp.absolutePath,
-                            target = target.absolutePath,
-                        )
-                    )
-                }
-                succeeded++
-                bytesDone = before + (outcome.info?.size ?: 0L)
-            } else {
-                failed++
-                failures.add(VaultFailure(relative, outcome.error ?: "unknown"))
-                log?.invoke("failed ${shortId(source.absolutePath)}: ${outcome.error}")
-                target.delete()
-                temp.delete()
             }
-            scratch.delete()
         }
+
+        val work = { source: File ->
+            if (shouldStop()) {
+                cancelled.set(true)
+            } else if (!source.isFile) {
+                skipped.incrementAndGet()
+            } else {
+                started.incrementAndGet()
+                val relative = source.relativeToOrSelf(folder.root).path
+                    .replace(File.separatorChar, '/')
+                val target = folder.allocate()
+                val temp = File(target.parentFile, target.name + ".tmp")
+                val scratch = File(target.parentFile, target.name + ".check")
+                var reported = 0L
+
+                emit(VaultPhase.ENCRYPTING, source.name, 0L, source.length())
+
+                val outcome = VaultOperations.encryptFile(
+                    source = source, target = target, temp = temp, scratch = scratch,
+                    masterKey = masterKey, preamble = preamble, relativePath = relative,
+                    journal = journal,
+                    verify = options.verifyAfterWrite,
+                    removeOriginal = false,
+                    chunkSize = options.chunkSize,
+                    created = 0L, accessed = 0L,
+                    thumbnail = options.thumbnailFor(source),
+                    progress = { done, total ->
+                        // Publish the delta, so the running total stays correct
+                        // however many files are in flight.
+                        bytesDone.addAndGet(done - reported)
+                        reported = done
+                        emit(VaultPhase.ENCRYPTING, source.name, done, total)
+                    },
+                )
+
+                if (outcome.ok) {
+                    // Disposal is the caller's policy — delete, or move to
+                    // Trash. Either way it happens only after verification.
+                    if (options.removeOriginal(source)) {
+                        journal.append(
+                            VaultRecord(
+                                id = source.absolutePath.hashCode().toString(16) + "-" +
+                                    (outcome.info?.size ?: 0),
+                                state = VaultState.DONE,
+                                source = source.absolutePath,
+                                temp = temp.absolutePath,
+                                target = target.absolutePath,
+                            )
+                        )
+                    }
+                    succeeded.incrementAndGet()
+                    bytesDone.addAndGet((outcome.info?.size ?: 0L) - reported)
+                } else {
+                    failed.incrementAndGet()
+                    failures.add(VaultFailure(relative, outcome.error ?: "unknown"))
+                    log?.invoke("failed ${shortId(source.absolutePath)}: ${outcome.error}")
+                    target.delete()
+                    temp.delete()
+                    bytesDone.addAndGet(-reported)
+                }
+                scratch.delete()
+            }
+            Unit
+        }
+
+        runPool(pending, options.workers, work)
 
         listener?.onProgress(VaultProgress(VaultPhase.CLEANING, startedAt = startedAt))
         removeEmptyFolders(folder)
-        if (!cancelled && failed == 0) journal.clear()
+        if (!cancelled.get() && failed.get() == 0) journal.clear()
 
         listener?.onProgress(
             VaultProgress(
                 phase = VaultPhase.DONE,
-                fileCount = pending.size, bytesDone = bytesDone, bytesTotal = totalBytes,
-                succeeded = succeeded, failed = failed, skipped = skipped, startedAt = startedAt,
+                fileCount = pending.size, bytesDone = bytesDone.get(), bytesTotal = totalBytes,
+                succeeded = succeeded.get(), failed = failed.get(), skipped = skipped.get(),
+                startedAt = startedAt, workers = options.workers,
             )
         )
-        return VaultSummary(succeeded, failed, skipped, bytesDone, failures, cancelled)
+        return VaultSummary(
+            succeeded.get(), failed.get(), skipped.get(), bytesDone.get(),
+            failures.toList(), cancelled.get(),
+        )
     }
 
     /** Restores every file, rebuilding the original folder structure. */
@@ -325,6 +352,27 @@ object VaultEngine {
         dirs.forEach { dir ->
             if (dir.parentFile == folder.root && dir.name.length == 2) return@forEach
             if (dir.list()?.isEmpty() == true) dir.delete()
+        }
+    }
+
+    /**
+     * Runs [work] over [items], one at a time when [workers] is 1 so the
+     * single-threaded path stays exactly as it was and as it was tested.
+     */
+    private fun <T> runPool(items: List<T>, workers: Int, work: (T) -> Unit) {
+        val lanes = workers.coerceIn(1, 8)
+        if (lanes == 1) {
+            items.forEach(work)
+            return
+        }
+        val pool = Executors.newFixedThreadPool(lanes)
+        try {
+            items.map { item -> pool.submit { work(item) } }.forEach { future ->
+                runCatching { future.get() }
+            }
+        } finally {
+            pool.shutdown()
+            runCatching { pool.awaitTermination(1, TimeUnit.MINUTES) }
         }
     }
 
