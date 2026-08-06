@@ -574,18 +574,25 @@ private fun VideoPage(
         DisposableEffect(file, player) {
             val path = file.absolutePath
             if (player != null) {
-                VideoController.bind(path) {
-                    val p = player
-                    if (p != null) {
-                        if (playing) {
-                            runCatching { p.pause() }
-                            playing = false
-                        } else {
-                            runCatching { p.start() }
-                            playing = true
+                VideoController.bind(
+                    path = path,
+                    onToggle = {
+                        val p = player
+                        if (p != null) {
+                            if (playing) {
+                                runCatching { p.pause() }
+                                playing = false
+                            } else {
+                                runCatching { p.start() }
+                                playing = true
+                            }
                         }
-                    }
-                }
+                    },
+                    onPause = {
+                        runCatching { player?.pause() }
+                        playing = false
+                    },
+                )
             }
             onDispose { VideoController.unbind(path) }
         }

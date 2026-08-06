@@ -130,6 +130,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
+        // Closing the floating window stops the activity but leaves the
+        // composition — and therefore the player — alive, so the video carried
+        // on as audio with nothing on screen. Only music is meant to outlive
+        // the app; video pauses whenever the screen goes away. Entering PiP
+        // does not call this, so floating playback is unaffected.
+        VideoController.pause()
+        updateVideoNotification()
         // Re-lock whenever the app leaves the foreground.
         if (Prefs.biometricLock) locked = true
         com.shahabcodes.filestorm.data.FolderLocks.clearSession()

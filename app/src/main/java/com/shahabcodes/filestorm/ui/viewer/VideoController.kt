@@ -28,15 +28,17 @@ object VideoController {
         private set
 
     private var toggleAction: (() -> Unit)? = null
+    private var pauseAction: (() -> Unit)? = null
 
     /** Notified when playback state changes so the PiP actions can be rebuilt. */
     var onStateChanged: (() -> Unit)? = null
 
     val available: Boolean get() = activePath != null
 
-    fun bind(path: String, onToggle: () -> Unit) {
+    fun bind(path: String, onToggle: () -> Unit, onPause: () -> Unit) {
         activePath = path
         toggleAction = onToggle
+        pauseAction = onPause
         onStateChanged?.invoke()
     }
 
@@ -44,6 +46,7 @@ object VideoController {
         if (activePath != path) return
         activePath = null
         toggleAction = null
+        pauseAction = null
         playing = false
         videoWidth = 0
         videoHeight = 0
@@ -64,5 +67,10 @@ object VideoController {
 
     fun toggle() {
         toggleAction?.invoke()
+    }
+
+    /** Used when the app leaves the screen, including closing the PiP window. */
+    fun pause() {
+        pauseAction?.invoke()
     }
 }
