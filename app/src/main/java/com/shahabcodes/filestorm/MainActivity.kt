@@ -28,6 +28,7 @@ import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.Prefs
 import androidx.navigation.NavBackStackEntry
 import com.shahabcodes.filestorm.ui.audio.MiniPlayer
+import com.shahabcodes.filestorm.ui.viewer.VideoController
 import com.shahabcodes.filestorm.ui.components.DiagnosticsOverlay
 import com.shahabcodes.filestorm.ui.Biometrics
 import com.shahabcodes.filestorm.ui.LockScreen
@@ -42,10 +43,19 @@ import com.shahabcodes.filestorm.ui.transfer.TransferScreen
 import com.shahabcodes.filestorm.ui.transfer.TransferSheet
 import java.io.File
 
+private const val ACTION_PIP_TOGGLE = "com.shahabcodes.filestorm.PIP_TOGGLE"
+
 class MainActivity : FragmentActivity() {
 
     private var hasAccess by mutableStateOf(false)
     private var locked by mutableStateOf(false)
+
+    /** Play/pause taps coming back from the floating window's controls. */
+    private val pipReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            if (intent?.action == ACTION_PIP_TOGGLE) VideoController.toggle()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +64,18 @@ class MainActivity : FragmentActivity() {
         locked = Prefs.biometricLock
         com.shahabcodes.filestorm.data.Diagnostics.log("APP", "activity created")
 
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            pipReceiver,
+            android.content.IntentFilter(ACTION_PIP_TOGGLE),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        // Rebuild the floating controls whenever playback flips, otherwise the
+        // button keeps showing the action that has already happened.
+        VideoController.onStateChanged = {
+            if (VideoController.inPip) runCatching { setPictureInPictureParams(pipParams()) }
+        }
+
         if (Build.VERSION.SDK_INT >= 33) {
             registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
                 .launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -61,8 +83,11 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             // FLAG_SECURE blanks the recent-apps preview (and blocks screenshots).
-            androidx.compose.runtime.LaunchedEffect(Prefs.secureScreen) {
-                if (Prefs.secureScreen) {
+            // Locking the app but leaving its contents legible in the recents
+            // switcher would defeat the point, so the lock implies it.
+            val hideContents = Prefs.secureScreen || Prefs.biometricLock
+            androidx.compose.runtime.LaunchedEffect(hideContents) {
+                if (hideContents) {
                     window.setFlags(
                         android.view.WindowManager.LayoutParams.FLAG_SECURE,
                         android.view.WindowManager.LayoutParams.FLAG_SECURE,
@@ -120,6 +145,65 @@ class MainActivity : FragmentActivity() {
             subtitle = "Use your fingerprint, face or device PIN",
             onSuccess = { locked = false },
         )
+    }
+
+    /**
+     * Shape and controls for the floating window. The aspect ratio has to sit
+     * inside the range Android accepts or the request is rejected outright, so
+     * an unusually tall or wide video is clamped rather than refused.
+     */
+    private fun pipParams(): android.app.PictureInPictureParams {
+        val width = VideoController.videoWidth.takeIf { it > 0 } ?: 16
+        val height = VideoController.videoHeight.takeIf { it > 0 } ?: 9
+        var ratio = width.toFloat() / height.toFloat()
+        ratio = ratio.coerceIn(0.42f, 2.38f)
+        val numerator = (ratio * 1000).toInt()
+
+        val icon = if (VideoController.playing) android.R.drawable.ic_media_pause
+        else android.R.drawable.ic_media_play
+        val label = if (VideoController.playing) "Pause" else "Play"
+        val action = android.app.RemoteAction(
+            android.graphics.drawable.Icon.createWithResource(this, icon),
+            label,
+            label,
+            android.app.PendingIntent.getBroadcast(
+                this,
+                0,
+                android.content.Intent(ACTION_PIP_TOGGLE).setPackage(packageName),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                    android.app.PendingIntent.FLAG_IMMUTABLE,
+            ),
+        )
+        return android.app.PictureInPictureParams.Builder()
+            .setAspectRatio(android.util.Rational(numerator, 1000))
+            .setActions(listOf(action))
+            .build()
+    }
+
+    fun enterPipIfPlaying() {
+        if (!VideoController.available) return
+        if (locked) return
+        runCatching { enterPictureInPictureMode(pipParams()) }
+    }
+
+    /** Pressing home while a video is up floats it instead of just leaving. */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (VideoController.playing) enterPipIfPlaying()
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: android.content.res.Configuration,
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        VideoController.inPip = isInPictureInPictureMode
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(pipReceiver) }
+        VideoController.onStateChanged = null
+        super.onDestroy()
     }
 
     private fun checkAccess(): Boolean =
@@ -322,7 +406,7 @@ private fun AppNav() {
 
     // The bar rides above every screen so playback is always reachable, and
     // steps aside while the image/video viewer or the full player is up.
-    if (viewerItems.isEmpty() && !showPlayer) {
+    if (viewerItems.isEmpty() && !showPlayer && !VideoController.inPip) {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
             MiniPlayer(onExpand = { showPlayer = true })
         }

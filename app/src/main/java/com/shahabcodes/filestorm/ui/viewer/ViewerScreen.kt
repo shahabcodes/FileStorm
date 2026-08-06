@@ -34,6 +34,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Info
@@ -126,6 +127,10 @@ fun ViewerScreen(
     }
     val pagerState = rememberPagerState(initialPage = initialPage) { current.size }
     var chromeVisible by remember { mutableStateOf(true) }
+    // In the floating window there is only room for the picture itself; the
+    // system draws its own controls over it.
+    val pip = VideoController.inPip
+    if (pip) chromeVisible = false
     var infoTarget by remember { mutableStateOf<FsEntry?>(null) }
     var confirmDelete by remember { mutableStateOf<File?>(null) }
 
@@ -158,7 +163,7 @@ fun ViewerScreen(
         }
 
         AnimatedVisibility(
-            visible = chromeVisible,
+            visible = chromeVisible && !pip,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
@@ -189,11 +194,18 @@ fun ViewerScreen(
                         maxLines = 1,
                     )
                 }
+                // Only offered for video, and only once a player exists to float.
+                if (VideoController.available) {
+                    val activity = LocalContext.current as? com.shahabcodes.filestorm.MainActivity
+                    BarIcon(Icons.Rounded.PictureInPictureAlt, "Float") {
+                        activity?.enterPipIfPlaying()
+                    }
+                }
             }
         }
 
         AnimatedVisibility(
-            visible = chromeVisible,
+            visible = chromeVisible && !pip,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -510,8 +522,12 @@ private fun VideoPage(
                                     videoWidth = it.videoWidth
                                     videoHeight = it.videoHeight
                                     it.setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f)
+                                    VideoController.reportSize(it.videoWidth, it.videoHeight)
                                 }
-                                mp.setOnCompletionListener { playing = false }
+                                mp.setOnCompletionListener {
+                                    playing = false
+                                    VideoController.reportPlaying(false)
+                                }
                                 mp.prepareAsync()
                                 player = mp
                             }
@@ -553,6 +569,27 @@ private fun VideoPage(
                 playing = false
             }
         }
+        // The activity needs a way to start and stop this from the floating
+        // window, where none of this composable's own controls are visible.
+        DisposableEffect(file, player) {
+            val path = file.absolutePath
+            if (player != null) {
+                VideoController.bind(path) {
+                    val p = player
+                    if (p != null) {
+                        if (playing) {
+                            runCatching { p.pause() }
+                            playing = false
+                        } else {
+                            runCatching { p.start() }
+                            playing = true
+                        }
+                    }
+                }
+            }
+            onDispose { VideoController.unbind(path) }
+        }
+        LaunchedEffect(playing) { VideoController.reportPlaying(playing) }
         DisposableEffect(file) {
             onDispose {
                 runCatching { player?.release() }
@@ -590,7 +627,7 @@ private fun VideoPage(
         }
 
         AnimatedVisibility(
-            visible = chromeVisible,
+            visible = chromeVisible && !VideoController.inPip,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter),

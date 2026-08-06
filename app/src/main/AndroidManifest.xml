@@ -31,9 +31,11 @@
 
         <activity
             android:name=".MainActivity"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|uiMode" />
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode" />
 
         <!-- Switchable launcher identity: one (icon, name) alias enabled at a time. -->
         <activity-alias android:name=".L_default_storm" android:targetActivity=".MainActivity" android:icon="@mipmap/ic_launcher" android:label="@string/app_label_storm" android:enabled="false" android:exported="true">
