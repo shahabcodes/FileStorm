@@ -502,22 +502,27 @@ private fun TreemapChart(slices: List<Slice>) {
                     .padding(7.dp),
             ) {
                 // Only label tiles with room for it; the rest stay clean blocks.
-                if (tile.w > 66f && tile.h > 38f) {
+                // The tile clips its content, so anything that does not fit is
+                // cut through the middle of a glyph — drop lines instead.
+                // 7dp padding each side, ~16dp a line.
+                if (tile.w > 66f && tile.h > 34f) {
                     Column {
                         Text(
                             slice.title,
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
-                            maxLines = 2,
+                            maxLines = if (tile.h > 76f) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Spacer(Modifier.height(1.dp))
-                        Text(
-                            Formatters.bytes(slice.bytes),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.9f),
-                            maxLines = 1,
-                        )
+                        if (tile.h > 52f) {
+                            Spacer(Modifier.height(1.dp))
+                            Text(
+                                Formatters.bytes(slice.bytes),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.9f),
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }

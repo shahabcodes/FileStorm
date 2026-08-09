@@ -179,14 +179,14 @@ backgrounded.
 
 # Screenshots
 
-**Captured.** Twelve are in [`store/screenshots/`](store/screenshots), taken
+**Captured.** Thirteen are in [`store/screenshots/`](store/screenshots), taken
 from the running app on an API 36 emulator at 1344 × 2992. Every one is a real
 frame — nothing is mocked up or retouched.
 
 | File | Screen |
 |---|---|
 | `01-dashboard.png` | Storage donut, category breakdown, Monthly Footprint |
-| `02-vault.png` | Vault unlocked — 24 encrypted files with thumbnails |
+| `02-vault.png` | Vault unlocked — 27 encrypted files with thumbnails |
 | `03-encrypting.png` | Encryption in progress: speed, ETA, per-file bar, counters |
 | `04-duplicates.png` | Whole-storage sweep results, contents verified, sortable |
 | `05-gallery-month.png` | Mosaic view grouped by month |
@@ -197,6 +197,7 @@ frame — nothing is mocked up or retouched.
 | `10-settings-dashboard.png` | Dashboard cards reordered and toggled |
 | `11-context-menu.png` | Folder actions, including Encrypt and Compress |
 | `12-blossom-dashboard.png` | The dashboard in Blossom |
+| `13-vault-settings.png` | Vault options — verification, speed, auto-lock |
 
 ## Which eight to upload
 
@@ -212,14 +213,19 @@ the weight. Recommended order:
 7. `08-music.png`
 8. `07-themes.png`
 
-`09`–`12` are spares — swap `12-blossom-dashboard.png` in for `07` if you would
+`09`–`13` are spares — swap `12-blossom-dashboard.png` in for `07` if you would
 rather lead the theming story with the whole app than with the settings page.
 
-**Note on the sample data.** The device was loaded with generated photos, tones
-and video files so the charts have real shape. If you would rather ship
-screenshots from your own phone, the same walkthrough works — just avoid
-filenames you would not want public. The vault shots are safe by nature; the
-browser ones are not.
+**Note on the sample data.** The device was loaded with real photographs and
+real video clips from Pexels, plus generated audio tones, so the thumbnails,
+charts and month grouping all show genuine content. The Pexels License permits
+this use and requires no attribution. Unsplash was the first choice but it
+serves a challenge page to anything scripted, so nothing could be fetched from
+it.
+
+If you would rather ship screenshots from your own phone, the same walkthrough
+works — just avoid filenames you would not want public. The vault shots are
+safe by nature; the browser ones are not.
 
 ## What Play needs
 
