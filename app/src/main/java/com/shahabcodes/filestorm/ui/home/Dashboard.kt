@@ -47,6 +47,10 @@ import androidx.compose.ui.unit.dp
 import com.shahabcodes.filestorm.data.FileKind
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.StorageAnalyzer
+import com.shahabcodes.filestorm.data.StorageInsights
+import com.shahabcodes.filestorm.data.DashboardPrefs
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.kindColor
 import com.shahabcodes.filestorm.ui.components.pressScale
@@ -69,6 +73,7 @@ fun StorageCard() {
     val stats = FileRepository.storageStats()
     val snapshot = StorageAnalyzer.snapshot
     val scanning = StorageAnalyzer.scanning
+    val scope = rememberCoroutineScope()
 
     // First composition with no cached data → kick off a scan automatically.
     LaunchedEffect(Unit) {
@@ -97,7 +102,15 @@ fun StorageCard() {
                         Icons.Rounded.Refresh, "Rescan",
                         tint = fsColors.accent,
                         modifier = Modifier
-                            .pressScale { StorageAnalyzer.refresh() }
+                            // Rescan means the whole dashboard, not just this
+                            // card — otherwise the cards below keep showing
+                            // figures from the previous walk.
+                            .pressScale {
+                                StorageAnalyzer.refresh()
+                                scope.launch {
+                                    StorageInsights.refresh(DashboardPrefs.scanningCards())
+                                }
+                            }
                             .padding(4.dp)
                             .size(18.dp),
                     )

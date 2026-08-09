@@ -22,6 +22,17 @@ object Formatters {
         else String.format(Locale.US, "%.1f %s", v, units[unit])
     }
 
+    /**
+     * A size short enough to sit under a chart bar, but still carrying its
+     * unit — "290K", "420M". Dropping the unit entirely makes 290 KB and
+     * 420 MB read as neighbours.
+     */
+    fun compactBytes(value: Long): String {
+        val full = bytes(value)
+        val unit = full.substringAfter(' ', "")
+        return full.substringBefore(' ') + unit.take(1)
+    }
+
     fun speed(bytesPerSecond: Double): String {
         if (bytesPerSecond <= 0) return "—"
         return bytes(bytesPerSecond.toLong()) + "/s"

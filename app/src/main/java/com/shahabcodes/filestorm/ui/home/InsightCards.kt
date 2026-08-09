@@ -727,7 +727,7 @@ fun GrowthCard(onViewMore: () -> Unit) {
                         verticalArrangement = Arrangement.Bottom,
                     ) {
                         Text(
-                            Formatters.bytes(month.bytes).substringBefore(" "),
+                            Formatters.compactBytes(month.bytes),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (isPeak) fsColors.label else fsColors.secondaryLabel,
                             maxLines = 1,

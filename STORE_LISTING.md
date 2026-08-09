@@ -179,9 +179,47 @@ backgrounded.
 
 # Screenshots
 
-**I could not take these.** Screenshots must show the real app, and no device
-was connected — inventing mockups would misrepresent it and breach Play's
-requirement that screenshots reflect actual use.
+**Captured.** Twelve are in [`store/screenshots/`](store/screenshots), taken
+from the running app on an API 36 emulator at 1344 × 2992. Every one is a real
+frame — nothing is mocked up or retouched.
+
+| File | Screen |
+|---|---|
+| `01-dashboard.png` | Storage donut, category breakdown, Monthly Footprint |
+| `02-vault.png` | Vault unlocked — 24 encrypted files with thumbnails |
+| `03-encrypting.png` | Encryption in progress: speed, ETA, per-file bar, counters |
+| `04-duplicates.png` | Whole-storage sweep results, contents verified, sortable |
+| `05-gallery-month.png` | Mosaic view grouped by month |
+| `06-largest-folders.png` | Largest Folders with the treemap chart |
+| `07-themes.png` | Appearance with Blossom applied |
+| `08-music.png` | Music player with queue and playback speed |
+| `09-settings-hub.png` | Settings hub with search and live summaries |
+| `10-settings-dashboard.png` | Dashboard cards reordered and toggled |
+| `11-context-menu.png` | Folder actions, including Encrypt and Compress |
+| `12-blossom-dashboard.png` | The dashboard in Blossom |
+
+## Which eight to upload
+
+Play allows at most eight phone screenshots, and the first two carry most of
+the weight. Recommended order:
+
+1. `01-dashboard.png`
+2. `02-vault.png`
+3. `03-encrypting.png`
+4. `04-duplicates.png`
+5. `06-largest-folders.png`
+6. `05-gallery-month.png`
+7. `08-music.png`
+8. `07-themes.png`
+
+`09`–`12` are spares — swap `12-blossom-dashboard.png` in for `07` if you would
+rather lead the theming story with the whole app than with the settings page.
+
+**Note on the sample data.** The device was loaded with generated photos, tones
+and video files so the charts have real shape. If you would rather ship
+screenshots from your own phone, the same walkthrough works — just avoid
+filenames you would not want public. The vault shots are safe by nature; the
+browser ones are not.
 
 ## What Play needs
 
@@ -191,29 +229,7 @@ requirement that screenshots reflect actual use.
 - **App icon:** 512 × 512 PNG, 32-bit with alpha. Use the Glass icon.
 - Tablet screenshots are optional but improve placement.
 
-## The eight to capture, in this order
-
-The first two are what most people ever see, so lead with the strongest.
-
-1. **Dashboard** — storage donut with the category breakdown visible. Best if
-   the device has a decent amount of data so the chart looks real.
-2. **Vault, unlocked** — the gallery of encrypted files with thumbnails. The
-   headline feature.
-3. **Transfer in progress** — the detailed progress screen with speed, ETA and
-   per-file bars. This is what sets the app apart from its competitors.
-4. **Duplicate results** — a sweep with results listed and space reclaimable.
-5. **Gallery view** — a photo folder in gallery or mosaic view, grouped by
-   month with a pinned header.
-6. **Biggest Files or Largest Folders** — with the treemap chart style
-   selected, since it photographs better than bars.
-7. **Themes** — Settings → Appearance with Blossom or Sakura selected, so the
-   colour work is visible.
-8. **Music player** — the full player with artwork and the queue.
-
-Avoid anything showing real filenames you would not want public. The vault
-screenshots are safe by nature; the browser ones are not.
-
-## Capturing them
+## Re-capturing on your own device
 
 With the phone connected and USB debugging on:
 
@@ -221,9 +237,7 @@ With the phone connected and USB debugging on:
 adb exec-out screencap -p > 01-dashboard.png
 ```
 
-Take each shot, then repeat with the next filename. If you would rather, plug
-the phone in and tell me — I can drive the capture and check each frame as it
-comes out.
+Take each shot, then repeat with the next filename.
 
 ## Feature graphic
 
