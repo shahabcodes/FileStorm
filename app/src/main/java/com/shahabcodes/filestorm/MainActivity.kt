@@ -452,8 +452,36 @@ private fun AppNav() {
         composable("transfer") {
             TransferScreen(onBack = { goBack() })
         }
-        composable("settings") {
-            SettingsScreen(onBack = { goBack() })
+        composable("settings") { entry ->
+            SettingsScreen(
+                onBack = { entry.ifCurrent { goBack() } },
+                onOpen = { page ->
+                    entry.ifCurrent { nav.navigate("settings/" + page.route) }
+                },
+            )
+        }
+        composable("settings/{page}") { entry ->
+            val page = runCatching {
+                com.shahabcodes.filestorm.ui.settings.SettingsPageId.entries
+                    .first { it.route == entry.arguments?.getString("page") }
+            }.getOrDefault(com.shahabcodes.filestorm.ui.settings.SettingsPageId.APPEARANCE)
+            val back = { entry.ifCurrent { goBack() } }
+            when (page) {
+                com.shahabcodes.filestorm.ui.settings.SettingsPageId.APPEARANCE ->
+                    com.shahabcodes.filestorm.ui.settings.AppearanceSettingsScreen(back)
+                com.shahabcodes.filestorm.ui.settings.SettingsPageId.DASHBOARD ->
+                    com.shahabcodes.filestorm.ui.settings.DashboardSettingsScreen(back)
+                com.shahabcodes.filestorm.ui.settings.SettingsPageId.FILES ->
+                    com.shahabcodes.filestorm.ui.settings.FilesSettingsScreen(back)
+                com.shahabcodes.filestorm.ui.settings.SettingsPageId.PRIVACY ->
+                    com.shahabcodes.filestorm.ui.settings.PrivacySettingsScreen(back)
+                com.shahabcodes.filestorm.ui.settings.SettingsPageId.VAULT ->
+                    com.shahabcodes.filestorm.ui.settings.VaultSettingsScreen(back)
+                com.shahabcodes.filestorm.ui.settings.SettingsPageId.IDENTITY ->
+                    com.shahabcodes.filestorm.ui.settings.IdentitySettingsScreen(back)
+                com.shahabcodes.filestorm.ui.settings.SettingsPageId.ABOUT ->
+                    com.shahabcodes.filestorm.ui.settings.AboutSettingsScreen(back)
+            }
         }
         composable("trash") {
             com.shahabcodes.filestorm.ui.trash.TrashScreen(onBack = { goBack() })
