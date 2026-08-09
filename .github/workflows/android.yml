@@ -30,12 +30,12 @@ jobs:
       - name: Restore signing keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/filestorm.jks"
 
-      - name: Build signed release APK
+      - name: Build signed release bundle and APK
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/filestorm.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        run: gradle :app:assembleRelease --no-daemon
+        run: gradle :app:bundleRelease :app:assembleRelease --no-daemon
 
       - name: Read version name
         id: version
@@ -44,7 +44,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk FileStorm-v${{ steps.version.outputs.version }}.apk
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk FileStorm-v${{ steps.version.outputs.version }}.apk
+          cp app/build/outputs/bundle/release/app-release.aab FileStorm-v${{ steps.version.outputs.version }}.aab
 
       - name: Remove old APKs from release
         env:
@@ -64,4 +66,6 @@ jobs:
             Built from commit ${{ github.sha }} at ${{ github.event.head_commit.timestamp }}.
 
             ${{ github.event.head_commit.message }}
-          files: FileStorm-v${{ steps.version.outputs.version }}.apk
+          files: |
+            FileStorm-v${{ steps.version.outputs.version }}.apk
+            FileStorm-v${{ steps.version.outputs.version }}.aab

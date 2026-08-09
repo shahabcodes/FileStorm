@@ -89,7 +89,6 @@ fun HomeScreen(
     onOpenTrash: () -> Unit,
     onOpenJobs: () -> Unit,
     onOpenDuplicates: () -> Unit,
-    onOpenApps: () -> Unit,
     onOpenViewer: (List<String>, Int) -> Unit,
     onOpenInsight: (DashboardCard) -> Unit,
 ) {
@@ -215,7 +214,6 @@ fun HomeScreen(
                         onOpenViewer = onOpenViewer,
                         onViewMore = { onOpenInsight(DashboardCard.RECENT) },
                     )
-                    DashboardCard.APPS -> AppStorageCard(onSeeAll = onOpenApps)
                 }
             }
         }

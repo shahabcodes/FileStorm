@@ -27,7 +27,6 @@ enum class DashboardCard(
     LARGEST_FOLDERS("folders", "Largest Folders", "Which folders are holding the most", true),
     GROWTH("growth", "Monthly Footprint", "How much of what you still have is dated to each month", true),
     RECENT("recent", "Recent Files", "Everything added or changed in the last week", true),
-    APPS("apps", "Apps", "Per-app storage — needs Usage Access from system settings", false),
 }
 
 /**
@@ -47,7 +46,6 @@ object DashboardPrefs {
         DashboardCard.BIGGEST_FILES,
         DashboardCard.LARGEST_FOLDERS,
         DashboardCard.RECENT,
-        DashboardCard.APPS,
     )
 
     private val defaultEnabled = setOf(

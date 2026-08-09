@@ -11,8 +11,8 @@ android {
         applicationId = "com.shahabcodes.filestorm"
         minSdk = 26
         targetSdk = 36
-        versionCode = 62
-        versionName = "1.61"
+        versionCode = 63
+        versionName = "1.62"
     }
 
     // CI signs every build with the same keystore (from GitHub secrets) so updates
@@ -47,7 +47,14 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Shrinking cuts the download substantially; the rules file keeps
+            // the handful of things reached by name rather than by code.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig = signingConfigs.findByName("release")
         }
     }

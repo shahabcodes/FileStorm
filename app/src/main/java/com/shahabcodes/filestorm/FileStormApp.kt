@@ -15,7 +15,6 @@ class FileStormApp : Application(), ImageLoaderFactory {
         com.shahabcodes.filestorm.data.Favorites.init(this)
         com.shahabcodes.filestorm.data.FolderLocks.init(this)
         com.shahabcodes.filestorm.data.StorageAnalyzer.init(this)
-        com.shahabcodes.filestorm.data.AppStorageAnalyzer.init(this)
         com.shahabcodes.filestorm.data.DashboardPrefs.init(this)
         com.shahabcodes.filestorm.data.StorageInsights.init(this)
         com.shahabcodes.filestorm.data.audio.AudioPlayer.init(this)

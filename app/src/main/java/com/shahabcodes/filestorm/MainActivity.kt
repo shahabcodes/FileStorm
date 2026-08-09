@@ -408,7 +408,6 @@ private fun AppNav() {
                 onOpenTrash = { entry.ifCurrent { nav.navigate("trash") } },
                 onOpenJobs = { entry.ifCurrent { nav.navigate("jobs") } },
                 onOpenDuplicates = { entry.ifCurrent { nav.navigate("duplicates") } },
-                onOpenApps = { entry.ifCurrent { nav.navigate("apps") } },
                 onOpenViewer = { paths, index -> entry.ifCurrent { openViewer(paths, index) } },
                 onOpenInsight = { card ->
                     entry.ifCurrent { nav.navigate("insight/${card.name}") }
@@ -540,11 +539,6 @@ private fun AppNav() {
                 path = target,
                 onBack = { entry.ifCurrent { goBack() } },
                 onOpenFolder = { path -> entry.ifCurrent { openBrowser(path) } },
-            )
-        }
-        composable("apps") { entry ->
-            com.shahabcodes.filestorm.ui.home.AppStorageScreen(
-                onBack = { entry.ifCurrent { goBack() } },
             )
         }
         composable("duplicates") {
