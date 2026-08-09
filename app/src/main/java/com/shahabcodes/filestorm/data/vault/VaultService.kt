@@ -55,9 +55,13 @@ class VaultService : Service() {
                     VaultPhase.SCANNING -> "Looking through the folder…"
                     VaultPhase.RESUMING -> "Finishing interrupted work…"
                     VaultPhase.CLEANING -> "Tidying up…"
-                    else -> "${p.fileIndex} of ${p.fileCount} · " +
-                        "${Formatters.bytes(p.bytesDone)} of ${Formatters.bytes(p.bytesTotal)}" +
-                        if (p.etaSeconds > 0) " · ${Formatters.eta(p.etaSeconds)} left" else ""
+                    else -> buildString {
+                        append("${p.fileIndex} of ${p.fileCount} · ")
+                        append("${Formatters.bytes(p.bytesDone)} of ${Formatters.bytes(p.bytesTotal)}")
+                        if (p.speedBps > 1.0) append(" · ${Formatters.speed(p.speedBps)}")
+                        if (p.etaSeconds > 0) append(" · ${Formatters.eta(p.etaSeconds)} left")
+                        if (p.failed > 0) append(" · ${p.failed} failed")
+                    }
                 }
                 notify(build("$verb · $text", (p.fraction * 100).toInt(), p.phase == VaultPhase.SCANNING))
             }

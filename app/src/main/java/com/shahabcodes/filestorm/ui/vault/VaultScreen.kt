@@ -238,11 +238,31 @@ fun VaultScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    VaultSession.clearSummary()
-                    FileRepository.invalidate(root.absolutePath)
-                }) { Text("OK", color = fsColors.accent) }
+                if (summary.failed > 0) {
+                    // Failed files kept their originals, so running again simply
+                    // picks them up — the engine only ever takes what is still
+                    // unencrypted.
+                    TextButton(onClick = {
+                        val wasLocking = run.locking
+                        VaultSession.clearSummary()
+                        if (wasLocking) VaultSession.startLock(context, root)
+                        else VaultSession.startUnlock(context, root)
+                    }) { Text("Retry failed", color = fsColors.accent) }
+                } else {
+                    TextButton(onClick = {
+                        VaultSession.clearSummary()
+                        FileRepository.invalidate(root.absolutePath)
+                    }) { Text("OK", color = fsColors.accent) }
+                }
             },
+            dismissButton = if (summary.failed > 0) {
+                {
+                    TextButton(onClick = {
+                        VaultSession.clearSummary()
+                        FileRepository.invalidate(root.absolutePath)
+                    }) { Text("Not now", color = fsColors.secondaryLabel) }
+                }
+            } else null,
         )
     }
 
@@ -750,6 +770,7 @@ private fun VaultRow(
 private fun VaultProgressView(locking: Boolean) {
     val run by VaultSession.run.collectAsState()
     val p = run.progress
+    val many = p.workers > 1 && p.activeFiles.size > 1
 
     Column(
         Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
@@ -769,42 +790,72 @@ private fun VaultProgressView(locking: Boolean) {
             style = MaterialTheme.typography.titleLarge,
             color = fsColors.label,
         )
-        if (p.currentName.isNotEmpty()) {
-            Text(
-                p.currentName,
-                style = MaterialTheme.typography.bodySmall,
-                color = fsColors.secondaryLabel,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
-        }
+        // With several files at once there is no single "current file", so say
+        // how many are running rather than naming one and looking wrong.
+        Text(
+            when {
+                many -> "${p.activeFiles.size} files at once"
+                p.currentName.isNotEmpty() -> p.currentName
+                else -> ""
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = fsColors.secondaryLabel,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(16.dp))
 
-        // Overall, then this file, because they answer different questions.
         ProgressBar(p.fraction)
         Spacer(Modifier.height(6.dp))
         Text(
-            "${Formatters.bytes(p.bytesDone)} of ${Formatters.bytes(p.bytesTotal)}" +
-                if (p.etaSeconds > 0) " · ${Formatters.eta(p.etaSeconds)} left" else "",
+            "${Formatters.bytes(p.bytesDone)} of ${Formatters.bytes(p.bytesTotal)}",
             style = MaterialTheme.typography.labelMedium,
+            color = fsColors.label,
+        )
+        Spacer(Modifier.height(2.dp))
+        // Speed is what tells you whether a long run is healthy or has hit
+        // something slow; elapsed gives the ETA something to be judged against.
+        Text(
+            listOfNotNull(
+                if (p.speedBps > 1.0) Formatters.speed(p.speedBps) else null,
+                if (p.etaSeconds > 0) "${Formatters.eta(p.etaSeconds)} left" else null,
+                "${Formatters.eta(p.elapsedSeconds)} so far",
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.labelSmall,
             color = fsColors.secondaryLabel,
         )
-        if (p.fileBytesTotal > 0) {
-            Spacer(Modifier.height(12.dp))
-            ProgressBar(
-                if (p.fileBytesTotal > 0) p.fileBytesDone.toFloat() / p.fileBytesTotal else 0f,
-                thin = true,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "This file: ${Formatters.bytes(p.fileBytesDone)} of ${Formatters.bytes(p.fileBytesTotal)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = fsColors.secondaryLabel,
-            )
+
+        if (p.activeFiles.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            GroupedCard {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    p.activeFiles.forEachIndexed { index, file ->
+                        if (index > 0) Spacer(Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                file.name,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = fsColors.label,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "${(file.fraction * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = fsColors.secondaryLabel,
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        ProgressBar(file.fraction, thin = true)
+                    }
+                }
+            }
         }
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(16.dp))
         GroupedCard {
             Column {
                 Tally("File", "${p.fileIndex} of ${p.fileCount}")
@@ -816,6 +867,38 @@ private fun VaultProgressView(locking: Boolean) {
                 Tally("Skipped", "${p.skipped}")
             }
         }
+
+        // Failures named while the run is still going, rather than only in the
+        // summary at the end — a run of thousands should not hide what broke.
+        if (p.recentFailures.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            GroupedCard {
+                Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                    Text(
+                        "Recent problems",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = fsColors.red,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    p.recentFailures.forEach { failure ->
+                        Text(
+                            "${failure.path} — ${failure.reason}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = fsColors.secondaryLabel,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Their originals were left exactly where they were.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
         Text(
             "Stop",

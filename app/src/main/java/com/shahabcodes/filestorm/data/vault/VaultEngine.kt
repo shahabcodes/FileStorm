@@ -9,6 +9,11 @@ import java.util.concurrent.atomic.AtomicLong
 
 enum class VaultPhase { SCANNING, RESUMING, ENCRYPTING, DECRYPTING, CLEANING, DONE }
 
+/** One file currently being worked on. Several at once when workers > 1. */
+data class ActiveFile(val name: String, val done: Long, val total: Long) {
+    val fraction: Float get() = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else 0f
+}
+
 /** Everything the progress screen needs, published as each file is handled. */
 data class VaultProgress(
     val phase: VaultPhase,
@@ -23,9 +28,16 @@ data class VaultProgress(
     val failed: Int = 0,
     val skipped: Int = 0,
     val startedAt: Long = 0,
-    /** More than one means the per-file line is whichever file reported last. */
     val workers: Int = 1,
+    /** Smoothed, so the figure settles instead of swinging file to file. */
+    val speedBps: Double = 0.0,
+    /** Everything in flight right now, which is more than one when workers > 1. */
+    val activeFiles: List<ActiveFile> = emptyList(),
+    /** Named as they happen rather than only in the summary at the end. */
+    val recentFailures: List<VaultFailure> = emptyList(),
 ) {
+    val elapsedSeconds: Long
+        get() = if (startedAt > 0) (System.currentTimeMillis() - startedAt) / 1000 else 0
     val fraction: Float
         get() = if (bytesTotal > 0) (bytesDone.toFloat() / bytesTotal).coerceIn(0f, 1f) else 0f
     val etaSeconds: Long
@@ -121,20 +133,48 @@ object VaultEngine {
         val failures = ConcurrentLinkedQueue<VaultFailure>()
         val cancelled = java.util.concurrent.atomic.AtomicBoolean(false)
 
+        // Everything in flight, so the screen can show four bars rather than
+        // one that jumps between files.
+        val active = LinkedHashMap<String, ActiveFile>()
+        var emaBps = 0.0
+        var lastSampleAt = startedAt
+        var lastSampleBytes = 0L
+
         // Progress is published from whichever thread just moved, so the emit
         // itself is synchronised to keep the numbers self-consistent.
         val emit = { phase: VaultPhase, name: String, fileDone: Long, fileTotal: Long ->
-            synchronized(failures) {
+            synchronized(active) {
+                if (name.isNotEmpty()) {
+                    if (fileTotal > 0 && fileDone < fileTotal) {
+                        active[name] = ActiveFile(name, fileDone, fileTotal)
+                    } else {
+                        active.remove(name)
+                    }
+                }
+                val now = System.currentTimeMillis()
+                val done = bytesDone.get()
+                val gap = now - lastSampleAt
+                if (gap >= 400) {
+                    // Smoothed rather than instantaneous: a raw figure swings
+                    // wildly as files start and finish.
+                    val instant = (done - lastSampleBytes) * 1000.0 / gap
+                    emaBps = if (emaBps <= 0.0) instant else 0.75 * emaBps + 0.25 * instant
+                    lastSampleAt = now
+                    lastSampleBytes = done
+                }
                 listener?.onProgress(
                     VaultProgress(
                         phase = phase,
                         fileIndex = started.get(), fileCount = pending.size,
                         currentName = name,
                         fileBytesDone = fileDone, fileBytesTotal = fileTotal,
-                        bytesDone = bytesDone.get(), bytesTotal = totalBytes,
+                        bytesDone = done, bytesTotal = totalBytes,
                         succeeded = succeeded.get(), failed = failed.get(),
                         skipped = skipped.get(), startedAt = startedAt,
                         workers = options.workers,
+                        speedBps = emaBps,
+                        activeFiles = active.values.toList(),
+                        recentFailures = failures.toList().takeLast(5),
                     )
                 )
             }
@@ -191,6 +231,7 @@ object VaultEngine {
                     }
                     succeeded.incrementAndGet()
                     bytesDone.addAndGet((outcome.info?.size ?: 0L) - reported)
+                    synchronized(active) { active.remove(source.name) }
                 } else {
                     failed.incrementAndGet()
                     failures.add(VaultFailure(relative, outcome.error ?: "unknown"))
@@ -198,8 +239,10 @@ object VaultEngine {
                     target.delete()
                     temp.delete()
                     bytesDone.addAndGet(-reported)
+                    synchronized(active) { active.remove(source.name) }
                 }
                 scratch.delete()
+                emit(VaultPhase.ENCRYPTING, "", 0L, 0L)
             }
             Unit
         }
@@ -250,16 +293,23 @@ object VaultEngine {
                 return@forEachIndexed
             }
             val before = bytesDone
+            val name = runCatching { VaultContainer.readInfo(file, masterKey).name }
+                .getOrDefault(file.name)
             val result = restore(folder, file, masterKey, destinationRoot = folder.root) { done, total ->
+                val now = System.currentTimeMillis()
+                val elapsed = (now - startedAt).coerceAtLeast(1)
                 listener?.onProgress(
                     VaultProgress(
                         phase = VaultPhase.DECRYPTING,
                         fileIndex = index + 1, fileCount = sealed.size,
-                        currentName = "",
+                        currentName = name,
                         fileBytesDone = done, fileBytesTotal = total,
                         bytesDone = before + done, bytesTotal = totalBytes,
                         succeeded = succeeded, failed = failed,
                         startedAt = startedAt,
+                        speedBps = (before + done) * 1000.0 / elapsed,
+                        activeFiles = listOf(ActiveFile(name, done, total)),
+                        recentFailures = failures.takeLast(5),
                     )
                 )
             }
