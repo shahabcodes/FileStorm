@@ -1,5 +1,10 @@
 package com.shahabcodes.filestorm.ui.settings
 
+import com.shahabcodes.filestorm.ui.components.SearchField
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +72,10 @@ enum class SettingsPageId(val route: String) {
  */
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onOpen: (SettingsPageId) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val results = remember(query) { SettingsIndex.search(query) }
+    val searching = query.isNotBlank()
+
     Column(
         Modifier
             .fillMaxSize()
@@ -95,7 +104,21 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (SettingsPageId) -> Unit) {
             color = fsColors.label,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(14.dp))
+
+        SearchField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = "Search settings",
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Spacer(Modifier.height(16.dp))
+
+        if (searching) {
+            SearchResults(results, onOpen)
+            Spacer(Modifier.height(40.dp))
+            return@Column
+        }
 
         GroupedCard(Modifier.padding(horizontal = 16.dp)) {
             HubRow(
@@ -140,6 +163,58 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (SettingsPageId) -> Unit) {
             ) { onOpen(SettingsPageId.ABOUT) }
         }
         Spacer(Modifier.height(40.dp))
+    }
+}
+
+/**
+ * What a search turns up. Each result names the page it lives on, so tapping it
+ * is predictable rather than a jump to somewhere unexplained.
+ */
+@Composable
+private fun SearchResults(
+    results: List<SettingsEntry>,
+    onOpen: (SettingsPageId) -> Unit,
+) {
+    if (results.isEmpty()) {
+        Text(
+            "Nothing matches that.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = fsColors.secondaryLabel,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+        return
+    }
+    GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+        results.forEachIndexed { index, entry ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .pressScale { onOpen(entry.page) }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        entry.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = fsColors.label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        entry.pageTitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fsColors.accent,
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ChevronRight, null,
+                    tint = fsColors.secondaryLabel.copy(alpha = 0.55f),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            if (index != results.lastIndex) RowSeparator(startIndent = 16.dp)
+        }
     }
 }
 
