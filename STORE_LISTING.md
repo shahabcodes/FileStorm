@@ -230,9 +230,11 @@ safe by nature; the browser ones are not.
 ## What Play needs
 
 - **Phone:** 2–8 screenshots. 16:9 or 9:16, each side 320–3840 px. A modern
-  phone's own resolution is fine.
+  phone's own resolution is fine. ✅ in `store/screenshots/`
 - **Feature graphic:** 1024 × 500 PNG or JPEG, no transparency. **Required.**
-- **App icon:** 512 × 512 PNG, 32-bit with alpha. Use the Glass icon.
+  ✅ `store/graphics/feature-graphic.png` — 1024 × 500, 8-bit RGB, no alpha
+- **App icon:** 512 × 512 PNG, 32-bit with alpha.
+  ✅ `store/graphics/ic_launcher-playstore.png` — 512 × 512, 8-bit RGBA
 - Tablet screenshots are optional but improve placement.
 
 ## Re-capturing on your own device
@@ -245,12 +247,24 @@ adb exec-out screencap -p > 01-dashboard.png
 
 Take each shot, then repeat with the next filename.
 
-## Feature graphic
+## Graphics
 
-I could not generate this either; there is no image tooling available here. It
-needs to be a designed 1024 × 500 banner, not a screenshot.
+Both are in [`store/graphics/`](store/graphics) and are rendered by
+[`tools/StoreArt.java`](tools/StoreArt.java) straight from the app's own
+`icon_bg_glass` / `icon_fg_opt25` vector drawables — so the store icon is
+literally the same drawing as the launcher icon, not a lookalike redrawn in a
+design tool. Re-run it after any icon change:
 
-What would suit the app: the Glass icon's indigo-to-rose gradient as the
-background, "File Storm" in large white text, and a short line beneath such as
-*"Organise, find and encrypt — entirely offline."* Any of Canva, Figma or
-Photopea will do it in a few minutes from that description.
+```bash
+javac -encoding UTF-8 -d /tmp/storeart tools/StoreArt.java && java -cp /tmp/storeart StoreArt store/graphics
+```
+
+**The store icon is cropped to the central 72dp of the 108dp adaptive-icon
+canvas**, which is the region a launcher actually shows. Rendering the full
+108dp canvas instead leaves the artwork small and adrift in the square; the
+crop matches what people see on their home screen.
+
+The feature graphic reuses the icon's indigo-to-rose gradient with the icon
+tile on the left, the name, and the one-line pitch. The tile sits on the same
+gradient it is made of, so it carries a blurred drop shadow — without one the
+two merge into each other.
