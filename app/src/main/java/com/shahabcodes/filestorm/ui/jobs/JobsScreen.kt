@@ -25,10 +25,11 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.HourglassEmpty
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.VerifiedUser
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +60,8 @@ import com.shahabcodes.filestorm.data.jobs.JobStore
 import com.shahabcodes.filestorm.data.jobs.OrganizeJob
 import com.shahabcodes.filestorm.transfer.JobService
 import com.shahabcodes.filestorm.ui.browser.FolderPickerSheet
+import com.shahabcodes.filestorm.ui.components.FsDialog
+import com.shahabcodes.filestorm.ui.components.FsInfoDialog
 import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.pressScale
@@ -294,32 +297,26 @@ fun JobsScreen(onBack: () -> Unit, onOpenProgress: () -> Unit, onOpenVerify: () 
     }
 
     deleteTarget?.let { job ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            containerColor = fsColors.card,
-            title = { Text("Delete job \"${job.name}\"?", color = fsColors.label) },
-            text = { Text("The job definition is removed. Your files are not touched.", color = fsColors.secondaryLabel) },
-            confirmButton = {
-                TextButton(onClick = {
-                    JobStore.delete(job.id)
-                    deleteTarget = null
-                }) { Text("Delete", color = fsColors.red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) { Text("Cancel", color = fsColors.secondaryLabel) }
+        FsDialog(
+            title = "Delete job \"${job.name}\"?",
+            message = "The job definition is removed. Your files are not touched.",
+            icon = Icons.Rounded.DeleteOutline,
+            destructive = true,
+            confirmText = "Delete",
+            onDismiss = { deleteTarget = null },
+            onConfirm = {
+                JobStore.delete(job.id)
+                deleteTarget = null
             },
         )
     }
 
     if (busyNotice) {
-        AlertDialog(
-            onDismissRequest = { busyNotice = false },
-            containerColor = fsColors.card,
-            title = { Text("Another task is running", color = fsColors.label) },
-            text = { Text("Wait for the current job or verification to finish, or cancel it first.", color = fsColors.secondaryLabel) },
-            confirmButton = {
-                TextButton(onClick = { busyNotice = false }) { Text("OK", color = fsColors.accent) }
-            },
+        FsInfoDialog(
+            title = "Another task is running",
+            message = "Wait for the current job or verification to finish, or cancel it first.",
+            icon = Icons.Rounded.HourglassEmpty,
+            onDismiss = { busyNotice = false },
         )
     }
 }

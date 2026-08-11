@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.OpenInNew
@@ -47,7 +48,7 @@ import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ZoomIn
 import androidx.compose.material.icons.rounded.ZoomOut
-import androidx.compose.material3.AlertDialog
+import com.shahabcodes.filestorm.ui.components.FsDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -238,31 +239,21 @@ fun ViewerScreen(
     }
 
     confirmDelete?.let { file ->
-        AlertDialog(
-            onDismissRequest = { confirmDelete = null },
-            containerColor = fsColors.card,
-            title = { Text("Move to Trash?", color = fsColors.label) },
-            text = {
-                Text(
-                    "${file.name} (${Formatters.bytes(file.length())}) goes to the Trash, " +
-                        "where you can restore it until you empty it.",
-                    color = fsColors.secondaryLabel,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = null
-                    scope.launch {
-                        if (file.exists()) TrashManager.moveToTrash(listOf(FsEntry.from(file)))
-                        FileRepository.invalidate(file.parent)
-                        current = current.filterNot { it == file.absolutePath }
-                        if (current.isEmpty()) close()
-                    }
-                }) { Text("Move to Trash", color = fsColors.red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = null }) {
-                    Text("Cancel", color = fsColors.secondaryLabel)
+        FsDialog(
+            title = "Move to Trash?",
+            message = "${file.name} (${Formatters.bytes(file.length())}) goes to the Trash, " +
+                "where you can restore it until you empty it.",
+            icon = Icons.Rounded.DeleteOutline,
+            destructive = true,
+            confirmText = "Move to Trash",
+            onDismiss = { confirmDelete = null },
+            onConfirm = {
+                confirmDelete = null
+                scope.launch {
+                    if (file.exists()) TrashManager.moveToTrash(listOf(FsEntry.from(file)))
+                    FileRepository.invalidate(file.parent)
+                    current = current.filterNot { it == file.absolutePath }
+                    if (current.isEmpty()) close()
                 }
             },
         )

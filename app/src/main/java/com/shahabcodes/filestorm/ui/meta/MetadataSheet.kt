@@ -1,6 +1,5 @@
 package com.shahabcodes.filestorm.ui.meta
 
-import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,11 +19,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CheckCircleOutline
+import androidx.compose.material.icons.rounded.EditCalendar
 import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
@@ -60,15 +61,19 @@ import androidx.compose.ui.window.Dialog
 import com.shahabcodes.filestorm.data.FsEntry
 import com.shahabcodes.filestorm.data.meta.FilenameDate
 import com.shahabcodes.filestorm.data.meta.MetadataEditor
+import com.shahabcodes.filestorm.ui.components.DialogNote
 import com.shahabcodes.filestorm.ui.components.FileIconView
+import com.shahabcodes.filestorm.ui.components.FsDialog
+import com.shahabcodes.filestorm.ui.components.FsInfoDialog
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.util.Formatters
+import java.util.Calendar
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Calendar
 
 /** Single-file date editor: shows what is there now, what the filename says, and what will be written. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -302,14 +307,28 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
     }
 
     if (confirming) {
-        AlertDialog(
-            onDismissRequest = { confirming = false },
-            containerColor = fsColors.card,
-            title = { Text("Save these changes?", color = fsColors.label) },
-            text = {
-                Column {
-                    Text(entry.name, color = fsColors.label, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(10.dp))
+        FsDialog(
+            title = "Save these changes?",
+            message = entry.name,
+            icon = Icons.Rounded.EditCalendar,
+            confirmText = "Save",
+            onDismiss = { confirming = false },
+            onConfirm = {
+                confirming = false
+                scope.launch {
+                    busy = true
+                    outcome = MetadataEditor.apply(
+                        context,
+                        listOf(MetadataEditor.Change(file, chosen, detected?.source ?: "manual")),
+                        writeExif = writeExif,
+                        writeFileDate = writeFileDate,
+                        writeVideoMeta = writeVideo,
+                    )
+                    busy = false
+                }
+            },
+            content = {
+                Column(Modifier.fillMaxWidth()) {
                     if (writeExif && current.exifWritable) {
                         ChangeLine(
                             "Photo taken",
@@ -331,32 +350,9 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
                             Formatters.fullDate(chosen),
                         )
                     }
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "The file is rewritten in place. This cannot be undone.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = fsColors.secondaryLabel,
-                    )
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirming = false
-                    scope.launch {
-                        busy = true
-                        outcome = MetadataEditor.apply(
-                            context,
-                            listOf(MetadataEditor.Change(file, chosen, detected?.source ?: "manual")),
-                            writeExif = writeExif,
-                            writeFileDate = writeFileDate,
-                            writeVideoMeta = writeVideo,
-                        )
-                        busy = false
-                    }
-                }) { Text("Save", color = fsColors.accent) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirming = false }) { Text("Cancel", color = fsColors.secondaryLabel) }
+                Spacer(Modifier.height(12.dp))
+                DialogNote("The file is rewritten in place. This cannot be undone.")
             },
         )
     }
@@ -364,33 +360,19 @@ fun MetadataSheet(entry: FsEntry, onDismiss: () -> Unit) {
     if (busy) BusyDialog("Saving…")
 
     outcome?.let { result ->
-        AlertDialog(
-            onDismissRequest = {
+        FsInfoDialog(
+            title = if (result.failed == 0) "Date updated" else "Could not update",
+            message = if (result.failed == 0)
+                "Saved successfully." +
+                    (if (result.exifWritten > 0) " EXIF metadata was rewritten." else "") +
+                    (if (result.videoWritten > 0) " Video creation time was rewritten." else "")
+            else result.errors.firstOrNull() ?: "Unknown error",
+            icon = if (result.failed == 0) Icons.Rounded.CheckCircleOutline
+            else Icons.Rounded.ErrorOutline,
+            buttonText = "Done",
+            onDismiss = {
                 outcome = null
                 onDismiss()
-            },
-            containerColor = fsColors.card,
-            title = {
-                Text(
-                    if (result.failed == 0) "Date updated" else "Could not update",
-                    color = fsColors.label,
-                )
-            },
-            text = {
-                Text(
-                    if (result.failed == 0)
-                        "Saved successfully." +
-                            (if (result.exifWritten > 0) " EXIF metadata was rewritten." else "") +
-                            (if (result.videoWritten > 0) " Video creation time was rewritten." else "")
-                    else result.errors.firstOrNull() ?: "Unknown error",
-                    color = fsColors.secondaryLabel,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    outcome = null
-                    onDismiss()
-                }) { Text("Done", color = fsColors.accent) }
             },
         )
     }
@@ -681,12 +663,27 @@ fun BatchDateSheet(
     }
 
     if (confirming) {
-        AlertDialog(
-            onDismissRequest = { confirming = false },
-            containerColor = fsColors.card,
-            title = { Text("Update ${matched.size} file(s)?", color = fsColors.label) },
-            text = {
-                Column {
+        FsDialog(
+            title = "Update ${matched.size} file(s)?",
+            icon = Icons.Rounded.EditCalendar,
+            confirmText = "Update",
+            onDismiss = { confirming = false },
+            onConfirm = {
+                confirming = false
+                scope.launch {
+                    outcome = MetadataEditor.apply(
+                        context,
+                        matched.map { it.first },
+                        writeExif = writeExif,
+                        writeFileDate = writeFileDate,
+                        writeVideoMeta = writeVideo,
+                        onProgress = { p -> progress = p },
+                    )
+                    progress = null
+                }
+            },
+            content = {
+                Column(Modifier.fillMaxWidth()) {
                     Text(
                         buildString {
                             if (writeExif && photoCount > 0) {
@@ -706,32 +703,9 @@ fun BatchDateSheet(
                         color = fsColors.secondaryLabel,
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "Files are rewritten in place. This cannot be undone.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = fsColors.secondaryLabel,
-                    )
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirming = false
-                    scope.launch {
-                        outcome = MetadataEditor.apply(
-                            context,
-                            matched.map { it.first },
-                            writeExif = writeExif,
-                            writeFileDate = writeFileDate,
-                            writeVideoMeta = writeVideo,
-                            onProgress = { p -> progress = p },
-                        )
-                        progress = null
-                    }
-                }) { Text("Update", color = fsColors.accent) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirming = false }) { Text("Cancel", color = fsColors.secondaryLabel) }
+                Spacer(Modifier.height(12.dp))
+                DialogNote("Files are rewritten in place. This cannot be undone.")
             },
         )
     }
@@ -739,15 +713,17 @@ fun BatchDateSheet(
     progress?.let { DetailedProgressDialog(it) }
 
     outcome?.let { finished ->
-        AlertDialog(
-            onDismissRequest = {
+        FsInfoDialog(
+            title = "Dates updated",
+            icon = if (finished.failed > 0) Icons.Rounded.ErrorOutline
+            else Icons.Rounded.CheckCircleOutline,
+            buttonText = "Done",
+            onDismiss = {
                 outcome = null
                 onDismiss()
             },
-            containerColor = fsColors.card,
-            title = { Text("Dates updated", color = fsColors.label) },
-            text = {
-                Column {
+            content = {
+                Column(Modifier.fillMaxWidth()) {
                     Text(
                         "${finished.succeeded} file(s) updated" +
                             (if (finished.exifWritten > 0) " · ${finished.exifWritten} EXIF rewritten" else "") +
@@ -771,12 +747,6 @@ fun BatchDateSheet(
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    outcome = null
-                    onDismiss()
-                }) { Text("Done", color = fsColors.accent) }
             },
         )
     }
@@ -1061,22 +1031,16 @@ private fun TimePickerDialog(
         initialHour = cal.get(Calendar.HOUR_OF_DAY),
         initialMinute = cal.get(Calendar.MINUTE),
     )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = fsColors.card,
-        title = { Text("Set time", color = fsColors.label) },
-        text = {
+    FsDialog(
+        title = "Set time",
+        icon = Icons.Rounded.Schedule,
+        confirmText = "Set",
+        onDismiss = onDismiss,
+        onConfirm = { onPicked(state.hour, state.minute) },
+        content = {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 TimePicker(state = state)
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onPicked(state.hour, state.minute) }) {
-                Text("Set", color = fsColors.accent)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = fsColors.secondaryLabel) }
         },
     )
 }

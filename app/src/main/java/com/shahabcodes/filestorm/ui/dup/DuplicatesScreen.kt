@@ -1,14 +1,11 @@
 package com.shahabcodes.filestorm.ui.dup
 
-import com.shahabcodes.filestorm.ui.components.FsSpinner
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,19 +20,20 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Error
-import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Storage
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -68,6 +66,8 @@ import com.shahabcodes.filestorm.data.dup.DupPhase
 import com.shahabcodes.filestorm.data.dup.DuplicateFinder
 import com.shahabcodes.filestorm.ui.browser.FolderPickerSheet
 import com.shahabcodes.filestorm.ui.components.FileIconView
+import com.shahabcodes.filestorm.ui.components.FsDialog
+import com.shahabcodes.filestorm.ui.components.FsSpinner
 import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.SelectionCircle
@@ -262,37 +262,24 @@ fun DuplicatesScreen(onBack: () -> Unit) {
         val count = selected.size
         val bytes = DuplicateFinder.state.value.pairs.filter { it.id in selected }.sumOf { it.size }
         val folderName = File(if (side == 1) s.folder1 else s.folder2).name
-        AlertDialog(
-            onDismissRequest = { confirmSide = 0 },
-            containerColor = fsColors.card,
-            title = {
-                Text(
-                    if (s.wholeStorage) "Delete $count extra copy(s)?"
-                    else "Delete from \"$folderName\"?",
-                    color = fsColors.label,
-                )
+        FsDialog(
+            title = if (s.wholeStorage) "Delete $count extra copy(s)?"
+            else "Delete from \"$folderName\"?",
+            message = if (s.wholeStorage) {
+                "$count file(s) (${Formatters.bytes(bytes)}) will be moved to the Trash. " +
+                    "One copy of every file is always kept, and nothing leaves the " +
+                    "Trash until you empty it."
+            } else {
+                "$count duplicate file(s) (${Formatters.bytes(bytes)}) will be moved from " +
+                    "\"$folderName\" to the Trash. The copies in the other folder stay untouched."
             },
-            text = {
-                Text(
-                    if (s.wholeStorage) {
-                        "$count file(s) (${Formatters.bytes(bytes)}) will be moved to the Trash. " +
-                            "One copy of every file is always kept, and nothing leaves the " +
-                            "Trash until you empty it."
-                    } else {
-                        "$count duplicate file(s) (${Formatters.bytes(bytes)}) will be moved from " +
-                            "\"$folderName\" to the Trash. The copies in the other folder stay untouched."
-                    },
-                    color = fsColors.secondaryLabel,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmSide = 0
-                    DuplicateFinder.deleteSide(side, selected)
-                }) { Text("Move to Trash", color = fsColors.red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmSide = 0 }) { Text("Cancel", color = fsColors.secondaryLabel) }
+            icon = Icons.Rounded.DeleteOutline,
+            destructive = true,
+            confirmText = "Move to Trash",
+            onDismiss = { confirmSide = 0 },
+            onConfirm = {
+                confirmSide = 0
+                DuplicateFinder.deleteSide(side, selected)
             },
         )
     }

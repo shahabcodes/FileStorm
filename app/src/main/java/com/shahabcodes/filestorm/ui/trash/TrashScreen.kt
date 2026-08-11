@@ -23,7 +23,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.RestoreFromTrash
-import androidx.compose.material3.AlertDialog
+import com.shahabcodes.filestorm.ui.components.FsDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -330,52 +330,42 @@ fun TrashScreen(onBack: () -> Unit) {
     }
 
     if (confirmForever) {
-        AlertDialog(
-            onDismissRequest = { confirmForever = false },
-            containerColor = fsColors.card,
-            title = { Text("Delete ${selected.size} item(s) forever?", color = fsColors.label) },
-            text = { Text("This permanently erases them. It cannot be undone.", color = fsColors.secondaryLabel) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmForever = false
-                    scope.launch {
-                        busyLabel = "Deleting ${selectedItems.size} item(s)…"
-                        TrashManager.deleteForever(selectedItems)
-                        selected = emptySet()
-                        busyLabel = null
-                    }
-                }) { Text("Delete Forever", color = fsColors.red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmForever = false }) { Text("Cancel", color = fsColors.secondaryLabel) }
+        FsDialog(
+            title = "Delete ${selected.size} item(s) forever?",
+            message = "This permanently erases them. It cannot be undone.",
+            icon = Icons.Rounded.DeleteForever,
+            destructive = true,
+            confirmText = "Delete Forever",
+            onDismiss = { confirmForever = false },
+            onConfirm = {
+                confirmForever = false
+                scope.launch {
+                    busyLabel = "Deleting ${selectedItems.size} item(s)…"
+                    TrashManager.deleteForever(selectedItems)
+                    selected = emptySet()
+                    busyLabel = null
+                }
             },
         )
     }
 
     if (confirmEmpty) {
-        AlertDialog(
-            onDismissRequest = { confirmEmpty = false },
-            containerColor = fsColors.card,
-            title = { Text("Empty the trash?", color = fsColors.label) },
-            text = {
-                Text(
-                    "All ${items.size} item(s) will be permanently erased. This cannot be undone.",
-                    color = fsColors.secondaryLabel,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmEmpty = false
-                    scope.launch {
-                        busyLabel = "Emptying trash…"
-                        TrashManager.emptyTrash()
-                        selected = emptySet()
-                        busyLabel = null
-                    }
-                }) { Text("Empty Trash", color = fsColors.red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmEmpty = false }) { Text("Cancel", color = fsColors.secondaryLabel) }
+        FsDialog(
+            title = "Empty the trash?",
+            message = "All ${items.size} item(s) will be permanently erased. " +
+                "This cannot be undone.",
+            icon = Icons.Rounded.DeleteForever,
+            destructive = true,
+            confirmText = "Empty Trash",
+            onDismiss = { confirmEmpty = false },
+            onConfirm = {
+                confirmEmpty = false
+                scope.launch {
+                    busyLabel = "Emptying trash…"
+                    TrashManager.emptyTrash()
+                    selected = emptySet()
+                    busyLabel = null
+                }
             },
         )
     }

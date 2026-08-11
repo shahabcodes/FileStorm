@@ -32,7 +32,8 @@ import androidx.compose.material.icons.rounded.RestoreFromTrash
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.DriveFileMove
 import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import com.shahabcodes.filestorm.ui.components.FsDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -412,15 +413,19 @@ fun NameDialog(
     onConfirm: (String) -> Unit,
 ) {
     var text by remember { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = fsColors.card,
-        title = { Text(title, color = fsColors.label, style = MaterialTheme.typography.titleLarge) },
-        text = {
+    FsDialog(
+        title = title,
+        icon = Icons.Rounded.DriveFileRenameOutline,
+        confirmText = confirmLabel,
+        confirmEnabled = text.trim().isNotEmpty() && !text.contains('/'),
+        onConfirm = { onConfirm(text.trim()) },
+        onDismiss = onDismiss,
+        content = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
                 singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = fsColors.accent,
                     unfocusedBorderColor = fsColors.separator,
@@ -428,17 +433,16 @@ fun NameDialog(
                     unfocusedTextColor = fsColors.label,
                     cursorColor = fsColors.accent,
                 ),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
             )
-        },
-        confirmButton = {
-            TextButton(
-                enabled = text.trim().isNotEmpty() && !text.contains('/'),
-                onClick = { onConfirm(text.trim()) },
-            ) { Text(confirmLabel, color = fsColors.accent) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = fsColors.secondaryLabel) }
+            if (text.contains('/')) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "A name cannot contain a slash.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.red,
+                )
+            }
         },
     )
 }
@@ -491,59 +495,50 @@ fun ConfirmDeleteDialog(
         counting = false
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = fsColors.card,
-        icon = {
-            Icon(Icons.Rounded.DeleteOutline, null, tint = fsColors.red)
+    FsDialog(
+        title = "Move ${entries.size} item${if (entries.size == 1) "" else "s"} to Trash?",
+        message = buildString {
+            append("This removes ")
+            if (files > 0) append("$files file${if (files == 1) "" else "s"}")
+            if (files > 0 && folders > 0) append(" and ")
+            if (folders > 0) append("$folders folder${if (folders == 1) "" else "s"}")
+            append(", totalling ${Formatters.bytes(bytes)}")
+            if (counting) append(" so far")
+            append(".")
         },
-        title = {
-            Text(
-                "Move ${entries.size} item${if (entries.size == 1) "" else "s"} to Trash?",
-                color = fsColors.label,
-            )
-        },
-        text = {
-            Column {
-                // What is going
+        icon = Icons.Rounded.DeleteOutline,
+        destructive = true,
+        confirmText = "Move to Trash",
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        content = {
+            if (counting) {
                 Text(
-                    buildString {
-                        append("This removes ")
-                        if (files > 0) append("$files file${if (files == 1) "" else "s"}")
-                        if (files > 0 && folders > 0) append(" and ")
-                        if (folders > 0) append("$folders folder${if (folders == 1) "" else "s"}")
-                        append(", totalling ${Formatters.bytes(bytes)}")
-                        if (counting) append(" so far")
-                        append(".")
-                    },
-                    color = fsColors.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                if (counting) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Still measuring folder contents…",
-                        color = fsColors.secondaryLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "ITEMS",
-                    style = MaterialTheme.typography.labelSmall,
+                    "Still measuring folder contents…",
                     color = fsColors.secondaryLabel,
+                    style = MaterialTheme.typography.labelSmall,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(10.dp))
+            }
+
+            // The names are the part worth checking before agreeing, so they
+            // get their own panel rather than being buried in the sentence.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(fsColors.fill.copy(alpha = 0.5f))
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            ) {
                 entries.take(6).forEach { entry ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             if (entry.isDirectory) Icons.Rounded.Folder else Icons.Rounded.InsertDriveFile,
                             null,
                             tint = fsColors.secondaryLabel,
-                            modifier = Modifier.size(13.dp),
+                            modifier = Modifier.size(14.dp),
                         )
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text(
                             entry.name,
                             color = fsColors.label,
@@ -554,34 +549,29 @@ fun ConfirmDeleteDialog(
                     }
                 }
                 if (entries.size > 6) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         "…and ${entries.size - 6} more",
                         color = fsColors.secondaryLabel,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
-
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(
-                        Icons.Rounded.RestoreFromTrash, null,
-                        tint = fsColors.green, modifier = Modifier.size(15.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "Everything goes to the Trash first, so you can restore it from " +
-                            "there until you empty the Trash.",
-                        color = fsColors.secondaryLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Move to Trash", color = fsColors.red) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = fsColors.secondaryLabel) }
+
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    Icons.Rounded.RestoreFromTrash, null,
+                    tint = fsColors.green, modifier = Modifier.size(15.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Everything goes to the Trash first, so you can restore it from " +
+                        "there until you empty the Trash.",
+                    color = fsColors.secondaryLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         },
     )
 }

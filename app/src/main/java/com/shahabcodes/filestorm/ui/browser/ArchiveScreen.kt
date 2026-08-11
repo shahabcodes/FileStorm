@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.rounded.CheckCircleOutline
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material3.Icon
@@ -48,8 +50,8 @@ import com.shahabcodes.filestorm.ui.components.SelectionCircle
 import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.util.Formatters
-import kotlinx.coroutines.launch
 import java.io.File
+import kotlinx.coroutines.launch
 
 /**
  * Looks inside an archive before anything is unpacked, so you can see what you
@@ -282,42 +284,24 @@ fun ArchiveScreen(path: String, onBack: () -> Unit, onOpenFolder: (String) -> Un
     progress?.let { ArchiveWorkingDialog("Extracting", it) }
 
     outcome?.let { result ->
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { outcome = null },
-            containerColor = fsColors.card,
-            title = {
-                Text(
-                    if (result.ok) "Extracted" else "Extraction failed",
-                    color = fsColors.label,
-                )
+        com.shahabcodes.filestorm.ui.components.FsDialog(
+            title = if (result.ok) "Extracted" else "Extraction failed",
+            message = if (result.ok) {
+                "${result.files} file(s) · ${Formatters.bytes(result.bytes)} written to " +
+                    result.target.replace(FileRepository.rootPath, "Internal storage")
+            } else {
+                result.error ?: "Unknown error"
             },
-            text = {
-                Text(
-                    if (result.ok) {
-                        "${result.files} file(s) · ${Formatters.bytes(result.bytes)} written to " +
-                            result.target.replace(FileRepository.rootPath, "Internal storage")
-                    } else {
-                        result.error ?: "Unknown error"
-                    },
-                    color = fsColors.secondaryLabel,
-                )
+            icon = if (result.ok) Icons.Rounded.CheckCircleOutline else Icons.Rounded.ErrorOutline,
+            destructive = !result.ok,
+            confirmText = if (result.ok) "Open Folder" else "OK",
+            dismissText = if (result.ok) "Done" else null,
+            onDismiss = { outcome = null },
+            onConfirm = {
+                val target = result.target
+                outcome = null
+                if (result.ok) onOpenFolder(target)
             },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
-                    val target = result.target
-                    outcome = null
-                    if (result.ok) onOpenFolder(target)
-                }) {
-                    Text(if (result.ok) "Open Folder" else "OK", color = fsColors.accent)
-                }
-            },
-            dismissButton = if (result.ok) {
-                {
-                    androidx.compose.material3.TextButton(onClick = { outcome = null }) {
-                        Text("Done", color = fsColors.secondaryLabel)
-                    }
-                }
-            } else null,
         )
     }
 }

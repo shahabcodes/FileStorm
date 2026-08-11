@@ -18,7 +18,6 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Unarchive
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -46,13 +45,14 @@ import androidx.compose.ui.window.Dialog
 import com.shahabcodes.filestorm.data.FileRepository
 import com.shahabcodes.filestorm.data.FsEntry
 import com.shahabcodes.filestorm.data.archive.ArchiveManager
+import com.shahabcodes.filestorm.ui.components.FsInfoDialog
 import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
 import com.shahabcodes.filestorm.util.Formatters
-import kotlinx.coroutines.launch
 import java.io.File
+import kotlinx.coroutines.launch
 
 /** Names the archive, then packs the selection with live progress. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -455,20 +455,11 @@ private fun ResultDialog(
     message: String,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = fsColors.card,
-        icon = {
-            Icon(
-                if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Error,
-                null,
-                tint = if (success) fsColors.green else fsColors.red,
-            )
-        },
-        title = { Text(title, color = fsColors.label) },
-        text = { Text(message, color = fsColors.secondaryLabel) },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Done", color = fsColors.accent) }
-        },
+    FsInfoDialog(
+        title = title,
+        message = message,
+        icon = if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Error,
+        buttonText = "Done",
+        onDismiss = onDismiss,
     )
 }

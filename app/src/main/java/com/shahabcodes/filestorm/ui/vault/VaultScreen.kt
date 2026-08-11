@@ -34,11 +34,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.PauseCircleOutline
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.AlertDialog
+import com.shahabcodes.filestorm.ui.components.FsDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -197,72 +200,58 @@ fun VaultScreen(
     }
 
     run.summary?.let { summary ->
-        AlertDialog(
-            onDismissRequest = { VaultSession.clearSummary() },
-            containerColor = fsColors.card,
-            title = {
-                Text(
-                    when {
-                        summary.cancelled -> "Stopped"
-                        summary.failed > 0 -> "Finished with problems"
-                        else -> "Done"
-                    },
-                    color = fsColors.label,
-                )
+        val close = {
+            VaultSession.clearSummary()
+            FileRepository.invalidate(root.absolutePath)
+        }
+        FsDialog(
+            title = when {
+                summary.cancelled -> "Stopped"
+                summary.failed > 0 -> "Finished with problems"
+                else -> "Done"
             },
-            text = {
-                Column {
-                    Text(
-                        "${summary.succeeded} file(s) · ${Formatters.bytes(summary.bytes)}" +
-                            if (summary.failed > 0) " · ${summary.failed} failed" else "",
-                        color = fsColors.secondaryLabel,
-                    )
-                    if (summary.failures.isNotEmpty()) {
-                        Spacer(Modifier.height(10.dp))
-                        summary.failures.take(6).forEach {
-                            Text(
-                                "${it.path}: ${it.reason}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = fsColors.red,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
+            message = "${summary.succeeded} file(s) · ${Formatters.bytes(summary.bytes)}" +
+                if (summary.failed > 0) " · ${summary.failed} failed" else "",
+            icon = when {
+                summary.failed > 0 -> Icons.Rounded.ErrorOutline
+                summary.cancelled -> Icons.Rounded.PauseCircleOutline
+                else -> Icons.Rounded.CheckCircleOutline
+            },
+            destructive = summary.failed > 0,
+            // Failed files kept their originals, so running again simply picks
+            // them up — the engine only ever takes what is still unencrypted.
+            confirmText = if (summary.failed > 0) "Retry failed" else "OK",
+            dismissText = if (summary.failed > 0) "Not now" else null,
+            onDismiss = close,
+            onConfirm = {
+                if (summary.failed > 0) {
+                    val wasLocking = run.locking
+                    VaultSession.clearSummary()
+                    if (wasLocking) VaultSession.startLock(context, root)
+                    else VaultSession.startUnlock(context, root)
+                } else close()
+            },
+            content = if (summary.failures.isEmpty()) null else {
+                {
+                    summary.failures.take(6).forEach {
                         Text(
-                            "Originals of failed files were left exactly where they were.",
+                            "${it.path}: ${it.reason}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = fsColors.secondaryLabel,
+                            color = fsColors.red,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
                         )
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Originals of failed files were left exactly where they were.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fsColors.secondaryLabel,
+                        textAlign = TextAlign.Center,
+                    )
                 }
             },
-            confirmButton = {
-                if (summary.failed > 0) {
-                    // Failed files kept their originals, so running again simply
-                    // picks them up — the engine only ever takes what is still
-                    // unencrypted.
-                    TextButton(onClick = {
-                        val wasLocking = run.locking
-                        VaultSession.clearSummary()
-                        if (wasLocking) VaultSession.startLock(context, root)
-                        else VaultSession.startUnlock(context, root)
-                    }) { Text("Retry failed", color = fsColors.accent) }
-                } else {
-                    TextButton(onClick = {
-                        VaultSession.clearSummary()
-                        FileRepository.invalidate(root.absolutePath)
-                    }) { Text("OK", color = fsColors.accent) }
-                }
-            },
-            dismissButton = if (summary.failed > 0) {
-                {
-                    TextButton(onClick = {
-                        VaultSession.clearSummary()
-                        FileRepository.invalidate(root.absolutePath)
-                    }) { Text("Not now", color = fsColors.secondaryLabel) }
-                }
-            } else null,
         )
     }
 
@@ -569,57 +558,46 @@ private fun UnlockedView(
     }
 
     sheetFor?.let { entry ->
-        AlertDialog(
-            onDismissRequest = { sheetFor = null },
-            containerColor = fsColors.card,
-            title = { Text(entry.second.name, color = fsColors.label) },
-            text = {
-                Column {
-                    Text(
-                        entry.second.relativePath,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = fsColors.secondaryLabel,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        Formatters.bytes(entry.second.size) + " · " +
-                            Formatters.fileDate(entry.second.modified),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = fsColors.secondaryLabel,
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "Bringing it back decrypts it to its original name, place and date, " +
-                            "and removes it from the vault. Everything else stays locked.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = fsColors.secondaryLabel,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val master = key
-                    val file = entry.first
-                    sheetFor = null
-                    if (master != null) {
-                        busyWith = entry.second.name
-                        scope.launch {
-                            val result = withContext(Dispatchers.IO) {
-                                VaultEngine.restore(folder, file, master)
-                            }
-                            busyWith = null
-                            if (result.ok) {
-                                FileRepository.invalidate(folder.root.absolutePath)
-                                entries = entries?.filterNot { it.first == file }
-                            }
+        FsDialog(
+            title = entry.second.name,
+            message = "Bringing it back decrypts it to its original name, place and date, " +
+                "and removes it from the vault. Everything else stays locked.",
+            icon = Icons.Rounded.LockOpen,
+            confirmText = "Bring It Back",
+            onDismiss = { sheetFor = null },
+            onConfirm = {
+                val master = key
+                val file = entry.first
+                sheetFor = null
+                if (master != null) {
+                    busyWith = entry.second.name
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            VaultEngine.restore(folder, file, master)
+                        }
+                        busyWith = null
+                        if (result.ok) {
+                            FileRepository.invalidate(folder.root.absolutePath)
+                            entries = entries?.filterNot { it.first == file }
                         }
                     }
-                }) { Text("Bring It Back", color = fsColors.accent) }
-            },
-            dismissButton = {
-                TextButton(onClick = { sheetFor = null }) {
-                    Text("Cancel", color = fsColors.secondaryLabel)
                 }
+            },
+            content = {
+                Text(
+                    entry.second.relativePath,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fsColors.secondaryLabel,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    Formatters.bytes(entry.second.size) + " · " +
+                        Formatters.fileDate(entry.second.modified),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fsColors.secondaryLabel,
+                    textAlign = TextAlign.Center,
+                )
             },
         )
     }
@@ -975,16 +953,12 @@ private fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = fsColors.card,
-        title = { Text(title, color = fsColors.label) },
-        text = { Text(body, color = fsColors.secondaryLabel) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text(confirmLabel, color = fsColors.accent) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = fsColors.secondaryLabel) }
-        },
+    FsDialog(
+        title = title,
+        message = body,
+        icon = Icons.Rounded.Lock,
+        confirmText = confirmLabel,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
     )
 }

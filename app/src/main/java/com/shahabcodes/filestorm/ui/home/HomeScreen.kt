@@ -554,47 +554,27 @@ private fun CleanConfirmDialog(
         CleanTarget.EMPTY_FOLDERS -> snapshot?.emptyFolderCount ?: 0
         CleanTarget.ZERO_BYTE -> snapshot?.zeroByteCount ?: 0
     }
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = fsColors.card,
-        title = {
-            Text(
-                when (target) {
-                    CleanTarget.EMPTY_FOLDERS -> "Delete $count empty folder(s)?"
-                    CleanTarget.ZERO_BYTE -> "Move $count empty file(s) to Trash?"
-                },
-                color = fsColors.label,
-            )
+    com.shahabcodes.filestorm.ui.components.FsDialog(
+        title = when (target) {
+            CleanTarget.EMPTY_FOLDERS -> "Delete $count empty folder(s)?"
+            CleanTarget.ZERO_BYTE -> "Move $count empty file(s) to Trash?"
         },
-        text = {
-            Text(
-                when (target) {
-                    // Folders hold nothing, so there is nothing to recover and
-                    // no reason to route them through the Trash.
-                    CleanTarget.EMPTY_FOLDERS ->
-                        "These folders contain no files at all. They are deleted outright " +
-                            "rather than sent to the Trash, since there is nothing inside to " +
-                            "recover. Hidden folders were never scanned and are left alone."
-                    CleanTarget.ZERO_BYTE ->
-                        "These files are 0 bytes. They go to the Trash, so you can restore " +
-                            "any of them if one turns out to matter."
-                },
-                color = fsColors.secondaryLabel,
-            )
+        message = when (target) {
+            // Folders hold nothing, so there is nothing to recover and no
+            // reason to route them through the Trash.
+            CleanTarget.EMPTY_FOLDERS ->
+                "These folders contain no files at all. They are deleted outright " +
+                    "rather than sent to the Trash, since there is nothing inside to " +
+                    "recover. Hidden folders were never scanned and are left alone."
+            CleanTarget.ZERO_BYTE ->
+                "These files are 0 bytes. They go to the Trash, so you can restore " +
+                    "any of them if one turns out to matter."
         },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onConfirm) {
-                Text(
-                    if (target == CleanTarget.EMPTY_FOLDERS) "Delete" else "Move to Trash",
-                    color = fsColors.red,
-                )
-            }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Cancel", color = fsColors.secondaryLabel)
-            }
-        },
+        icon = androidx.compose.material.icons.Icons.Rounded.DeleteOutline,
+        destructive = true,
+        confirmText = if (target == CleanTarget.EMPTY_FOLDERS) "Delete" else "Move to Trash",
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
     )
 }
 
