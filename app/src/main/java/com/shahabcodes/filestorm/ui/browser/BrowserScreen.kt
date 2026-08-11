@@ -309,7 +309,7 @@ fun BrowserScreen(
     }
 
     fun openEntryFolder(entry: FsEntry) {
-        openFolderGated(context, entry.path, entry.name) { BrowserTabs.push(entry.path) }
+        openFolderForBrowsing(context, entry.path, entry.name) { BrowserTabs.push(entry.path) }
     }
 
     var modeBeforeReel by remember { mutableStateOf(ViewMode.GALLERY) }
@@ -692,7 +692,52 @@ fun BrowserScreen(
 
         // ── File list ───────────────────────────────────────────────────
         Box(Modifier.weight(1f)) {
+            // Tabs are restored across launches and a folder can be encrypted
+            // while a tab still points at it, so the listing itself has to
+            // refuse rather than relying on the tap being routed.
+            val isVaultHere = remember(path, entries) {
+                com.shahabcodes.filestorm.data.vault.VaultFolder.isVault(File(path))
+            }
             when {
+                isVaultHere -> Column(
+                    Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.Lock, null,
+                        tint = fsColors.accent, modifier = Modifier.size(46.dp),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "This folder is encrypted",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = fsColors.label,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Its contents are stored as sealed containers. Open the " +
+                            "vault to see the real names.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 40.dp),
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(fsColors.accent)
+                            .pressScale { onOpenVault?.invoke(path) }
+                            .padding(horizontal = 26.dp, vertical = 12.dp),
+                    ) {
+                        Text(
+                            "Open Vault",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                        )
+                    }
+                }
                 loading -> com.shahabcodes.filestorm.ui.components.FsLoadingState(
                     title = "Opening folder",
                     detail = File(path).name.ifEmpty { "Internal storage" },
@@ -894,7 +939,7 @@ fun BrowserScreen(
             },
             onOpenInNewTab = if (target.isDirectory) {
                 {
-                    openFolderGated(context, target.path, target.name) {
+                    openFolderForBrowsing(context, target.path, target.name) {
                         BrowserTabs.newTab(target.path)
                     }
                 }

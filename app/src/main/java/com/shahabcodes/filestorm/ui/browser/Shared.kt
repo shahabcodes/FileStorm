@@ -576,6 +576,30 @@ fun ConfirmDeleteDialog(
     )
 }
 
+/**
+ * Opens a folder for browsing, sending an encrypted one to its vault screen.
+ *
+ * Browsing a vault as an ordinary folder shows the container's own shard
+ * directories — two-character names like "2b" holding opaque blobs. That is
+ * both confusing and useless, since the real names live encrypted in the index.
+ *
+ * Deliberately not folded into [openFolderGated]: the folder picker uses that
+ * to walk into a folder as a *destination*, where jumping to the vault screen
+ * would be wrong.
+ */
+fun openFolderForBrowsing(
+    context: android.content.Context,
+    path: String,
+    name: String,
+    onOpen: () -> Unit,
+) {
+    if (com.shahabcodes.filestorm.data.vault.VaultFolder.isVault(java.io.File(path))) {
+        onOpenVault?.invoke(path)
+        return
+    }
+    openFolderGated(context, path, name, onOpen)
+}
+
 /** Opens a folder, first passing biometric auth when the folder is locked. */
 fun openFolderGated(
     context: android.content.Context,
