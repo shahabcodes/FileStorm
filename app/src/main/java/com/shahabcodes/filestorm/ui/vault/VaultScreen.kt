@@ -351,22 +351,14 @@ private fun UnlockView(root: File) {
                     color = fsColors.label,
                 )
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
+                PassphraseField(
                     value = passphrase,
                     onValueChange = { passphrase = it; wrong = false },
-                    singleLine = true,
-                    visualTransformation = if (usingRecovery) androidx.compose.ui.text.input.VisualTransformation.None
-                    else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    // The recovery code is shown as issued — it is written down
+                    // rather than memorised, so hiding it helps nobody.
+                    masked = !usingRecovery,
                     isError = wrong,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = fsColors.accent,
-                        unfocusedBorderColor = fsColors.separator,
-                        focusedTextColor = fsColors.label,
-                        unfocusedTextColor = fsColors.label,
-                        cursorColor = fsColors.accent,
-                    ),
                 )
                 if (wrong) {
                     Spacer(Modifier.height(6.dp))

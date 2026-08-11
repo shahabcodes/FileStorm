@@ -258,21 +258,11 @@ fun VaultSetupSheet(root: File, onDismiss: () -> Unit, onCreated: () -> Unit) {
 
 @Composable
 private fun Field(value: String, label: String, onChange: (String) -> Unit) {
-    OutlinedTextField(
+    PassphraseField(
         value = value,
         onValueChange = onChange,
-        singleLine = true,
-        label = { Text(label, color = fsColors.secondaryLabel) },
-        visualTransformation = PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        label = label,
         modifier = Modifier.fillMaxWidth(),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = fsColors.accent,
-            unfocusedBorderColor = fsColors.separator,
-            focusedTextColor = fsColors.label,
-            unfocusedTextColor = fsColors.label,
-            cursorColor = fsColors.accent,
-        ),
     )
 }
 
