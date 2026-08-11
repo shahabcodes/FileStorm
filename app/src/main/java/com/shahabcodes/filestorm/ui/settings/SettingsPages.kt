@@ -1,22 +1,6 @@
 package com.shahabcodes.filestorm.ui.settings
 
-import com.shahabcodes.filestorm.util.Formatters
-import com.shahabcodes.filestorm.data.vault.VaultPrefs
-import com.shahabcodes.filestorm.data.vault.VaultLogLevel
-import com.shahabcodes.filestorm.data.vault.VaultLog
-import com.shahabcodes.filestorm.data.vault.VaultCrypto
-import com.shahabcodes.filestorm.data.vault.AutoLock
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.getValue
 import android.widget.Toast
-import com.shahabcodes.filestorm.data.ChartStyle
-import com.shahabcodes.filestorm.data.DashboardPrefs
-import com.shahabcodes.filestorm.data.DashboardCard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -40,37 +24,57 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.PlayCircleOutline
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.Slideshow
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.fragment.app.FragmentActivity
 import com.shahabcodes.filestorm.BuildConfig
 import com.shahabcodes.filestorm.data.Accent
 import com.shahabcodes.filestorm.data.Appearance
+import com.shahabcodes.filestorm.data.ChartStyle
+import com.shahabcodes.filestorm.data.DashboardCard
+import com.shahabcodes.filestorm.data.DashboardPrefs
 import com.shahabcodes.filestorm.data.LoaderStyle
 import com.shahabcodes.filestorm.data.Prefs
 import com.shahabcodes.filestorm.data.ThemePalette
+import com.shahabcodes.filestorm.data.vault.AutoLock
+import com.shahabcodes.filestorm.data.vault.VaultCrypto
+import com.shahabcodes.filestorm.data.vault.VaultLog
+import com.shahabcodes.filestorm.data.vault.VaultLogLevel
+import com.shahabcodes.filestorm.data.vault.VaultPrefs
 import com.shahabcodes.filestorm.ui.Biometrics
 import com.shahabcodes.filestorm.ui.components.FsSpinner
 import com.shahabcodes.filestorm.ui.components.GroupedCard
 import com.shahabcodes.filestorm.ui.components.RowSeparator
 import com.shahabcodes.filestorm.ui.components.pressScale
 import com.shahabcodes.filestorm.ui.theme.fsColors
+import com.shahabcodes.filestorm.util.Formatters
 
 /**
  * The individual settings pages.
@@ -415,6 +419,85 @@ fun FilesSettingsScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
 
+        // ── Reel ───────────────────────────────────────────────────────
+        SectionHeader("Reel")
+        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+            SettingSwitch(
+                icon = Icons.Rounded.Slideshow,
+                title = "Reel view",
+                subtitle = "Adds a full-screen feed of a folder's photos and videos " +
+                    "to the view menu",
+                checked = Prefs.reelEnabled,
+                onChange = { Prefs.updateReelEnabled(it) },
+            )
+            if (Prefs.reelEnabled) {
+                RowSeparator(startIndent = 56.dp)
+                SettingSwitch(
+                    icon = Icons.Rounded.PlayCircleOutline,
+                    title = "Play videos automatically",
+                    subtitle = "Start each clip as it reaches the front",
+                    checked = Prefs.reelAutoplay,
+                    onChange = { Prefs.updateReelAutoplay(it) },
+                )
+                RowSeparator(startIndent = 56.dp)
+                SettingSwitch(
+                    icon = Icons.Rounded.VolumeOff,
+                    title = "Start muted",
+                    subtitle = "Unmuting stays on until you leave the reel",
+                    checked = Prefs.reelStartMuted,
+                    onChange = { Prefs.updateReelStartMuted(it) },
+                )
+                RowSeparator(startIndent = 56.dp)
+                SettingSwitch(
+                    icon = Icons.Rounded.Repeat,
+                    title = "Repeat videos",
+                    subtitle = "Loop the clip instead of stopping at the end",
+                    checked = Prefs.reelLoop,
+                    onChange = { Prefs.updateReelLoop(it) },
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** The switch row used throughout the settings pages. */
+@Composable
+private fun SettingSwitch(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = fsColors.accent, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = fsColors.label)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = fsColors.secondaryLabel,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = fsColors.accent,
+                checkedThumbColor = Color.White,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = fsColors.fill,
+                uncheckedBorderColor = Color.Transparent,
+            ),
+        )
     }
 }
 

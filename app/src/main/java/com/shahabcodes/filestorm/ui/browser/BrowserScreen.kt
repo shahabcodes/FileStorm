@@ -97,8 +97,11 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class BrowserViewModel(val path: String) : ViewModel() {
-    val entries = MutableStateFlow<List<FsEntry>>(emptyList())
-    val loading = MutableStateFlow(true)
+    // Walking into a folder builds a fresh ViewModel, so start from whatever is
+    // already in memory. Without this a folder of 30,000 files shows a spinner
+    // and rebuilds its sort order every single time you step back into it.
+    val entries = MutableStateFlow(FileRepository.peek(path) ?: emptyList())
+    val loading = MutableStateFlow(entries.value.isEmpty())
 
     /** Guards against re-listing a huge folder every time the screen re-enters. */
     private var loadedWithHidden: Boolean? = null
@@ -111,7 +114,10 @@ class BrowserViewModel(val path: String) : ViewModel() {
         if (force) FileRepository.invalidate(path)
         viewModelScope.launch {
             loading.value = entries.value.isEmpty()
-            entries.value = FileRepository.list(path)
+            val fresh = FileRepository.list(path)
+            // Replacing an identical list would restart every thumbnail request
+            // and drop the scroll position for no reason.
+            if (fresh !== entries.value) entries.value = fresh
             loadedWithHidden = Prefs.showHidden
             loading.value = false
         }
@@ -123,7 +129,10 @@ class BrowserViewModel(val path: String) : ViewModel() {
     }
 
     fun resort() {
-        entries.value = FileRepository.sortEntries(entries.value, Prefs.sortField, Prefs.sortAscending)
+        // An order used before is already built; anything else goes through
+        // list(), which re-sorts off the main thread and keeps the result.
+        FileRepository.peek(path)?.let { entries.value = it; return }
+        viewModelScope.launch { entries.value = FileRepository.list(path) }
     }
 }
 
@@ -172,7 +181,11 @@ fun ViewModeMenu(
         onDismissRequest = onDismiss,
         modifier = Modifier.background(fsColors.cardSecondary),
     ) {
-        ViewMode.entries.filter { it != ViewMode.TIMELINE }.forEach { mode ->
+        ViewMode.entries.filter {
+            // Timeline is driven by the group-by-month switch below, and Reel
+            // only appears when it has been turned on in Settings.
+            it != ViewMode.TIMELINE && (it != ViewMode.REEL || Prefs.reelEnabled)
+        }.forEach { mode ->
             val active = current == mode
             DropdownMenuItem(
                 text = { Text(mode.label, color = if (active) fsColors.accent else fsColors.label) },
@@ -299,14 +312,24 @@ fun BrowserScreen(
         openFolderGated(context, entry.path, entry.name) { BrowserTabs.push(entry.path) }
     }
 
+    var modeBeforeReel by remember { mutableStateOf(ViewMode.GALLERY) }
+
+    // A reel is meant to be looked at, not framed by a toolbar, so it takes the
+    // whole screen. Selecting files still needs the chrome, so that wins.
+    val immersive = viewMode == ViewMode.REEL && !selectionMode
+    androidx.activity.compose.BackHandler(enabled = immersive) {
+        com.shahabcodes.filestorm.data.FolderViews.setView(path, modeBeforeReel)
+    }
+
     Column(
         Modifier
             .fillMaxSize()
-            .background(fsColors.groupedBackground)
-            .statusBarsPadding(),
+            .background(if (immersive) Color.Black else fsColors.groupedBackground)
+            .then(if (immersive) Modifier else Modifier.statusBarsPadding()),
     ) {
         // ── Tab bar ─────────────────────────────────────────────────────
         var renameTabIndex by remember { mutableStateOf(-1) }
+        if (!immersive) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -466,7 +489,13 @@ fun BrowserScreen(
                         current = viewMode,
                         grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(path),
                         onDismiss = { viewMenuOpen = false },
-                        onSelect = { com.shahabcodes.filestorm.data.FolderViews.setView(path, it) },
+                        onSelect = {
+                            // Remember where to come back to when the reel exits.
+                            if (it == ViewMode.REEL && viewMode != ViewMode.REEL) {
+                                modeBeforeReel = viewMode
+                            }
+                            com.shahabcodes.filestorm.data.FolderViews.setView(path, it)
+                        },
                         onGroupedChange = {
                             com.shahabcodes.filestorm.data.FolderViews.setGrouped(path, it)
                         },
@@ -659,6 +688,7 @@ fun BrowserScreen(
         }
 
         Spacer(Modifier.height(12.dp))
+        } // end of chrome, hidden while a reel is playing
 
         // ── File list ───────────────────────────────────────────────────
         Box(Modifier.weight(1f)) {
@@ -689,8 +719,13 @@ fun BrowserScreen(
                     scrollResetKey = listOf(query, dateFilter, Prefs.sortField, Prefs.sortAscending),
                     selectionMode = selectionMode,
                     selected = selected,
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
+                    // The reel is edge to edge; every other view is inset.
+                    contentPadding = if (immersive) PaddingValues(0.dp)
+                    else PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
                     viewMode = viewMode,
+                    onExitReel = {
+                        com.shahabcodes.filestorm.data.FolderViews.setView(path, modeBeforeReel)
+                    },
                     columns = com.shahabcodes.filestorm.data.FolderViews.columnsFor(path, viewMode),
                     grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(path),
                     collapsedMonths = collapsedMonths,

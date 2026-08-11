@@ -421,6 +421,11 @@ private fun VideoPage(
     var scrubbing by remember(file) { mutableStateOf(false) }
     var videoWidth by remember(file) { mutableIntStateOf(0) }
     var videoHeight by remember(file) { mutableIntStateOf(0) }
+    var surface by remember(file) { mutableStateOf<android.view.Surface?>(null) }
+    // start() before onPrepared throws, and the throw used to be swallowed —
+    // which is why an early tap on play appeared to do nothing at all.
+    var prepared by remember(file) { mutableStateOf(false) }
+    var wantsPlay by remember(file) { mutableStateOf(false) }
 
     var scale by remember(file) { mutableFloatStateOf(1f) }
     var offsetX by remember(file) { mutableFloatStateOf(0f) }
@@ -504,24 +509,10 @@ private fun VideoPage(
                             width: Int,
                             height: Int,
                         ) {
-                            runCatching {
-                                val mp = android.media.MediaPlayer()
-                                mp.setSurface(android.view.Surface(texture))
-                                mp.setDataSource(file.absolutePath)
-                                mp.setOnPreparedListener {
-                                    duration = it.duration
-                                    videoWidth = it.videoWidth
-                                    videoHeight = it.videoHeight
-                                    it.setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f)
-                                    VideoController.reportSize(it.videoWidth, it.videoHeight)
-                                }
-                                mp.setOnCompletionListener {
-                                    playing = false
-                                    VideoController.reportPlaying(false)
-                                }
-                                mp.prepareAsync()
-                                player = mp
-                            }
+                            // Only hand over the surface here. Creating the
+                            // player is driven by `active` below, so the pager's
+                            // off-screen neighbours never open one.
+                            surface = android.view.Surface(texture)
                         }
 
                         override fun onSurfaceTextureSizeChanged(
@@ -533,9 +524,7 @@ private fun VideoPage(
                         override fun onSurfaceTextureDestroyed(
                             texture: android.graphics.SurfaceTexture,
                         ): Boolean {
-                            runCatching { player?.release() }
-                            player = null
-                            playing = false
+                            surface = null
                             return true
                         }
 
@@ -554,10 +543,55 @@ private fun VideoPage(
                 ),
         )
 
-        LaunchedEffect(active) {
-            if (!active) {
-                runCatching { player?.pause() }
+        // One player, belonging to the page you are actually looking at.
+        //
+        // Previously every page opened its own MediaPlayer the moment its
+        // surface appeared, so swiping through a folder of videos left several
+        // decoding at once. That is what made swiping stutter and eventually
+        // stall — there are only so many hardware decoders.
+        DisposableEffect(file, active, surface) {
+            val target = surface
+            if (active && target != null) {
+                runCatching {
+                    val mp = android.media.MediaPlayer()
+                    mp.setSurface(target)
+                    mp.setDataSource(file.absolutePath)
+                    mp.setOnPreparedListener {
+                        duration = it.duration
+                        videoWidth = it.videoWidth
+                        videoHeight = it.videoHeight
+                        it.setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f)
+                        VideoController.reportSize(it.videoWidth, it.videoHeight)
+                        prepared = true
+                        // A tap that arrived while this was still loading is
+                        // honoured now rather than being dropped.
+                        if (wantsPlay) {
+                            runCatching { it.start() }
+                            playing = true
+                            wantsPlay = false
+                        }
+                    }
+                    mp.setOnCompletionListener {
+                        playing = false
+                        wantsPlay = false
+                        VideoController.reportPlaying(false)
+                    }
+                    mp.setOnErrorListener { _, _, _ ->
+                        playing = false
+                        wantsPlay = false
+                        prepared = false
+                        true
+                    }
+                    mp.prepareAsync()
+                    player = mp
+                }
+            }
+            onDispose {
+                runCatching { player?.release() }
+                player = null
+                prepared = false
                 playing = false
+                wantsPlay = false
             }
         }
         // The activity needs a way to start and stop this from the floating
@@ -573,8 +607,12 @@ private fun VideoPage(
                             if (playing) {
                                 runCatching { p.pause() }
                                 playing = false
-                            } else {
+                                wantsPlay = false
+                            } else if (prepared) {
                                 runCatching { p.start() }
+                                playing = true
+                            } else {
+                                wantsPlay = true
                                 playing = true
                             }
                         }
@@ -582,18 +620,13 @@ private fun VideoPage(
                     onPause = {
                         runCatching { player?.pause() }
                         playing = false
+                        wantsPlay = false
                     },
                 )
             }
             onDispose { VideoController.unbind(path) }
         }
         LaunchedEffect(playing) { VideoController.reportPlaying(playing) }
-        DisposableEffect(file) {
-            onDispose {
-                runCatching { player?.release() }
-                player = null
-            }
-        }
         LaunchedEffect(playing, active) {
             while (playing && active) {
                 runCatching { player?.let { if (!scrubbing) position = it.currentPosition } }
@@ -611,8 +644,17 @@ private fun VideoPage(
                     .background(Color.Black.copy(alpha = 0.45f), CircleShape)
                     .pointerInput(file) {
                         detectTapGestures {
-                            runCatching { player?.start() }
-                            playing = true
+                            val p = player
+                            if (p != null && prepared) {
+                                runCatching { p.start() }
+                                playing = true
+                                wantsPlay = false
+                            } else {
+                                // Still loading: remember the intent so it plays
+                                // the moment it can, instead of ignoring the tap.
+                                wantsPlay = true
+                                playing = true
+                            }
                         }
                     },
                 contentAlignment = Alignment.Center,

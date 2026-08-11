@@ -18,7 +18,16 @@ object FileRepository {
 
     val rootPath: String = Environment.getExternalStorageDirectory().absolutePath
 
-    private class Cached(val stamp: Long, val showHidden: Boolean, val entries: List<FsEntry>)
+    private class Cached(val stamp: Long, val showHidden: Boolean, val entries: List<FsEntry>) {
+        /**
+         * Sorting 30,000 entries costs a partition, two sorts and a concat. The
+         * browser asks for the same order almost every time, so each order is
+         * kept once rather than rebuilt on every visit.
+         */
+        val sorted = java.util.concurrent.ConcurrentHashMap<String, List<FsEntry>>()
+    }
+
+    private fun sortKey(field: SortField, ascending: Boolean) = "${field.name}:$ascending"
 
     /**
      * Directory listings are cached per path and reused while the folder's own
@@ -31,6 +40,29 @@ object FileRepository {
         if (path == null) listCache.clear() else listCache.remove(path)
     }
 
+    /**
+     * What is already in memory for [path], or null. Touches no disk at all, so
+     * it is safe to call while composing.
+     *
+     * The browser builds a new ViewModel every time you walk into a folder, so
+     * without this a revisit starts from an empty list and shows a spinner even
+     * though every entry is already known. Painting from here first makes going
+     * back into a large folder instant; [list] still runs behind it and
+     * replaces this if the folder actually changed.
+     */
+    fun peek(
+        path: String,
+        field: SortField = Prefs.sortField,
+        ascending: Boolean = Prefs.sortAscending,
+        showHidden: Boolean = Prefs.showHidden,
+    ): List<FsEntry>? {
+        val cached = listCache[path] ?: return null
+        if (cached.showHidden != showHidden) return null
+        // Deliberately no freshness check: a stat here would be disk I/O on the
+        // main thread, and list() corrects anything stale a moment later.
+        return cached.sorted[sortKey(field, ascending)]
+    }
+
     suspend fun list(
         path: String,
         field: SortField = Prefs.sortField,
@@ -39,10 +71,8 @@ object FileRepository {
     ): List<FsEntry> = withContext(Dispatchers.IO) {
         val dir = File(path)
         val stamp = dir.lastModified()
-        val cached = listCache[path]
-        val base = if (cached != null && cached.stamp == stamp && cached.showHidden == showHidden) {
-            cached.entries
-        } else {
+        var cached = listCache[path]
+        if (cached == null || cached.stamp != stamp || cached.showHidden != showHidden) {
             val children = dir.listFiles() ?: return@withContext emptyList()
             val fresh = ArrayList<FsEntry>(children.size)
             for (child in children) {
@@ -50,10 +80,12 @@ object FileRepository {
                 if (!showHidden && child.name.startsWith(".")) continue
                 fresh.add(FsEntry.from(child))
             }
-            listCache[path] = Cached(stamp, showHidden, fresh)
-            fresh
+            cached = Cached(stamp, showHidden, fresh)
+            listCache[path] = cached
         }
-        sortEntries(base, field, ascending)
+        val key = sortKey(field, ascending)
+        cached.sorted[key] ?: sortEntries(cached.entries, field, ascending)
+            .also { cached.sorted[key] = it }
     }
 
     /** Folders always group first; the chosen order applies within each group. */

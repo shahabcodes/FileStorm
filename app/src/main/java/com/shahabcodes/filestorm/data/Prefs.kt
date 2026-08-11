@@ -12,6 +12,7 @@ enum class ViewMode(val label: String) {
     GRID("Grid"),
     GALLERY("Gallery"),
     MOSAIC("Mosaic"),
+    REEL("Reel"),
     TIMELINE("Timeline"),
 }
 
@@ -126,6 +127,16 @@ object Prefs {
     var chartStyle by mutableStateOf(ChartStyle.BARS)
         private set
 
+    // Reel: a full-screen vertical feed of the photos and videos in a folder.
+    var reelEnabled by mutableStateOf(true)
+        private set
+    var reelAutoplay by mutableStateOf(true)
+        private set
+    var reelStartMuted by mutableStateOf(true)
+        private set
+    var reelLoop by mutableStateOf(true)
+        private set
+
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm", Context.MODE_PRIVATE)
         showHidden = sp.getBoolean("show_hidden", false)
@@ -163,9 +174,36 @@ object Prefs {
                 .putString("palette", palette.name)
                 .apply()
         }
+        reelEnabled = sp.getBoolean("reel_enabled", true)
+        reelAutoplay = sp.getBoolean("reel_autoplay", true)
+        reelStartMuted = sp.getBoolean("reel_start_muted", true)
+        reelLoop = sp.getBoolean("reel_loop", true)
         accent = runCatching {
             Accent.valueOf(sp.getString("accent", Accent.BLUE.name)!!)
         }.getOrDefault(Accent.BLUE)
+    }
+
+    fun updateReelEnabled(value: Boolean) {
+        reelEnabled = value
+        sp.edit().putBoolean("reel_enabled", value).apply()
+        // Leaving the mode selected while hiding its switch would strand the
+        // folder in a view with no way back to a list.
+        if (!value && viewMode == ViewMode.REEL) updateViewMode(ViewMode.GALLERY)
+    }
+
+    fun updateReelAutoplay(value: Boolean) {
+        reelAutoplay = value
+        sp.edit().putBoolean("reel_autoplay", value).apply()
+    }
+
+    fun updateReelStartMuted(value: Boolean) {
+        reelStartMuted = value
+        sp.edit().putBoolean("reel_start_muted", value).apply()
+    }
+
+    fun updateReelLoop(value: Boolean) {
+        reelLoop = value
+        sp.edit().putBoolean("reel_loop", value).apply()
     }
 
     fun updateShowHidden(value: Boolean) {

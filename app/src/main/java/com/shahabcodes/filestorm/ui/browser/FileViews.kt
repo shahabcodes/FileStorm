@@ -99,6 +99,7 @@ fun FileListView(
     scrollResetKey: Any? = null,
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
+    onExitReel: (() -> Unit)? = null,
 ) {
     if (grouped) {
         GroupedByMonth(
@@ -268,6 +269,13 @@ fun FileListView(
                 }
             }
         }
+
+        ViewMode.REEL -> ReelView(
+            entries = entries,
+            contentPadding = contentPadding,
+            onLongClick = onLongClick,
+            onExit = onExitReel,
+        )
     }
 
         val handle = when (viewMode) {
