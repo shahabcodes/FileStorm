@@ -73,6 +73,16 @@ object FileRepository {
         val stamp = dir.lastModified()
         var cached = listCache[path]
         if (cached == null || cached.stamp != stamp || cached.showHidden != showHidden) {
+            // The in-memory cache dies with the process, so a folder of tens of
+            // thousands of files was re-walked from scratch every cold start.
+            // Disk holds the same listing and is read in a fraction of the time.
+            ListingCache.read(path, stamp, showHidden)?.let { stored ->
+                val restored = Cached(stamp, showHidden, stored)
+                listCache[path] = restored
+                val key = sortKey(field, ascending)
+                return@withContext restored.sorted[key]
+                    ?: sortEntries(stored, field, ascending).also { restored.sorted[key] = it }
+            }
             val children = dir.listFiles() ?: return@withContext emptyList()
             val fresh = ArrayList<FsEntry>(children.size)
             for (child in children) {
@@ -84,6 +94,7 @@ object FileRepository {
             }
             cached = Cached(stamp, showHidden, fresh)
             listCache[path] = cached
+            ListingCache.write(path, stamp, showHidden, fresh)
         }
         val key = sortKey(field, ascending)
         cached.sorted[key] ?: sortEntries(cached.entries, field, ascending)
