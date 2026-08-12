@@ -1,6 +1,7 @@
 package com.shahabcodes.filestorm.ui.browser
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -437,14 +438,91 @@ private fun ArchiveProgressDialog(action: String, progress: ArchiveManager.Progr
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "${Formatters.bytes(progress.bytesDone)} of ${Formatters.bytes(progress.bytesTotal)}" +
-                    if (progress.etaSeconds >= 0) " · ${Formatters.eta(progress.etaSeconds)} left" else "",
-                style = MaterialTheme.typography.labelSmall,
-                color = fsColors.secondaryLabel,
+            Spacer(Modifier.height(8.dp))
+
+            // What it is doing, how fast, and how much is left — the three
+            // things you actually want to know while waiting.
+            DetailLine(
+                "Files",
+                "${progress.doneFiles} of ${progress.totalFiles}",
             )
+            DetailLine(
+                "Read",
+                "${Formatters.bytes(progress.bytesDone)} of " +
+                    Formatters.bytes(progress.bytesTotal),
+            )
+            if (progress.archiveBytes > 0) {
+                DetailLine(
+                    "Archive",
+                    Formatters.bytes(progress.archiveBytes) +
+                        (progress.savedFraction?.let {
+                            " · ${(it * 100).toInt()}% smaller"
+                        } ?: ""),
+                )
+            }
+            DetailLine(
+                "Speed",
+                if (progress.paused) "Paused" else Formatters.speed(progress.speedBps),
+            )
+            DetailLine(
+                "Remaining",
+                if (progress.etaSeconds >= 0) Formatters.eta(progress.etaSeconds) else "—",
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ArchiveActionPill(
+                    label = if (progress.paused) "Resume" else "Pause",
+                    tint = fsColors.accent,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    if (progress.paused) ArchiveManager.resume() else ArchiveManager.pause()
+                }
+                ArchiveActionPill(
+                    label = "Stop",
+                    tint = fsColors.red,
+                    modifier = Modifier.weight(1f),
+                ) { ArchiveManager.cancel() }
+            }
         }
+    }
+}
+
+@Composable
+private fun DetailLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = fsColors.secondaryLabel,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.labelSmall,
+            color = fsColors.label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun ArchiveActionPill(
+    label: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(tint.copy(alpha = 0.14f))
+            .pressScale(onClick)
+            .padding(vertical = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = tint)
     }
 }
 

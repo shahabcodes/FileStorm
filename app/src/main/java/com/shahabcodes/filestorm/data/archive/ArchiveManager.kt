@@ -22,16 +22,32 @@ object ArchiveManager {
         val bytesDone: Long,
         val bytesTotal: Long,
         val startedAt: Long,
+        val paused: Boolean = false,
+        /** Time spent paused, so speed and ETA describe the work, not the wait. */
+        val pausedMillis: Long = 0L,
+        /** Bytes written so far, which is the interesting half of a zip. */
+        val archiveBytes: Long = 0L,
     ) {
         val fraction: Float
             get() = if (bytesTotal > 0) (bytesDone.toFloat() / bytesTotal).coerceIn(0f, 1f) else 0f
+
+        private val workingMillis: Long
+            get() = (System.currentTimeMillis() - startedAt - pausedMillis).coerceAtLeast(1L)
+
+        val speedBps: Double
+            get() = if (bytesDone <= 0) 0.0 else bytesDone * 1000.0 / workingMillis
+
         val etaSeconds: Long
             get() {
-                if (bytesDone <= 0) return -1
-                val elapsed = System.currentTimeMillis() - startedAt
-                val perByte = elapsed.toDouble() / bytesDone
+                if (bytesDone <= 0 || paused) return -1
+                val perByte = workingMillis.toDouble() / bytesDone
                 return ((bytesTotal - bytesDone) * perByte / 1000).toLong()
             }
+
+        /** How much smaller it is so far; null until it means anything. */
+        val savedFraction: Float?
+            get() = if (bytesDone < 1_000_000 || archiveBytes <= 0) null
+            else (1f - archiveBytes.toFloat() / bytesDone).coerceIn(0f, 1f)
     }
 
     data class Outcome(
@@ -44,13 +60,72 @@ object ArchiveManager {
 
     val supportedArchives = setOf("zip", "jar", "apk", "aab", "epub", "tar", "gz", "tgz")
 
+    /** Marks an archive still being written. Never a finished file. */
+    const val PART_SUFFIX = ".fspart"
+
     fun isArchive(file: File): Boolean = ArchiveReader.isSupported(file)
 
     @Volatile
     private var cancelled = false
 
+    @Volatile
+    private var paused = false
+
+    /** Observed by the progress dialog so its button can read Pause or Resume. */
+    val isPaused: Boolean get() = paused
+
     fun cancel() {
         cancelled = true
+        paused = false
+    }
+
+    fun pause() {
+        paused = true
+    }
+
+    fun resume() {
+        paused = false
+    }
+
+    /**
+     * Blocks while paused and returns the time spent waiting, so speed and ETA
+     * can ignore it — otherwise a minute's pause makes the job look slow for
+     * the rest of its run.
+     */
+    private fun awaitResume(): Long {
+        if (!paused) return 0L
+        val from = System.currentTimeMillis()
+        while (paused && !cancelled) Thread.sleep(60)
+        return System.currentTimeMillis() - from
+    }
+
+    /**
+     * Compressing something already compressed spends CPU to save nothing. A
+     * folder of photos or video is the common case for zipping, and storing it
+     * rather than deflating it is several times faster for the same size.
+     */
+    private val alreadyCompressed = setOf(
+        "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif",
+        "mp4", "mkv", "mov", "avi", "webm", "m4v", "3gp",
+        "mp3", "aac", "m4a", "ogg", "opus", "flac", "wma",
+        "zip", "jar", "apk", "aab", "gz", "tgz", "xz", "7z", "rar", "bz2",
+        "pdf", "docx", "xlsx", "pptx", "epub",
+    )
+
+    /**
+     * Progress used to be pushed on every buffer read — thousands of state
+     * writes for one large file, each one recomposing the dialog. The work
+     * itself was waiting on the UI.
+     */
+    private class Ticker(private val onProgress: (Progress) -> Unit) {
+        private var last = 0L
+        fun emit(progress: Progress, force: Boolean = false) {
+            val now = System.currentTimeMillis()
+            if (force || now - last >= 80) {
+                last = now
+                onProgress(progress)
+            }
+        }
     }
 
     /** Packs [entries] (files and whole folders) into [target]. */
@@ -60,7 +135,24 @@ object ArchiveManager {
         onProgress: (Progress) -> Unit,
     ): Outcome = withContext(Dispatchers.IO) {
         cancelled = false
+        paused = false
+        val ticker = Ticker(onProgress)
+        var pausedMillis = 0L
         val startedAt = System.currentTimeMillis()
+
+        // Written under a working name and renamed only once it is complete.
+        //
+        // Killing the app — swiped from recents, force stopped, out of memory —
+        // stops this mid-write with no chance to tidy up. Writing straight to
+        // the real name would leave a .zip that opens to an error, looks
+        // finished in the folder, and is counted as a backup nobody made.
+        // A leftover working file is unambiguous instead, and swept below.
+        val part = File(target.parentFile, target.name + PART_SUFFIX)
+        runCatching {
+            target.parentFile?.listFiles()
+                ?.filter { it.isFile && it.name.endsWith(PART_SUFFIX) }
+                ?.forEach { it.delete() }
+        }
 
         // Flatten the selection into (file, entry name) pairs first so totals and
         // progress are accurate before a single byte is written.
@@ -97,30 +189,56 @@ object ArchiveManager {
         var doneFiles = 0
 
         val result = runCatching {
-            ZipOutputStream(FileOutputStream(target).buffered()).use { zos ->
+            ZipOutputStream(FileOutputStream(part).buffered()).use { zos ->
                 val buffer = ByteArray(256 * 1024)
                 planned.forEach { (file, entryName) ->
                     if (cancelled) error("Cancelled")
-                    onProgress(
-                        Progress(file.name, doneFiles, planned.size, bytesDone, totalBytes, startedAt)
+                    pausedMillis += awaitResume()
+                    if (cancelled) error("Cancelled")
+                    ticker.emit(
+                        Progress(
+                            file.name, doneFiles, planned.size, bytesDone, totalBytes,
+                            startedAt, paused, pausedMillis, part.length(),
+                        ),
+                        force = true,
                     )
                     if (file.isDirectory) {
                         zos.putNextEntry(ZipEntry(entryName))
                         zos.closeEntry()
                     } else {
+                        zos.setLevel(
+                            if (file.extension.lowercase() in alreadyCompressed) {
+                                java.util.zip.Deflater.NO_COMPRESSION
+                            } else {
+                                java.util.zip.Deflater.DEFAULT_COMPRESSION
+                            }
+                        )
                         val zipEntry = ZipEntry(entryName).apply { time = file.lastModified() }
                         zos.putNextEntry(zipEntry)
                         FileInputStream(file).use { input ->
                             while (true) {
                                 if (cancelled) error("Cancelled")
+                                if (paused) {
+                                    ticker.emit(
+                                        Progress(
+                                            file.name, doneFiles, planned.size, bytesDone,
+                                            totalBytes, startedAt, true, pausedMillis,
+                                            part.length(),
+                                        ),
+                                        force = true,
+                                    )
+                                    pausedMillis += awaitResume()
+                                    if (cancelled) error("Cancelled")
+                                }
                                 val read = input.read(buffer)
                                 if (read < 0) break
                                 zos.write(buffer, 0, read)
                                 bytesDone += read
-                                onProgress(
+                                ticker.emit(
                                     Progress(
                                         file.name, doneFiles, planned.size,
-                                        bytesDone, totalBytes, startedAt,
+                                        bytesDone, totalBytes, startedAt, false,
+                                        pausedMillis, part.length(),
                                     )
                                 )
                             }
@@ -132,14 +250,25 @@ object ArchiveManager {
             }
         }
 
-        FileRepository.invalidate(target.parent)
         if (result.isFailure) {
-            target.delete()
+            part.delete()
+            FileRepository.invalidate(target.parent)
             return@withContext Outcome(
                 false, doneFiles, bytesDone, target.absolutePath,
                 result.exceptionOrNull()?.message ?: "Could not create the archive",
             )
         }
+        // Same folder, so this is a rename: the archive appears whole or not
+        // at all, never half of one.
+        if (!part.renameTo(target)) {
+            part.delete()
+            FileRepository.invalidate(target.parent)
+            return@withContext Outcome(
+                false, doneFiles, bytesDone, target.absolutePath,
+                "Could not finish writing the archive",
+            )
+        }
+        FileRepository.invalidate(target.parent)
         Outcome(true, doneFiles, target.length(), target.absolutePath)
     }
 

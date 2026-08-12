@@ -77,6 +77,8 @@ object FileRepository {
             val fresh = ArrayList<FsEntry>(children.size)
             for (child in children) {
                 if (child.name == ".FileStorm") continue
+                // A half-written archive is not a file the user has.
+                if (child.name.endsWith(com.shahabcodes.filestorm.data.archive.ArchiveManager.PART_SUFFIX)) continue
                 if (!showHidden && child.name.startsWith(".")) continue
                 fresh.add(FsEntry.from(child))
             }
@@ -117,6 +119,8 @@ object FileRepository {
                 val children = dir.listFiles() ?: continue
                 for (child in children) {
                     if (child.name == ".FileStorm") continue
+                // A half-written archive is not a file the user has.
+                if (child.name.endsWith(com.shahabcodes.filestorm.data.archive.ArchiveManager.PART_SUFFIX)) continue
                     if (!showHidden && child.name.startsWith(".")) continue
                     if (child.name.lowercase().contains(q)) {
                         results.add(FsEntry.from(child))
@@ -156,6 +160,8 @@ object FileRepository {
                 val children = dir.listFiles() ?: continue
                 for (child in children) {
                     if (child.name == ".FileStorm") continue
+                // A half-written archive is not a file the user has.
+                if (child.name.endsWith(com.shahabcodes.filestorm.data.archive.ArchiveManager.PART_SUFFIX)) continue
                     if (!showHidden && child.name.startsWith(".")) continue
                     if (child.isDirectory) {
                         if (child.name != "Android") queue.add(child)

@@ -16,8 +16,11 @@ data class TrashItem(
     val deletedAt: Long,
     val size: Long,
     val isDirectory: Boolean,
+    /** Where it is now. Empty for items trashed before trash went per-volume. */
+    val trashPath: String = "",
 ) {
-    fun trashFile(): File = File(TrashManager.trashDir, trashName)
+    fun trashFile(): File =
+        if (trashPath.isNotEmpty()) File(trashPath) else File(TrashManager.trashDir, trashName)
 }
 
 /**
@@ -67,8 +70,60 @@ object TrashManager {
         progress = TrashProgress()
     }
 
+    /** The primary volume's trash. Still where the index lives. */
     val trashDir: File get() = File(FileRepository.rootPath, ".FileStorm/Trash")
     private val indexFile: File get() = File(FileRepository.rootPath, ".FileStorm/trash-index.json")
+
+    /**
+     * The volume [file] sits on.
+     *
+     * Anything unrecognised resolves to primary storage, which is exactly what
+     * happened before trash went per-volume — so an odd mount is no worse off.
+     */
+    private fun volumeRootOf(file: File): File {
+        val primary = FileRepository.rootPath
+        val path = file.absolutePath
+        if (path == primary || path.startsWith("$primary/")) return File(primary)
+        val parts = path.split(File.separatorChar).filter { it.isNotEmpty() }
+        // Removable volumes mount at /storage/<id>; /storage/emulated is us.
+        if (parts.size >= 2 && parts[0] == "storage" && parts[1] != "emulated") {
+            return File("${File.separatorChar}${parts[0]}${File.separatorChar}${parts[1]}")
+        }
+        return File(primary)
+    }
+
+    /**
+     * Trash on the same volume as the file, so deleting is a rename.
+     *
+     * A rename costs nothing and cannot half-finish, whatever the file's size.
+     * Sending an SD card's files to a trash on internal storage meant a real
+     * copy: minutes for a large video, internal space spent to free none, and
+     * a chance of running out partway.
+     *
+     * A volume that will not take a trash folder — read-only, or gone — falls
+     * back to primary, where the copy path still applies.
+     */
+    private fun trashDirFor(file: File): File {
+        val dir = File(volumeRootOf(file), ".FileStorm/Trash")
+        if (dir.isDirectory || dir.mkdirs()) return dir
+        return trashDir.also { it.mkdirs() }
+    }
+
+    /**
+     * Moves [src] to [target], copying only when a rename cannot work.
+     *
+     * A copy that runs out of space leaves a partial behind. Left alone it is
+     * invisible to the index, so it can never be restored or emptied, and it
+     * holds the very space that just ran out.
+     */
+    private fun relocate(src: File, target: File): Boolean {
+        if (src.renameTo(target)) return true
+        val copied = runCatching {
+            src.copyRecursively(target, overwrite = false) && src.deleteRecursively()
+        }.getOrDefault(false)
+        if (!copied) runCatching { target.deleteRecursively() }
+        return copied
+    }
 
     var items by mutableStateOf<List<TrashItem>>(emptyList())
         private set
@@ -78,7 +133,6 @@ object TrashManager {
     }
 
     suspend fun moveToTrash(entries: List<FsEntry>): Int = withContext(Dispatchers.IO) {
-        trashDir.mkdirs()
         val index = readIndex().toMutableList()
         var failed = 0
         begin("Moving to Trash", entries.size, entries.sumOf { it.size })
@@ -89,10 +143,8 @@ object TrashManager {
                 continue
             }
             val trashName = "${System.currentTimeMillis()}_${entry.name}"
-            val target = File(trashDir, trashName)
-            val ok = src.renameTo(target) || runCatching {
-                src.copyRecursively(target, overwrite = false) && src.deleteRecursively()
-            }.getOrDefault(false)
+            val target = File(trashDirFor(src), trashName)
+            val ok = relocate(src, target)
             if (ok) {
                 index.add(
                     TrashItem(
@@ -102,6 +154,7 @@ object TrashManager {
                         deletedAt = System.currentTimeMillis(),
                         size = entry.size,
                         isDirectory = entry.isDirectory,
+                        trashPath = target.absolutePath,
                     )
                 )
             } else failed++
@@ -136,9 +189,7 @@ object TrashManager {
                     n++
                 }
             }
-            val ok = src.renameTo(target) || runCatching {
-                src.copyRecursively(target, overwrite = false) && src.deleteRecursively()
-            }.getOrDefault(false)
+            val ok = relocate(src, target)
             if (ok) index.removeAll { it.trashName == item.trashName } else failed++
             step(item.name, item.size, ok)
         }
@@ -172,8 +223,11 @@ object TrashManager {
             val ok = runCatching { item.trashFile().deleteRecursively() }.getOrDefault(false)
             step(item.name, item.size, ok)
         }
-        // Anything the index did not know about goes too.
-        runCatching { trashDir.deleteRecursively() }
+        // Anything the index did not know about goes too — including partials
+        // from older versions, which had no cleanup and could leave them.
+        val dirs = (index.mapNotNull { it.trashFile().parentFile } + trashDir)
+            .distinctBy { it.absolutePath }
+        dirs.forEach { runCatching { it.deleteRecursively() } }
         writeIndex(emptyList())
         items = emptyList()
         finish()
@@ -193,6 +247,7 @@ object TrashManager {
                         deletedAt = o.getLong("deletedAt"),
                         size = o.optLong("size", 0L),
                         isDirectory = o.optBoolean("isDirectory", false),
+                        trashPath = o.optString("trashPath", ""),
                     )
                 )
             }
@@ -212,6 +267,7 @@ object TrashManager {
                         .put("deletedAt", item.deletedAt)
                         .put("size", item.size)
                         .put("isDirectory", item.isDirectory)
+                        .put("trashPath", item.trashPath)
                 )
             }
             indexFile.writeText(array.toString())
