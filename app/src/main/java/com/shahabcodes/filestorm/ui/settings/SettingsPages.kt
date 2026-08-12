@@ -2,6 +2,12 @@ package com.shahabcodes.filestorm.ui.settings
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import kotlin.math.roundToInt
@@ -275,6 +281,7 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
 @Composable
 fun DashboardSettingsScreen(onBack: () -> Unit) {
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
     var dragCard by remember { mutableStateOf<DashboardCard?>(null) }
     var lift by remember { mutableFloatStateOf(0f) }
     val context = LocalContext.current
@@ -335,6 +342,28 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
                 val on = DashboardPrefs.isEnabled(card)
                 val dragging = dragCard == card
 
+                // When the dragged card takes this row's slot, the row does not
+                // simply appear in its new place: it starts where it used to be
+                // and springs across, overshooting a little, so you can see what
+                // your card just displaced.
+                var lastIndex by remember { mutableIntStateOf(i) }
+                val bump = remember { Animatable(0f) }
+                LaunchedEffect(i) {
+                    val moved = i != lastIndex
+                    val from = (lastIndex - i) * rowPx
+                    lastIndex = i
+                    if (moved && !dragging) {
+                        bump.snapTo(from)
+                        bump.animateTo(
+                            0f,
+                            spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMediumLow,
+                            ),
+                        )
+                    }
+                }
+
                 // Belt and braces: if this row ever does leave composition
                 // mid-drag, the page must not be left unscrollable with a card
                 // floating over it.
@@ -360,6 +389,16 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
                                 shadowElevation = 14f
                                 shape = RoundedCornerShape(16.dp)
                                 clip = false
+                            } else {
+                                translationY = bump.value
+                                // Shrinking by a whisker while it travels is
+                                // what makes it read as knocked aside rather
+                                // than merely relocated.
+                                val travel = (kotlin.math.abs(bump.value) / rowPx)
+                                    .coerceAtMost(1f)
+                                val squash = 1f - 0.04f * travel
+                                scaleX = squash
+                                scaleY = squash
                             }
                         }
                         .background(
@@ -387,7 +426,21 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
                                         dragCard = card
                                         lift = 0f
                                     },
-                                    onDragEnd = { dragCard = null; lift = 0f },
+                                    onDragEnd = {
+                                        // Let go and it drops into the slot
+                                        // rather than teleporting there.
+                                        scope.launch {
+                                            animate(
+                                                initialValue = lift,
+                                                targetValue = 0f,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                                    stiffness = Spring.StiffnessMedium,
+                                                ),
+                                            ) { value, _ -> lift = value }
+                                            dragCard = null
+                                        }
+                                    },
                                     onDragCancel = { dragCard = null; lift = 0f },
                                 ) { change, delta ->
                                     change.consume()
