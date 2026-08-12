@@ -46,14 +46,16 @@ object DashboardPrefs {
     private lateinit var sp: SharedPreferences
 
     private val defaultOrder = listOf(
+        // How full am I, then the two ways of getting somewhere, then what has
+        // been piling up — and only after that the detail and the shortcuts.
         DashboardCard.STORAGE,
+        DashboardCard.CATEGORIES,
+        DashboardCard.BROWSE,
         DashboardCard.GROWTH,
         DashboardCard.RECLAIM,
         DashboardCard.BIGGEST_FILES,
         DashboardCard.LARGEST_FOLDERS,
         DashboardCard.RECENT,
-        DashboardCard.CATEGORIES,
-        DashboardCard.BROWSE,
         DashboardCard.FAVOURITES,
         DashboardCard.JOBS,
         DashboardCard.DUPLICATES,
@@ -114,14 +116,13 @@ object DashboardPrefs {
         sp.edit().putStringSet("enabled", enabled.map { it.key }.toSet()).apply()
     }
 
-    /** Moves a card one place up or down the dashboard. */
-    fun move(card: DashboardCard, up: Boolean) {
+    /** Drops [card] at [index], shuffling everything else along. */
+    fun moveTo(card: DashboardCard, index: Int) {
         val current = order.indexOf(card)
-        val target = if (up) current - 1 else current + 1
-        if (current < 0 || target !in order.indices) return
+        if (current < 0 || index !in order.indices || index == current) return
         order = order.toMutableList().apply {
             removeAt(current)
-            add(target, card)
+            add(index, card)
         }
         persistOrder()
     }

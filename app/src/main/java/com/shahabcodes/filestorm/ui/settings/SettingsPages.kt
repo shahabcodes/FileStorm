@@ -23,9 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.Fingerprint
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircleOutline
 import androidx.compose.material.icons.rounded.Repeat
@@ -263,32 +262,113 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
         // Anything switched off here is never composed and never scanned for,
         // so turning a card off actually removes its cost.
         SectionHeader("Dashboard")
+
+        // Pick a card up, then tap where it goes.
+        //
+        // Nudging one step at a time meant up to eleven taps to move something
+        // across twelve cards, and the row slid out from under your finger on
+        // every one. Dragging is the usual answer but not here: the list is
+        // taller than the screen, so a drag would have to fight the page's own
+        // scroll and auto-scroll at the edges to reach the far end. Two taps
+        // with a scroll in between is both simpler and shorter.
+        var moving by remember { mutableStateOf<DashboardCard?>(null) }
+
+        moving?.let { card ->
+            GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                    Text(
+                        "Moving “${card.label}”",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = fsColors.accent,
+                    )
+                    Text(
+                        "Tap a row below to drop it there. Scroll first if you need to.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fsColors.secondaryLabel,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MovePill("To top") {
+                            DashboardPrefs.moveTo(card, 0)
+                            moving = null
+                        }
+                        MovePill("To bottom") {
+                            DashboardPrefs.moveTo(card, DashboardPrefs.order.lastIndex)
+                            moving = null
+                        }
+                        MovePill("Cancel") { moving = null }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+
         GroupedCard(Modifier.padding(horizontal = 16.dp)) {
             DashboardPrefs.order.forEachIndexed { i, card ->
                 val on = DashboardPrefs.isEnabled(card)
+                val lifted = moving == card
+                val placing = moving != null && !lifted
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                        .background(
+                            when {
+                                lifted -> fsColors.accent.copy(alpha = 0.12f)
+                                else -> Color.Transparent
+                            }
+                        )
+                        // While something is in hand the whole row is the drop
+                        // target, so placing never needs a precise tap.
+                        .then(
+                            if (placing) {
+                                Modifier.pressScale {
+                                    DashboardPrefs.moveTo(moving!!, i)
+                                    moving = null
+                                }
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .padding(start = 10.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Arrows rather than drag: this list lives inside a
-                    // scrolling page, where a drag gesture would fight the
-                    // scroll and end up moving neither reliably.
-                    Column {
-                        MoveButton(Icons.Rounded.KeyboardArrowUp, i > 0) {
-                            DashboardPrefs.move(card, up = true)
-                        }
-                        MoveButton(Icons.Rounded.KeyboardArrowDown, i < DashboardPrefs.order.lastIndex) {
-                            DashboardPrefs.move(card, up = false)
+                    Box(
+                        Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (lifted) fsColors.accent else fsColors.fill.copy(alpha = 0.6f)
+                            )
+                            .then(
+                                if (moving == null) {
+                                    Modifier.pressScale { moving = card }
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (placing) {
+                            Text(
+                                "${i + 1}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = fsColors.secondaryLabel,
+                            )
+                        } else {
+                            Icon(
+                                Icons.Rounded.DragIndicator,
+                                if (lifted) "In hand" else "Move ${card.label}",
+                                tint = if (lifted) Color.White else fsColors.secondaryLabel,
+                                modifier = Modifier.size(19.dp),
+                            )
                         }
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(10.dp))
                     Text(
                         "${i + 1}",
                         style = MaterialTheme.typography.labelMedium,
                         color = if (on) fsColors.accent else fsColors.secondaryLabel,
-                        modifier = Modifier.width(18.dp),
+                        modifier = Modifier.width(20.dp),
                     )
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -297,22 +377,26 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
                             color = if (on) fsColors.label else fsColors.secondaryLabel,
                         )
                         Text(
-                            card.blurb,
+                            if (placing) "Drop here" else card.blurb,
                             style = MaterialTheme.typography.bodySmall,
-                            color = fsColors.secondaryLabel,
+                            color = if (placing) fsColors.accent else fsColors.secondaryLabel,
                         )
                     }
-                    Switch(
-                        checked = on,
-                        onCheckedChange = { DashboardPrefs.setEnabled(card, it) },
-                        colors = SwitchDefaults.colors(
-                            checkedTrackColor = fsColors.accent,
-                            checkedThumbColor = Color.White,
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = fsColors.fill,
-                            uncheckedBorderColor = Color.Transparent,
-                        ),
-                    )
+                    // Hidden mid-move: the row means "drop here" then, and a
+                    // switch sitting in it would be the one thing that did not.
+                    if (moving == null) {
+                        Switch(
+                            checked = on,
+                            onCheckedChange = { DashboardPrefs.setEnabled(card, it) },
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = fsColors.accent,
+                                checkedThumbColor = Color.White,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = fsColors.fill,
+                                uncheckedBorderColor = Color.Transparent,
+                            ),
+                        )
+                    }
                 }
                 if (i != DashboardPrefs.order.lastIndex) RowSeparator(startIndent = 16.dp)
             }
@@ -320,7 +404,11 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Cards appear on the dashboard in this order.",
+                if (moving == null) {
+                    "Cards appear on the dashboard in this order. Tap the handle to move one."
+                } else {
+                    "Tap any row to drop it there."
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = fsColors.secondaryLabel,
                 modifier = Modifier.weight(1f),
@@ -329,7 +417,12 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
                 "Reset",
                 style = MaterialTheme.typography.labelMedium,
                 color = fsColors.accent,
-                modifier = Modifier.pressScale { DashboardPrefs.resetOrder() }.padding(4.dp),
+                modifier = Modifier
+                    .pressScale {
+                        moving = null
+                        DashboardPrefs.resetOrder()
+                    }
+                    .padding(4.dp),
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -1025,20 +1118,20 @@ private fun ChoiceRow(
 
 /** A compact chevron for nudging a dashboard card up or down the list. */
 @Composable
-private fun MoveButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    Icon(
-        icon,
-        null,
-        tint = if (enabled) fsColors.accent else fsColors.secondaryLabel.copy(alpha = 0.3f),
-        modifier = Modifier
-            .then(if (enabled) Modifier.pressScale(onClick) else Modifier)
-            .padding(2.dp)
-            .size(20.dp),
-    )
+private fun MovePill(label: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(CircleShape)
+            .background(fsColors.fill)
+            .pressScale(onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = fsColors.accent,
+        )
+    }
 }
 
 /** A vault switch with room for the explanation each one needs. */
