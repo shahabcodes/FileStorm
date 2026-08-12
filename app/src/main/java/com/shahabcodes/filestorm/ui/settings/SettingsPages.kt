@@ -2,6 +2,21 @@ package com.shahabcodes.filestorm.ui.settings
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
+import kotlin.math.roundToInt
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -87,6 +102,9 @@ import com.shahabcodes.filestorm.util.Formatters
 private fun SettingsPage(
     title: String,
     onBack: () -> Unit,
+    scrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
+    /** Held off while a card is being dragged, so the page cannot slide too. */
+    scrollEnabled: Boolean = true,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     Column(
@@ -94,7 +112,7 @@ private fun SettingsPage(
             .fillMaxSize()
             .background(fsColors.groupedBackground)
             .statusBarsPadding()
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(scrollState, enabled = scrollEnabled),
     ) {
         Row(
             Modifier
@@ -256,159 +274,185 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
 
 @Composable
 fun DashboardSettingsScreen(onBack: () -> Unit) {
+    val scrollState = rememberScrollState()
+    var dragCard by remember { mutableStateOf<DashboardCard?>(null) }
+    var lift by remember { mutableFloatStateOf(0f) }
     val context = LocalContext.current
     val activity = context as? FragmentActivity
-    SettingsPage("Dashboard", onBack) {
+    SettingsPage(
+        "Dashboard",
+        onBack,
+        scrollState = scrollState,
+        scrollEnabled = dragCard == null,
+    ) {
         // Anything switched off here is never composed and never scanned for,
         // so turning a card off actually removes its cost.
         SectionHeader("Dashboard")
 
-        // Pick a card up, then tap where it goes.
-        //
-        // Nudging one step at a time meant up to eleven taps to move something
-        // across twelve cards, and the row slid out from under your finger on
-        // every one. Dragging is the usual answer but not here: the list is
-        // taller than the screen, so a drag would have to fight the page's own
-        // scroll and auto-scroll at the edges to reach the far end. Two taps
-        // with a scroll in between is both simpler and shorter.
-        var moving by remember { mutableStateOf<DashboardCard?>(null) }
+        // Grab the handle and drag. The row lifts, everything else slides
+        // around it live, and holding near an edge scrolls the page so cards
+        // can be taken further than one screenful.
+        val rowHeight = 76.dp
+        val rowPx = with(LocalDensity.current) { rowHeight.toPx() }
+        val edgePx = with(LocalDensity.current) { 110.dp.toPx() }
 
-        moving?.let { card ->
-            GroupedCard(Modifier.padding(horizontal = 16.dp)) {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                    Text(
-                        "Moving “${card.label}”",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = fsColors.accent,
-                    )
-                    Text(
-                        "Tap a row below to drop it there. Scroll first if you need to.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = fsColors.secondaryLabel,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MovePill("To top") {
-                            DashboardPrefs.moveTo(card, 0)
-                            moving = null
-                        }
-                        MovePill("To bottom") {
-                            DashboardPrefs.moveTo(card, DashboardPrefs.order.lastIndex)
-                            moving = null
-                        }
-                        MovePill("Cancel") { moving = null }
-                    }
+        // Where the dragged row would sit if it were not lifted, in window
+        // space, so the finger's position can be worked out while the page
+        // scrolls underneath it.
+        var slotTop by remember { mutableFloatStateOf(0f) }
+        var viewportBottom by remember { mutableFloatStateOf(0f) }
+
+        // Dragging is committed to the real order as it happens, which is what
+        // makes the other rows part around the card instead of jumping at the
+        // end. `lift` is only how far the floating card sits from its slot.
+        LaunchedEffect(dragCard) {
+            if (dragCard == null) return@LaunchedEffect
+            while (true) {
+                withFrameNanos { }
+                val pointer = slotTop + lift + rowPx / 2f
+                val speed = when {
+                    pointer < edgePx -> -(1f - pointer / edgePx) * 22f
+                    pointer > viewportBottom - edgePx ->
+                        (1f - (viewportBottom - pointer) / edgePx) * 22f
+                    else -> 0f
+                }
+                if (speed != 0f) {
+                    // Scrolling slides the slot out from under the finger, so
+                    // the lift grows by exactly what the page consumed and the
+                    // card stays put on screen.
+                    lift += scrollState.scrollBy(speed)
                 }
             }
-            Spacer(Modifier.height(10.dp))
         }
 
-        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
+        GroupedCard(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .onGloballyPositioned { viewportBottom = it.positionInWindow().y + it.size.height },
+        ) {
             DashboardPrefs.order.forEachIndexed { i, card ->
+                key(card) {
                 val on = DashboardPrefs.isEnabled(card)
-                val lifted = moving == card
-                val placing = moving != null && !lifted
+                val dragging = dragCard == card
+
+                // Belt and braces: if this row ever does leave composition
+                // mid-drag, the page must not be left unscrollable with a card
+                // floating over it.
+                DisposableEffect(Unit) {
+                    onDispose {
+                        if (dragCard == card) {
+                            dragCard = null
+                            lift = 0f
+                        }
+                    }
+                }
+
                 Row(
                     Modifier
                         .fillMaxWidth()
+                        .height(rowHeight)
+                        .zIndex(if (dragging) 1f else 0f)
+                        .graphicsLayer {
+                            if (dragging) {
+                                translationY = lift
+                                scaleX = 1.03f
+                                scaleY = 1.03f
+                                shadowElevation = 14f
+                                shape = RoundedCornerShape(16.dp)
+                                clip = false
+                            }
+                        }
                         .background(
-                            when {
-                                lifted -> fsColors.accent.copy(alpha = 0.12f)
-                                else -> Color.Transparent
-                            }
+                            if (dragging) fsColors.cardSecondary else Color.Transparent,
+                            RoundedCornerShape(if (dragging) 16.dp else 0.dp),
                         )
-                        // While something is in hand the whole row is the drop
-                        // target, so placing never needs a precise tap.
-                        .then(
-                            if (placing) {
-                                Modifier.pressScale {
-                                    DashboardPrefs.moveTo(moving!!, i)
-                                    moving = null
-                                }
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .padding(start = 10.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                        .onGloballyPositioned {
+                            // Read while dragging only: every other row reports
+                            // constantly and none of it is needed.
+                            if (dragging) slotTop = it.positionInWindow().y - lift
+                        }
+                        .padding(start = 6.dp, end = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(
-                        Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (lifted) fsColors.accent else fsColors.fill.copy(alpha = 0.6f)
-                            )
-                            .then(
-                                if (moving == null) {
-                                    Modifier.pressScale { moving = card }
-                                } else {
-                                    Modifier
+                    Icon(
+                        Icons.Rounded.DragIndicator,
+                        "Drag ${card.label}",
+                        tint = if (dragging) fsColors.accent else fsColors.secondaryLabel,
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .size(22.dp)
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        dragCard = card
+                                        lift = 0f
+                                    },
+                                    onDragEnd = { dragCard = null; lift = 0f },
+                                    onDragCancel = { dragCard = null; lift = 0f },
+                                ) { change, delta ->
+                                    change.consume()
+                                    lift += delta.y
+                                    // Hand the card to the next slot as soon as
+                                    // it has travelled far enough to be over it.
+                                    val from = DashboardPrefs.order.indexOf(card)
+                                    val steps = (lift / rowPx).roundToInt()
+                                    if (steps != 0) {
+                                        val to = (from + steps)
+                                            .coerceIn(0, DashboardPrefs.order.lastIndex)
+                                        if (to != from) {
+                                            DashboardPrefs.moveTo(card, to)
+                                            lift -= (to - from) * rowPx
+                                        }
+                                    }
                                 }
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (placing) {
-                            Text(
-                                "${i + 1}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = fsColors.secondaryLabel,
-                            )
-                        } else {
-                            Icon(
-                                Icons.Rounded.DragIndicator,
-                                if (lifted) "In hand" else "Move ${card.label}",
-                                tint = if (lifted) Color.White else fsColors.secondaryLabel,
-                                modifier = Modifier.size(19.dp),
-                            )
-                        }
-                    }
-                    Spacer(Modifier.width(10.dp))
+                            },
+                    )
                     Text(
                         "${i + 1}",
                         style = MaterialTheme.typography.labelMedium,
                         color = if (on) fsColors.accent else fsColors.secondaryLabel,
                         modifier = Modifier.width(20.dp),
                     )
+                    Spacer(Modifier.width(6.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
                             card.label,
                             style = MaterialTheme.typography.bodyLarge,
                             color = if (on) fsColors.label else fsColors.secondaryLabel,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
                         Text(
-                            if (placing) "Drop here" else card.blurb,
+                            card.blurb,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (placing) fsColors.accent else fsColors.secondaryLabel,
+                            color = fsColors.secondaryLabel,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
                     }
-                    // Hidden mid-move: the row means "drop here" then, and a
-                    // switch sitting in it would be the one thing that did not.
-                    if (moving == null) {
-                        Switch(
-                            checked = on,
-                            onCheckedChange = { DashboardPrefs.setEnabled(card, it) },
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = fsColors.accent,
-                                checkedThumbColor = Color.White,
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = fsColors.fill,
-                                uncheckedBorderColor = Color.Transparent,
-                            ),
-                        )
-                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = on,
+                        onCheckedChange = { DashboardPrefs.setEnabled(card, it) },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = fsColors.accent,
+                            checkedThumbColor = Color.White,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = fsColors.fill,
+                            uncheckedBorderColor = Color.Transparent,
+                        ),
+                    )
                 }
-                if (i != DashboardPrefs.order.lastIndex) RowSeparator(startIndent = 16.dp)
+                if (i != DashboardPrefs.order.lastIndex && dragCard == null) {
+                    RowSeparator(startIndent = 16.dp)
+                }
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
         Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (moving == null) {
-                    "Cards appear on the dashboard in this order. Tap the handle to move one."
-                } else {
-                    "Tap any row to drop it there."
-                },
+                "Drag a card by its handle to reorder. Hold near the top or bottom to scroll.",
                 style = MaterialTheme.typography.labelSmall,
                 color = fsColors.secondaryLabel,
                 modifier = Modifier.weight(1f),
@@ -417,12 +461,7 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
                 "Reset",
                 style = MaterialTheme.typography.labelMedium,
                 color = fsColors.accent,
-                modifier = Modifier
-                    .pressScale {
-                        moving = null
-                        DashboardPrefs.resetOrder()
-                    }
-                    .padding(4.dp),
+                modifier = Modifier.pressScale { DashboardPrefs.resetOrder() }.padding(4.dp),
             )
         }
         Spacer(Modifier.height(24.dp))
