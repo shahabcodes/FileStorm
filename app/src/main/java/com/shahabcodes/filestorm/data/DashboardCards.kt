@@ -27,6 +27,8 @@ enum class DashboardCard(
     LARGEST_FOLDERS("folders", "Largest Folders", "Which folders are holding the most", true),
     GROWTH("growth", "Monthly Footprint", "How much of what you still have is dated to each month", true),
     RECENT("recent", "Recent Files", "Everything added or changed in the last week", true),
+    CATEGORIES("categories", "Categories", "Jump straight to photos, video, audio, documents, archives or apps", false),
+    BROWSE("browse", "Browse", "Shortcuts to Downloads, DCIM, Documents and internal storage", false),
 }
 
 /**
@@ -46,6 +48,8 @@ object DashboardPrefs {
         DashboardCard.BIGGEST_FILES,
         DashboardCard.LARGEST_FOLDERS,
         DashboardCard.RECENT,
+        DashboardCard.CATEGORIES,
+        DashboardCard.BROWSE,
     )
 
     private val defaultEnabled = setOf(
@@ -54,6 +58,8 @@ object DashboardPrefs {
         DashboardCard.RECLAIM,
         DashboardCard.BIGGEST_FILES,
         DashboardCard.LARGEST_FOLDERS,
+        DashboardCard.CATEGORIES,
+        DashboardCard.BROWSE,
     )
 
     var enabled by mutableStateOf(defaultEnabled)
@@ -64,9 +70,21 @@ object DashboardPrefs {
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm_dashboard_cards", Context.MODE_PRIVATE)
 
+        // A card added in a later version is missing from a stored enabled set,
+        // which would read as "switched off" and quietly remove a section that
+        // had always been there. Cards are remembered as they are first seen, so
+        // an unseen one starts at its own default instead.
+        val seen = sp.getStringSet("seen", null)
+        val unseen = DashboardCard.entries.filter { seen == null || it.key !in seen }
+
         val storedEnabled = sp.getStringSet("enabled", null)
-        enabled = if (storedEnabled == null) defaultEnabled
-        else DashboardCard.entries.filter { it.key in storedEnabled }.toSet()
+        enabled = if (storedEnabled == null) {
+            defaultEnabled
+        } else {
+            DashboardCard.entries.filter { it.key in storedEnabled }.toSet() +
+                unseen.filter { it in defaultEnabled }
+        }
+        sp.edit().putStringSet("seen", DashboardCard.entries.map { it.key }.toSet()).apply()
 
         val storedOrder = sp.getString("order", null)
             ?.split(",")

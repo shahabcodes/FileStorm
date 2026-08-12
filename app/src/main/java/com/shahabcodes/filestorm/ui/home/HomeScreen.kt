@@ -105,26 +105,7 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val stats = remember { FileRepository.storageStats() }
     val transfer by TransferManager.state.collectAsState()
-
-    // Tile colours follow the active theme's file-type palette, so the
-    // dashboard restyles with everything else rather than staying a fixed blue.
-    val kinds = fsColors.kinds
-    val categories = listOf(
-        Category(FileKind.IMAGE, "Images", Icons.Rounded.Image, kinds.image),
-        Category(FileKind.VIDEO, "Videos", Icons.Rounded.PlayCircleFilled, kinds.video),
-        Category(FileKind.AUDIO, "Audio", Icons.Rounded.AudioFile, kinds.audio),
-        Category(FileKind.DOCUMENT, "Docs", Icons.Rounded.Description, kinds.document),
-        Category(FileKind.ARCHIVE, "Archives", Icons.Rounded.Archive, kinds.archive),
-        Category(FileKind.APK, "APKs", Icons.Rounded.Android, kinds.apk),
-    )
-
     val root = FileRepository.rootPath
-    val shortcuts = listOf(
-        Shortcut("Downloads", "$root/${Environment.DIRECTORY_DOWNLOADS}", Icons.Rounded.Download),
-        Shortcut("DCIM", "$root/${Environment.DIRECTORY_DCIM}", Icons.Rounded.Image),
-        Shortcut("Documents", "$root/${Environment.DIRECTORY_DOCUMENTS}", Icons.Rounded.Description),
-        Shortcut("Internal storage", root, Icons.Rounded.PhoneAndroid),
-    )
 
     LazyColumn(
         modifier = Modifier
@@ -214,6 +195,8 @@ fun HomeScreen(
                         onOpenViewer = onOpenViewer,
                         onViewMore = { onOpenInsight(DashboardCard.RECENT) },
                     )
+                    DashboardCard.CATEGORIES -> CategoriesSection(onOpenCategory)
+                    DashboardCard.BROWSE -> BrowseSection(onOpenFolder)
                 }
             }
         }
@@ -286,101 +269,6 @@ fun HomeScreen(
                             }
                             if (i != favs.lastIndex) RowSeparator(startIndent = 62.dp)
                         }
-                    }
-                }
-            }
-        }
-
-        // Categories grid
-        item {
-            Column {
-                Text(
-                    "Categories",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = fsColors.label,
-                    modifier = Modifier.padding(bottom = 12.dp, start = 4.dp),
-                )
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    modifier = Modifier.height(190.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    userScrollEnabled = false,
-                ) {
-                    items(categories) { cat ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(fsColors.card)
-                                .pressScale { onOpenCategory(cat.kind) }
-                                .padding(vertical = 14.dp),
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(cat.color, cat.color.copy(alpha = 0.72f))
-                                        )
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(cat.icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                            }
-                            Text(
-                                cat.label,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = fsColors.label,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Shortcuts
-        item {
-            Column {
-                Text(
-                    "Browse",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = fsColors.label,
-                    modifier = Modifier.padding(bottom = 12.dp, start = 4.dp),
-                )
-                GroupedCard {
-                    shortcuts.forEachIndexed { i, s ->
-                        Row(
-                            Modifier
-                                .pressScale { onOpenFolder(s.path) }
-                                .padding(horizontal = 16.dp, vertical = 13.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(fsColors.accent.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(s.icon, null, tint = fsColors.accent, modifier = Modifier.size(18.dp))
-                            }
-                            Spacer(Modifier.width(14.dp))
-                            Text(
-                                s.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = fsColors.label,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Icon(
-                                Icons.Rounded.ChevronRight, null,
-                                tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                        if (i != shortcuts.lastIndex) RowSeparator(startIndent = 62.dp)
                     }
                 }
             }
@@ -601,5 +489,125 @@ private fun StorageRing(fraction: Float, size: androidx.compose.ui.unit.Dp) {
             style = MaterialTheme.typography.titleMedium,
             color = fsColors.label,
         )
+    }
+}
+
+/**
+ * The category grid and the folder shortcuts, as dashboard sections.
+ *
+ * These used to be drawn in a fixed position after the cards, so they could not
+ * be reordered or switched off like everything else on the dashboard. Nothing
+ * about how they look changed — they simply became cards.
+ */
+@Composable
+private fun CategoriesSection(onOpenCategory: (FileKind) -> Unit) {
+    // Tile colours follow the active theme's file-type palette, so the
+    // dashboard restyles with everything else rather than staying a fixed blue.
+    val kinds = fsColors.kinds
+    val categories = listOf(
+        Category(FileKind.IMAGE, "Images", Icons.Rounded.Image, kinds.image),
+        Category(FileKind.VIDEO, "Videos", Icons.Rounded.PlayCircleFilled, kinds.video),
+        Category(FileKind.AUDIO, "Audio", Icons.Rounded.AudioFile, kinds.audio),
+        Category(FileKind.DOCUMENT, "Docs", Icons.Rounded.Description, kinds.document),
+        Category(FileKind.ARCHIVE, "Archives", Icons.Rounded.Archive, kinds.archive),
+        Category(FileKind.APK, "APKs", Icons.Rounded.Android, kinds.apk),
+    )
+    Column {
+        Text(
+            "Categories",
+            style = MaterialTheme.typography.titleLarge,
+            color = fsColors.label,
+            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp),
+        )
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = Modifier.height(190.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            userScrollEnabled = false,
+        ) {
+            items(categories) { cat ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(fsColors.card)
+                        .pressScale { onOpenCategory(cat.kind) }
+                        .padding(vertical = 14.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(cat.color, cat.color.copy(alpha = 0.72f))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(cat.icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    }
+                    Text(
+                        cat.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = fsColors.label,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseSection(onOpenFolder: (String) -> Unit) {
+    val root = FileRepository.rootPath
+    val shortcuts = listOf(
+        Shortcut("Downloads", "$root/${Environment.DIRECTORY_DOWNLOADS}", Icons.Rounded.Download),
+        Shortcut("DCIM", "$root/${Environment.DIRECTORY_DCIM}", Icons.Rounded.Image),
+        Shortcut("Documents", "$root/${Environment.DIRECTORY_DOCUMENTS}", Icons.Rounded.Description),
+        Shortcut("Internal storage", root, Icons.Rounded.PhoneAndroid),
+    )
+    Column {
+        Text(
+            "Browse",
+            style = MaterialTheme.typography.titleLarge,
+            color = fsColors.label,
+            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp),
+        )
+        GroupedCard {
+            shortcuts.forEachIndexed { i, s ->
+                Row(
+                    Modifier
+                        .pressScale { onOpenFolder(s.path) }
+                        .padding(horizontal = 16.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(fsColors.accent.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(s.icon, null, tint = fsColors.accent, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Text(
+                        s.label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = fsColors.label,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        Icons.Rounded.ChevronRight, null,
+                        tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                if (i != shortcuts.lastIndex) RowSeparator(startIndent = 62.dp)
+            }
+        }
     }
 }
