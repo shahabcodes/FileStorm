@@ -85,12 +85,20 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            // FLAG_SECURE blanks the recent-apps preview (and blocks screenshots).
             // Locking the app but leaving its contents legible in the recents
-            // switcher would defeat the point, so the lock implies it.
-            val hideContents = Prefs.secureScreen || Prefs.biometricLock
-            androidx.compose.runtime.LaunchedEffect(hideContents) {
-                if (hideContents) {
+            // switcher would defeat the point, so the lock still blanks that
+            // preview. It must not cost you screenshots and screen recording
+            // as well, though — nothing about a fingerprint prompt implies it,
+            // and FLAG_SECURE blocks both outright.
+            //
+            // Android 13 can blank the preview on its own. Below that the only
+            // tool is FLAG_SECURE, so there the lock does still cost captures
+            // and the setting says as much.
+            val hideRecents = Prefs.secureScreen || Prefs.biometricLock
+            val modern = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+            val blockCapture = Prefs.secureScreen || (hideRecents && !modern)
+            androidx.compose.runtime.LaunchedEffect(hideRecents, blockCapture) {
+                if (blockCapture) {
                     window.setFlags(
                         android.view.WindowManager.LayoutParams.FLAG_SECURE,
                         android.view.WindowManager.LayoutParams.FLAG_SECURE,
@@ -98,6 +106,7 @@ class MainActivity : FragmentActivity() {
                 } else {
                     window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
                 }
+                if (modern) setRecentsScreenshotEnabled(!hideRecents)
             }
             FileStormTheme {
                 Surface(

@@ -2,6 +2,8 @@ package com.shahabcodes.filestorm.ui.settings
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.core.spring
@@ -22,7 +24,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -282,6 +284,7 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
 fun DashboardSettingsScreen(onBack: () -> Unit) {
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
     var dragCard by remember { mutableStateOf<DashboardCard?>(null) }
     var lift by remember { mutableFloatStateOf(0f) }
     val context = LocalContext.current
@@ -410,55 +413,59 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
                             // constantly and none of it is needed.
                             if (dragging) slotTop = it.positionInWindow().y - lift
                         }
+                        // Starting the drag the moment a finger touched the
+                        // handle meant a scroll that happened to begin there
+                        // dragged the card instead. Waiting for a hold makes
+                        // the two gestures unmistakable, and lets the whole row
+                        // be the target rather than a 22dp icon.
+                        .pointerInput(Unit) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    dragCard = card
+                                    lift = 0f
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDragEnd = {
+                                    // Let go and it drops into the slot rather
+                                    // than teleporting there.
+                                    scope.launch {
+                                        animate(
+                                            initialValue = lift,
+                                            targetValue = 0f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = Spring.StiffnessMedium,
+                                            ),
+                                        ) { value, _ -> lift = value }
+                                        dragCard = null
+                                    }
+                                },
+                                onDragCancel = { dragCard = null; lift = 0f },
+                            ) { change, delta ->
+                                change.consume()
+                                lift += delta.y
+                                // Hand the card to the next slot as soon as it
+                                // has travelled far enough to be over it.
+                                val from = DashboardPrefs.order.indexOf(card)
+                                val steps = (lift / rowPx).roundToInt()
+                                if (steps != 0) {
+                                    val to = (from + steps)
+                                        .coerceIn(0, DashboardPrefs.order.lastIndex)
+                                    if (to != from) {
+                                        DashboardPrefs.moveTo(card, to)
+                                        lift -= (to - from) * rowPx
+                                    }
+                                }
+                            }
+                        }
                         .padding(start = 6.dp, end = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         Icons.Rounded.DragIndicator,
-                        "Drag ${card.label}",
+                        null,
                         tint = if (dragging) fsColors.accent else fsColors.secondaryLabel,
-                        modifier = Modifier
-                            .padding(10.dp)
-                            .size(22.dp)
-                            .pointerInput(Unit) {
-                                detectDragGestures(
-                                    onDragStart = {
-                                        dragCard = card
-                                        lift = 0f
-                                    },
-                                    onDragEnd = {
-                                        // Let go and it drops into the slot
-                                        // rather than teleporting there.
-                                        scope.launch {
-                                            animate(
-                                                initialValue = lift,
-                                                targetValue = 0f,
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                                    stiffness = Spring.StiffnessMedium,
-                                                ),
-                                            ) { value, _ -> lift = value }
-                                            dragCard = null
-                                        }
-                                    },
-                                    onDragCancel = { dragCard = null; lift = 0f },
-                                ) { change, delta ->
-                                    change.consume()
-                                    lift += delta.y
-                                    // Hand the card to the next slot as soon as
-                                    // it has travelled far enough to be over it.
-                                    val from = DashboardPrefs.order.indexOf(card)
-                                    val steps = (lift / rowPx).roundToInt()
-                                    if (steps != 0) {
-                                        val to = (from + steps)
-                                            .coerceIn(0, DashboardPrefs.order.lastIndex)
-                                        if (to != from) {
-                                            DashboardPrefs.moveTo(card, to)
-                                            lift -= (to - from) * rowPx
-                                        }
-                                    }
-                                }
-                            },
+                        modifier = Modifier.padding(10.dp).size(22.dp),
                     )
                     Text(
                         "${i + 1}",
@@ -505,7 +512,8 @@ fun DashboardSettingsScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Drag a card by its handle to reorder. Hold near the top or bottom to scroll.",
+                "Hold a card, then drag it to reorder. Keep hold near the top or " +
+                    "bottom edge to scroll.",
                 style = MaterialTheme.typography.labelSmall,
                 color = fsColors.secondaryLabel,
                 modifier = Modifier.weight(1f),
@@ -754,8 +762,16 @@ fun PrivacySettingsScreen(onBack: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Biometric lock", style = MaterialTheme.typography.bodyLarge, color = fsColors.label)
                     Text(
-                        if (biometricsAvailable) "Require fingerprint, face or PIN to open File Storm"
-                        else "Set up a screen lock on this device first",
+                        when {
+                            !biometricsAvailable -> "Set up a screen lock on this device first"
+                            // Only worth saying where it is actually true.
+                            android.os.Build.VERSION.SDK_INT <
+                                android.os.Build.VERSION_CODES.TIRAMISU ->
+                                "Require fingerprint, face or PIN to open File Storm. On this " +
+                                    "version of Android, hiding the app from recents also " +
+                                    "blocks screenshots"
+                            else -> "Require fingerprint, face or PIN to open File Storm"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = fsColors.secondaryLabel,
                     )

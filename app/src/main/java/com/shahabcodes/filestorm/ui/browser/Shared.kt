@@ -694,6 +694,24 @@ var onOpenArchive: ((String) -> Unit)? = null
 var onOpenVault: ((String) -> Unit)? = null
 
 fun openFile(context: android.content.Context, entry: FsEntry) {
+    // An apk is a zip, and the archive reader will happily list it — but
+    // tapping one means "install this", not "show me its manifest". Reading it
+    // as an archive is still on the long-press menu, under Extract.
+    if (entry.kind == com.shahabcodes.filestorm.data.FileKind.APK) {
+        runCatching {
+            val uri = FileProvider.getUriForFile(
+                context, context.packageName + ".provider", entry.toFile(),
+            )
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW)
+                    // Named outright: MimeTypeMap does not know this one on
+                    // every device, and a wrong type sends it to a text viewer.
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            )
+        }
+        return
+    }
     val opener = onOpenArchive
     if (opener != null && com.shahabcodes.filestorm.data.archive.ArchiveReader
             .isSupported(entry.toFile())
