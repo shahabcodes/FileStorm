@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircleOutline
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Slideshow
+import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.VolumeOff
@@ -451,10 +452,54 @@ fun FilesSettingsScreen(onBack: () -> Unit) {
                 SettingSwitch(
                     icon = Icons.Rounded.Repeat,
                     title = "Repeat videos",
-                    subtitle = "Loop the clip instead of stopping at the end",
+                    subtitle = if (Prefs.reelAutoAdvance) {
+                        "Ignored while playing through — a looping clip never ends"
+                    } else {
+                        "Loop the clip instead of stopping at the end"
+                    },
                     checked = Prefs.reelLoop,
                     onChange = { Prefs.updateReelLoop(it) },
                 )
+                RowSeparator(startIndent = 56.dp)
+                SettingSwitch(
+                    icon = Icons.Rounded.SmartDisplay,
+                    title = "Play through automatically",
+                    subtitle = "Move on by itself: a video when it finishes, " +
+                        "a photo after a moment",
+                    checked = Prefs.reelAutoAdvance,
+                    onChange = { Prefs.updateReelAutoAdvance(it) },
+                )
+                if (Prefs.reelAutoAdvance) {
+                    RowSeparator(startIndent = 56.dp)
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            "Hold each photo for",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(3, 5, 8, 12).forEach { seconds ->
+                                val active = Prefs.reelPhotoSeconds == seconds
+                                Box(
+                                    Modifier
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (active) fsColors.accent else fsColors.fill
+                                        )
+                                        .pressScale { Prefs.updateReelPhotoSeconds(seconds) }
+                                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                                ) {
+                                    Text(
+                                        "${seconds}s",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = if (active) Color.White else fsColors.label,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         Spacer(Modifier.height(24.dp))

@@ -136,6 +136,10 @@ object Prefs {
         private set
     var reelLoop by mutableStateOf(true)
         private set
+    var reelAutoAdvance by mutableStateOf(false)
+        private set
+    var reelPhotoSeconds by mutableStateOf(5)
+        private set
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("filestorm", Context.MODE_PRIVATE)
@@ -178,6 +182,8 @@ object Prefs {
         reelAutoplay = sp.getBoolean("reel_autoplay", true)
         reelStartMuted = sp.getBoolean("reel_start_muted", true)
         reelLoop = sp.getBoolean("reel_loop", true)
+        reelAutoAdvance = sp.getBoolean("reel_auto_advance", false)
+        reelPhotoSeconds = sp.getInt("reel_photo_seconds", 5)
         accent = runCatching {
             Accent.valueOf(sp.getString("accent", Accent.BLUE.name)!!)
         }.getOrDefault(Accent.BLUE)
@@ -204,6 +210,16 @@ object Prefs {
     fun updateReelLoop(value: Boolean) {
         reelLoop = value
         sp.edit().putBoolean("reel_loop", value).apply()
+    }
+
+    fun updateReelAutoAdvance(value: Boolean) {
+        reelAutoAdvance = value
+        sp.edit().putBoolean("reel_auto_advance", value).apply()
+    }
+
+    fun updateReelPhotoSeconds(value: Int) {
+        reelPhotoSeconds = value
+        sp.edit().putInt("reel_photo_seconds", value).apply()
     }
 
     fun updateShowHidden(value: Boolean) {

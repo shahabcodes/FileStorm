@@ -1,46 +1,40 @@
 package com.shahabcodes.filestorm.ui.browser
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material.icons.rounded.FullscreenExit
-import androidx.compose.material.icons.rounded.Fullscreen
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitEachGesture
-import kotlinx.coroutines.delay
-import androidx.compose.material.icons.rounded.Share
-import androidx.compose.foundation.pager.PagerSnapDistance
-import androidx.compose.foundation.pager.PagerDefaults
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.Icon
@@ -50,18 +44,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
@@ -71,6 +71,8 @@ import com.shahabcodes.filestorm.data.FsEntry
 import com.shahabcodes.filestorm.data.Prefs
 import com.shahabcodes.filestorm.util.Formatters
 import java.io.File
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Photos and videos only — everything else has nothing to show full screen. */
 fun reelItems(entries: List<FsEntry>): List<FsEntry> =
@@ -88,18 +90,20 @@ class ReelPlayback {
     var duration by mutableIntStateOf(0)
     var playing by mutableStateOf(false)
     var seek: ((Int) -> Unit)? = null
+
+    /** Bumped each time the clip reaches its end, so auto-advance can wait. */
+    var completions by mutableIntStateOf(0)
 }
 
 /**
- * Whether the reel has been expanded to fill the screen.
+ * Whether the reel is filling the screen. It starts that way — a feed is meant
+ * to be looked at — and its own button collapses it back into the layout when
+ * you want the toolbar, search and sort again. Back does the same.
  *
- * The reel used to swallow the toolbar the moment you picked it, which is
- * wrong — you can no longer search, sort or get out without knowing that back
- * works. It now sits in the layout like any other view until you ask for the
- * whole screen, and the screens that draw the toolbar read this to know.
+ * The screens that draw the toolbar read this to know whether to stand down.
  */
 object ReelFullscreen {
-    var on by mutableStateOf(false)
+    var on by mutableStateOf(true)
 }
 
 /**
@@ -137,6 +141,32 @@ fun ReelView(
     var zoomedPage by remember { mutableStateOf(-1) }
     val playback = remember { ReelPlayback() }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    fun advance() {
+        val next = pagerState.currentPage + 1
+        // Stopping at the end rather than wrapping: a feed that silently starts
+        // over is disorienting when you are looking for the last thing.
+        if (next < items.size) scope.launch { pagerState.animateScrollToPage(next) }
+    }
+
+    // Auto-advance. A photo is held for a fixed spell; a video is given as long
+    // as it needs and moves on when it actually finishes. Zooming in cancels
+    // it — you are clearly looking at something.
+    val current = items.getOrNull(pagerState.currentPage)
+    LaunchedEffect(
+        pagerState.currentPage, Prefs.reelAutoAdvance, Prefs.reelPhotoSeconds, zoomedPage,
+    ) {
+        playback.completions = 0
+        if (!Prefs.reelAutoAdvance || zoomedPage >= 0) return@LaunchedEffect
+        if (current != null && current.kind != FileKind.VIDEO) {
+            delay(Prefs.reelPhotoSeconds * 1000L)
+            advance()
+        }
+    }
+    LaunchedEffect(playback.completions) {
+        if (Prefs.reelAutoAdvance && zoomedPage < 0 && playback.completions > 0) advance()
+    }
 
     // A short flick should move exactly one item and settle immediately, which
     // is what a feed feels like. The stock behaviour needs a longer, more
@@ -369,9 +399,10 @@ fun ReelView(
         }
     }
 
-    // Leaving the reel must not strand the rest of the app with no toolbar.
+    // Back to the default when the reel goes away, so the next one opens full
+    // screen again rather than inheriting a collapse from last time.
     DisposableEffect(Unit) {
-        onDispose { ReelFullscreen.on = false }
+        onDispose { ReelFullscreen.on = true }
     }
 }
 
@@ -459,7 +490,8 @@ private fun ReelVideo(
                     val mp = android.media.MediaPlayer()
                     mp.setSurface(target)
                     mp.setDataSource(file.absolutePath)
-                    mp.isLooping = Prefs.reelLoop
+                    // Looping would mean it never ends, so auto-advance wins.
+                    mp.isLooping = Prefs.reelLoop && !Prefs.reelAutoAdvance
                     mp.setOnPreparedListener {
                         width = it.videoWidth
                         height = it.videoHeight
@@ -471,7 +503,10 @@ private fun ReelVideo(
                             playing = true
                         }
                     }
-                    mp.setOnCompletionListener { playing = false }
+                    mp.setOnCompletionListener {
+                        playing = false
+                        playback?.let { p -> p.completions = p.completions + 1 }
+                    }
                     mp.setOnErrorListener { _, _, _ -> playing = false; true }
                     mp.prepareAsync()
                     player = mp
