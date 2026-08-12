@@ -111,6 +111,9 @@ fun CategoryScreen(
     var reloadKey by remember(kind) { mutableStateOf(0) }
     val viewKey = "category:" + kind.name
     val viewMode = com.shahabcodes.filestorm.data.FolderViews.viewFor(viewKey)
+    var modeBeforeReel by remember {
+        mutableStateOf(com.shahabcodes.filestorm.data.ViewMode.GALLERY)
+    }
     var pinchAccumulator by remember(kind) { mutableStateOf(1f) }
     var collapsedMonths by remember(kind) { mutableStateOf(setOf<String>()) }
     var monthSorts by remember(kind) {
@@ -159,12 +162,22 @@ fun CategoryScreen(
         selected = emptySet()
     }
 
+    val immersive = viewMode == com.shahabcodes.filestorm.data.ViewMode.REEL &&
+        !selectionMode && ReelFullscreen.on
+    androidx.activity.compose.BackHandler(enabled = immersive) {
+        ReelFullscreen.on = false
+    }
+
     Column(
         Modifier
             .fillMaxSize()
-            .background(fsColors.groupedBackground)
-            .statusBarsPadding(),
+            .background(
+                if (immersive) androidx.compose.ui.graphics.Color.Black
+                else fsColors.groupedBackground
+            )
+            .then(if (immersive) Modifier else Modifier.statusBarsPadding()),
     ) {
+        if (!immersive) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -216,7 +229,15 @@ fun CategoryScreen(
                         current = viewMode,
                         grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(viewKey),
                         onDismiss = { viewMenuOpen = false },
-                        onSelect = { com.shahabcodes.filestorm.data.FolderViews.setView(viewKey, it) },
+                        onSelect = {
+                            // Remember where to come back to when the reel exits.
+                            if (it == com.shahabcodes.filestorm.data.ViewMode.REEL &&
+                                viewMode != com.shahabcodes.filestorm.data.ViewMode.REEL
+                            ) {
+                                modeBeforeReel = viewMode
+                            }
+                            com.shahabcodes.filestorm.data.FolderViews.setView(viewKey, it)
+                        },
                         onGroupedChange = {
                             com.shahabcodes.filestorm.data.FolderViews.setGrouped(viewKey, it)
                         },
@@ -258,6 +279,7 @@ fun CategoryScreen(
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         Spacer(Modifier.height(12.dp))
+        } // end of chrome, hidden while the reel is full screen
 
         Box(Modifier.weight(1f)) {
             when {
@@ -283,10 +305,19 @@ fun CategoryScreen(
                     scrollResetKey = listOf(query, Prefs.sortField, Prefs.sortAscending),
                     selectionMode = selectionMode,
                     selected = selected,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        start = 16.dp, end = 16.dp, bottom = 120.dp
-                    ),
+                    contentPadding = if (immersive) {
+                        androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    } else {
+                        androidx.compose.foundation.layout.PaddingValues(
+                            start = 16.dp, end = 16.dp, bottom = 120.dp
+                        )
+                    },
                     viewMode = viewMode,
+                    onExitReel = {
+                        com.shahabcodes.filestorm.data.FolderViews.setView(
+                            viewKey, modeBeforeReel,
+                        )
+                    },
                     columns = com.shahabcodes.filestorm.data.FolderViews.columnsFor(viewKey, viewMode),
                     grouped = com.shahabcodes.filestorm.data.FolderViews.groupedFor(viewKey),
                     collapsedMonths = collapsedMonths,

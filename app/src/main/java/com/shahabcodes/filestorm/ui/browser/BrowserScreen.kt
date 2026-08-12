@@ -314,11 +314,11 @@ fun BrowserScreen(
 
     var modeBeforeReel by remember { mutableStateOf(ViewMode.GALLERY) }
 
-    // A reel is meant to be looked at, not framed by a toolbar, so it takes the
-    // whole screen. Selecting files still needs the chrome, so that wins.
-    val immersive = viewMode == ViewMode.REEL && !selectionMode
+    // The reel keeps the toolbar until you ask for the whole screen with its
+    // own button. Selecting files always needs the chrome, so that wins.
+    val immersive = viewMode == ViewMode.REEL && !selectionMode && ReelFullscreen.on
     androidx.activity.compose.BackHandler(enabled = immersive) {
-        com.shahabcodes.filestorm.data.FolderViews.setView(path, modeBeforeReel)
+        ReelFullscreen.on = false
     }
 
     Column(

@@ -4,6 +4,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.rounded.FullscreenExit
+import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -86,6 +88,18 @@ class ReelPlayback {
     var duration by mutableIntStateOf(0)
     var playing by mutableStateOf(false)
     var seek: ((Int) -> Unit)? = null
+}
+
+/**
+ * Whether the reel has been expanded to fill the screen.
+ *
+ * The reel used to swallow the toolbar the moment you picked it, which is
+ * wrong — you can no longer search, sort or get out without knowing that back
+ * works. It now sits in the layout like any other view until you ask for the
+ * whole screen, and the screens that draw the toolbar read this to know.
+ */
+object ReelFullscreen {
+    var on by mutableStateOf(false)
 }
 
 /**
@@ -318,45 +332,65 @@ fun ReelView(
             )
         }
 
-        if (onExit != null) {
-            Box(
-                Modifier
+        // Close only earns its place once the toolbar is gone; otherwise the
+        // header's own Back is right there.
+        if (onExit != null && ReelFullscreen.on) {
+            ReelButton(
+                icon = Icons.Rounded.Close,
+                label = "Leave reel",
+                onClick = onExit,
+                modifier = Modifier
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
-                    .padding(top = 8.dp, start = 14.dp)
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .pointerInput(Unit) { detectTapGestures { onExit() } },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Rounded.Close, "Leave reel",
-                    tint = Color.White, modifier = Modifier.size(21.dp),
-                )
-            }
+                    .padding(top = 8.dp, start = 14.dp),
+            )
         }
 
-        if (items.any { it.kind == FileKind.VIDEO }) {
-            Box(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 8.dp, end = 14.dp)
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .pointerInput(Unit) { detectTapGestures { muted = !muted } },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    if (muted) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
-                    if (muted) "Unmute" else "Mute",
-                    tint = Color.White,
-                    modifier = Modifier.size(21.dp),
+        Row(
+            Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 8.dp, end = 14.dp),
+        ) {
+            if (items.any { it.kind == FileKind.VIDEO }) {
+                ReelButton(
+                    icon = if (muted) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp,
+                    label = if (muted) "Unmute" else "Mute",
+                    onClick = { muted = !muted },
                 )
+                Spacer(Modifier.width(10.dp))
             }
+            ReelButton(
+                icon = if (ReelFullscreen.on) Icons.Rounded.FullscreenExit
+                else Icons.Rounded.Fullscreen,
+                label = if (ReelFullscreen.on) "Exit full screen" else "Full screen",
+                onClick = { ReelFullscreen.on = !ReelFullscreen.on },
+            )
         }
+    }
+
+    // Leaving the reel must not strand the rest of the app with no toolbar.
+    DisposableEffect(Unit) {
+        onDispose { ReelFullscreen.on = false }
+    }
+}
+
+@Composable
+private fun ReelButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.45f))
+            .pointerInput(label) { detectTapGestures { onClick() } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, label, tint = Color.White, modifier = Modifier.size(21.dp))
     }
 }
 

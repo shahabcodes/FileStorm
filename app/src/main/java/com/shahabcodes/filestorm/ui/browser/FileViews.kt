@@ -101,7 +101,9 @@ fun FileListView(
     onLongClick: (FsEntry) -> Unit,
     onExitReel: (() -> Unit)? = null,
 ) {
-    if (grouped) {
+    // A reel is one continuous feed, so month headings have nothing to attach
+    // to. Without this the grouped path silently falls through to a plain list.
+    if (grouped && viewMode != ViewMode.REEL) {
         GroupedByMonth(
             entries = entries,
             scrollResetKey = scrollResetKey,
