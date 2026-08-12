@@ -197,209 +197,14 @@ fun HomeScreen(
                     )
                     DashboardCard.CATEGORIES -> CategoriesSection(onOpenCategory)
                     DashboardCard.BROWSE -> BrowseSection(onOpenFolder)
+                    DashboardCard.FAVOURITES -> FavouritesSection(onOpenFolder)
+                    DashboardCard.JOBS -> JobsSection(onOpenJobs)
+                    DashboardCard.DUPLICATES -> DuplicatesSection(onOpenDuplicates)
+                    DashboardCard.TRASH -> TrashSection(onOpenTrash)
                 }
             }
         }
 
-        // Favorites
-        if (Favorites.paths.isNotEmpty()) {
-            item {
-                Column {
-                    Text(
-                        "Favourites",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = fsColors.label,
-                        modifier = Modifier.padding(bottom = 12.dp, start = 4.dp),
-                    )
-                    GroupedCard {
-                        val favs = Favorites.paths
-                        favs.forEachIndexed { i, favPath ->
-                            Row(
-                                Modifier
-                                    .pressScale { onOpenFolder(favPath) }
-                                    .padding(horizontal = 16.dp, vertical = 13.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(
-                                    Modifier
-                                        .size(32.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(
-                                            (com.shahabcodes.filestorm.data.FolderStyles
-                                                .colorOf(favPath)?.let { Color(it) } ?: fsColors.accent)
-                                                .copy(alpha = 0.18f)
-                                        ),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Folder, null,
-                                        tint = com.shahabcodes.filestorm.data.FolderStyles
-                                            .colorOf(favPath)?.let { Color(it) } ?: fsColors.accent,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                }
-                                Spacer(Modifier.width(14.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        java.io.File(favPath).name.ifEmpty { "Storage" },
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = fsColors.label,
-                                        maxLines = 1,
-                                    )
-                                    Text(
-                                        favPath.replace(root, "Internal storage"),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = fsColors.secondaryLabel,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                    )
-                                }
-                                if (com.shahabcodes.filestorm.data.FolderLocks.isLocked(favPath)) {
-                                    Icon(
-                                        Icons.Rounded.Lock, null,
-                                        tint = fsColors.orange, modifier = Modifier.size(16.dp),
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                }
-                                Icon(
-                                    Icons.Rounded.ChevronRight, null,
-                                    tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                            if (i != favs.lastIndex) RowSeparator(startIndent = 62.dp)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Jobs
-        item {
-            GroupedCard(Modifier.pressScale(onOpenJobs)) {
-                Row(
-                    Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(fsColors.kinds.archive.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Rounded.CalendarMonth, null,
-                            tint = fsColors.kinds.archive, modifier = Modifier.size(18.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "Jobs",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = fsColors.label,
-                        )
-                        val jobCount = JobStore.jobs.size
-                        Text(
-                            if (jobCount == 0) "Organize files into month folders"
-                            else "$jobCount saved job${if (jobCount == 1) "" else "s"}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = fsColors.secondaryLabel,
-                        )
-                    }
-                    Icon(
-                        Icons.Rounded.ChevronRight, null,
-                        tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-        }
-
-        // Duplicate finder
-        item {
-            GroupedCard(Modifier.pressScale(onOpenDuplicates)) {
-                Row(
-                    Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(fsColors.kinds.apk.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Rounded.ContentCopy, null,
-                            tint = fsColors.kinds.apk, modifier = Modifier.size(17.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "Duplicate Finder",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = fsColors.label,
-                        )
-                        Text(
-                            "Match two folders and reclaim space",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = fsColors.secondaryLabel,
-                        )
-                    }
-                    Icon(
-                        Icons.Rounded.ChevronRight, null,
-                        tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-        }
-
-        // Trash
-        item {
-            GroupedCard(Modifier.pressScale(onOpenTrash)) {
-                Row(
-                    Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(fsColors.red.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Rounded.DeleteOutline, null,
-                            tint = fsColors.red, modifier = Modifier.size(18.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "Trash",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = fsColors.label,
-                        )
-                        val trashCount = TrashManager.items.size
-                        Text(
-                            if (trashCount == 0) "Empty"
-                            else "$trashCount item${if (trashCount == 1) "" else "s"} · recoverable",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = fsColors.secondaryLabel,
-                        )
-                    }
-                    Icon(
-                        Icons.Rounded.ChevronRight, null,
-                        tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-        }
     }
 
     confirmClean?.let { target ->
@@ -608,6 +413,210 @@ private fun BrowseSection(onOpenFolder: (String) -> Unit) {
                 }
                 if (i != shortcuts.lastIndex) RowSeparator(startIndent = 62.dp)
             }
+        }
+    }
+}
+
+/**
+ * A starred folder is only worth a heading when there is one, so an empty
+ * favourites list still draws nothing even with the card switched on.
+ */
+@Composable
+private fun FavouritesSection(onOpenFolder: (String) -> Unit) {
+    if (Favorites.paths.isEmpty()) return
+    val root = FileRepository.rootPath
+    Column {
+        Text(
+            "Favourites",
+            style = MaterialTheme.typography.titleLarge,
+            color = fsColors.label,
+            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp),
+        )
+        GroupedCard {
+            val favs = Favorites.paths
+            favs.forEachIndexed { i, favPath ->
+                Row(
+                    Modifier
+                        .pressScale { onOpenFolder(favPath) }
+                        .padding(horizontal = 16.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                (com.shahabcodes.filestorm.data.FolderStyles
+                                    .colorOf(favPath)?.let { Color(it) } ?: fsColors.accent)
+                                    .copy(alpha = 0.18f)
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Rounded.Folder, null,
+                            tint = com.shahabcodes.filestorm.data.FolderStyles
+                                .colorOf(favPath)?.let { Color(it) } ?: fsColors.accent,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            java.io.File(favPath).name.ifEmpty { "Storage" },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = fsColors.label,
+                            maxLines = 1,
+                        )
+                        Text(
+                            favPath.replace(root, "Internal storage"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fsColors.secondaryLabel,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (com.shahabcodes.filestorm.data.FolderLocks.isLocked(favPath)) {
+                        Icon(
+                            Icons.Rounded.Lock, null,
+                            tint = fsColors.orange, modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Icon(
+                        Icons.Rounded.ChevronRight, null,
+                        tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                if (i != favs.lastIndex) RowSeparator(startIndent = 62.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun JobsSection(onOpenJobs: () -> Unit) {
+    GroupedCard(Modifier.pressScale(onOpenJobs)) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(fsColors.kinds.archive.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.CalendarMonth, null,
+                    tint = fsColors.kinds.archive, modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Jobs",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = fsColors.label,
+                )
+                val jobCount = JobStore.jobs.size
+                Text(
+                    if (jobCount == 0) "Organize files into month folders"
+                    else "$jobCount saved job${if (jobCount == 1) "" else "s"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fsColors.secondaryLabel,
+                )
+            }
+            Icon(
+                Icons.Rounded.ChevronRight, null,
+                tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DuplicatesSection(onOpenDuplicates: () -> Unit) {
+    GroupedCard(Modifier.pressScale(onOpenDuplicates)) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(fsColors.kinds.apk.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.ContentCopy, null,
+                    tint = fsColors.kinds.apk, modifier = Modifier.size(17.dp),
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Duplicate Finder",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = fsColors.label,
+                )
+                Text(
+                    "Match two folders and reclaim space",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fsColors.secondaryLabel,
+                )
+            }
+            Icon(
+                Icons.Rounded.ChevronRight, null,
+                tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrashSection(onOpenTrash: () -> Unit) {
+    GroupedCard(Modifier.pressScale(onOpenTrash)) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(fsColors.red.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.DeleteOutline, null,
+                    tint = fsColors.red, modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Trash",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = fsColors.label,
+                )
+                val trashCount = TrashManager.items.size
+                Text(
+                    if (trashCount == 0) "Empty"
+                    else "$trashCount item${if (trashCount == 1) "" else "s"} · recoverable",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fsColors.secondaryLabel,
+                )
+            }
+            Icon(
+                Icons.Rounded.ChevronRight, null,
+                tint = fsColors.secondaryLabel.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }

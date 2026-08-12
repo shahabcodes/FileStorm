@@ -29,6 +29,10 @@ enum class DashboardCard(
     RECENT("recent", "Recent Files", "Everything added or changed in the last week", true),
     CATEGORIES("categories", "Categories", "Jump straight to photos, video, audio, documents, archives or apps", false),
     BROWSE("browse", "Browse", "Shortcuts to Downloads, DCIM, Documents and internal storage", false),
+    FAVOURITES("favourites", "Favourites", "Folders you have starred, if there are any", false),
+    JOBS("jobs", "Jobs", "The shortcut to organising files into month folders", false),
+    DUPLICATES("duplicates", "Duplicate Finder", "The shortcut to matching folders and reclaiming space", false),
+    TRASH("trash", "Trash", "The shortcut to recently deleted files", false),
 }
 
 /**
@@ -50,6 +54,10 @@ object DashboardPrefs {
         DashboardCard.RECENT,
         DashboardCard.CATEGORIES,
         DashboardCard.BROWSE,
+        DashboardCard.FAVOURITES,
+        DashboardCard.JOBS,
+        DashboardCard.DUPLICATES,
+        DashboardCard.TRASH,
     )
 
     private val defaultEnabled = setOf(
@@ -60,6 +68,10 @@ object DashboardPrefs {
         DashboardCard.LARGEST_FOLDERS,
         DashboardCard.CATEGORIES,
         DashboardCard.BROWSE,
+        DashboardCard.FAVOURITES,
+        DashboardCard.JOBS,
+        DashboardCard.DUPLICATES,
+        DashboardCard.TRASH,
     )
 
     var enabled by mutableStateOf(defaultEnabled)
