@@ -694,24 +694,14 @@ var onOpenArchive: ((String) -> Unit)? = null
 var onOpenVault: ((String) -> Unit)? = null
 
 fun openFile(context: android.content.Context, entry: FsEntry) {
-    // An apk is a zip, and the archive reader will happily list it — but
-    // tapping one means "install this", not "show me its manifest". Reading it
-    // as an archive is still on the long-press menu, under Extract.
-    if (entry.kind == com.shahaabapps.filestorm.data.FileKind.APK) {
-        runCatching {
-            val uri = FileProvider.getUriForFile(
-                context, context.packageName + ".provider", entry.toFile(),
-            )
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW)
-                    // Named outright: MimeTypeMap does not know this one on
-                    // every device, and a wrong type sends it to a text viewer.
-                    .setDataAndType(uri, "application/vnd.android.package-archive")
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            )
-        }
-        return
-    }
+    // An apk opens as an archive, not as an install.
+    //
+    // Handing it to the system installer needs REQUEST_INSTALL_PACKAGES, which
+    // this app deliberately does not ask for: it is a sensitive permission
+    // needing its own Play declaration, and installing apps is not what a file
+    // manager is for. Without it the system refuses the request outright rather
+    // than offering to allow it, so a tap that tried to install would simply
+    // fail. Listing what is inside is the useful thing left.
     val opener = onOpenArchive
     if (opener != null && com.shahaabapps.filestorm.data.archive.ArchiveReader
             .isSupported(entry.toFile())
