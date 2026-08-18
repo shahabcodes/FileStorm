@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.shahabcodes.filestorm"
+    namespace = "com.shahaabapps.filestorm"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.shahabcodes.filestorm"
+        applicationId = "com.shahaabapps.filestorm"
         minSdk = 26
         targetSdk = 36
         versionCode = 79
