@@ -36,6 +36,7 @@ public class StoreArt {
         writeIcon(new File(out, "ic_launcher-playstore.png"), 72);
         writeIcon(new File(out, "icon-fullcanvas.png"), 108);
         writeFeature(new File(out, "feature-graphic.png"));
+        writeThumbnail(new File(out, "review-video-thumbnail.png"));
         System.out.println("wrote " + out.getAbsolutePath());
     }
 
@@ -175,6 +176,86 @@ public class StoreArt {
         g.dispose();
         ImageIO.write(downscale(big, w, h), "png", dest);
         System.out.println("  feature " + w + "x" + h);
+    }
+
+    /**
+     * 1280 x 720 thumbnail for the unlisted demo video.
+     *
+     * Its audience is one Play reviewer, not a browsing viewer, so it says what
+     * the video proves and which package it belongs to rather than trying to
+     * earn a click.
+     */
+    static void writeThumbnail(File dest) throws Exception {
+        int w = 1280, h = 720, ss = 2;
+        BufferedImage big = new BufferedImage(w * ss, h * ss, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = quality(big.createGraphics());
+        g.scale(ss, ss);
+
+        g.setPaint(new GradientPaint(0, 0, INDIGO, w, h, ROSE));
+        g.fillRect(0, 0, w, h);
+        g.setColor(new Color(255, 255, 255, 0x18));
+        g.fill(new Ellipse2D.Double(-160, -220, 620, 620));
+        g.setColor(new Color(255, 255, 255, 0x12));
+        g.fill(new Ellipse2D.Double(950, 420, 540, 540));
+
+        int tile = 300, tx = 96, ty = (h - tile) / 2;
+        BufferedImage shadow = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D sg = quality(shadow.createGraphics());
+        sg.setColor(new Color(0, 0, 0, 140));
+        sg.fill(new RoundRectangle2D.Double(tx, ty + 12, tile, tile, 72, 72));
+        sg.dispose();
+        blur(shadow, 16);
+        g.drawImage(shadow, 0, 0, w, h, null);
+
+        AffineTransform saved = g.getTransform();
+        Shape clip = new RoundRectangle2D.Double(tx, ty, tile, tile, 72, 72);
+        g.setClip(clip);
+        g.translate(tx, ty);
+        double s = tile / 72.0;
+        g.scale(s, s);
+        g.translate(-18, -18);
+        paintGlass(g, 72);
+        g.setTransform(saved);
+        g.setClip(null);
+        g.setColor(new Color(255, 255, 255, 0x40));
+        g.setStroke(new BasicStroke(2f));
+        g.draw(clip);
+
+        int textX = tx + tile + 70;
+        int avail = w - textX - 70;
+
+        Font title = fit(g, pick(Font.BOLD, 78), "File Storm", avail);
+        Font line = fit(g, pick(Font.PLAIN, 37), "All files access", avail);
+        Font small = fit(g, pick(Font.PLAIN, 25), "com.shahaabapps.filestorm", avail);
+
+        FontMetrics tm = g.getFontMetrics(title);
+        FontMetrics lm = g.getFontMetrics(line);
+        FontMetrics sm = g.getFontMetrics(small);
+
+        int block = tm.getAscent() + 26 + lm.getAscent() + 10 + lm.getAscent() + 30 + sm.getAscent();
+        int y = (h - block) / 2 + tm.getAscent();
+
+        g.setFont(title);
+        g.setColor(new Color(0, 0, 0, 0x38));
+        g.drawString("File Storm", textX + 2, y + 3);
+        g.setColor(Color.WHITE);
+        g.drawString("File Storm", textX, y);
+
+        y += 26 + lm.getAscent();
+        g.setFont(line);
+        g.setColor(new Color(255, 255, 255, 0xF2));
+        g.drawString("All files access", textX, y);
+        y += 10 + lm.getAscent();
+        g.drawString("Foreground service demo", textX, y);
+
+        y += 30 + sm.getAscent();
+        g.setFont(small);
+        g.setColor(new Color(255, 255, 255, 0xB0));
+        g.drawString("com.shahaabapps.filestorm", textX, y);
+
+        g.dispose();
+        ImageIO.write(downscale(big, w, h), "png", dest);
+        System.out.println("  thumb   " + w + "x" + h);
     }
 
     /** First font on the machine that actually exists, so this is not Dialog. */
