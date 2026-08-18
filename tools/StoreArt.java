@@ -36,7 +36,10 @@ public class StoreArt {
         writeIcon(new File(out, "ic_launcher-playstore.png"), 72);
         writeIcon(new File(out, "icon-fullcanvas.png"), 108);
         writeFeature(new File(out, "feature-graphic.png"));
-        writeThumbnail(new File(out, "review-video-thumbnail.png"));
+        writeThumbnail(new File(out, "review-video-thumbnail.png"),
+            "All files access", "Foreground service demo");
+        writeThumbnail(new File(out, "review-video-thumbnail-media.png"),
+            "Media playback", "Foreground service demo");
         System.out.println("wrote " + out.getAbsolutePath());
     }
 
@@ -185,7 +188,7 @@ public class StoreArt {
      * the video proves and which package it belongs to rather than trying to
      * earn a click.
      */
-    static void writeThumbnail(File dest) throws Exception {
+    static void writeThumbnail(File dest, String lineOne, String lineTwo) throws Exception {
         int w = 1280, h = 720, ss = 2;
         BufferedImage big = new BufferedImage(w * ss, h * ss, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = quality(big.createGraphics());
@@ -225,7 +228,8 @@ public class StoreArt {
         int avail = w - textX - 70;
 
         Font title = fit(g, pick(Font.BOLD, 78), "File Storm", avail);
-        Font line = fit(g, pick(Font.PLAIN, 37), "All files access", avail);
+        Font line = fit(g, pick(Font.PLAIN, 37),
+            lineOne.length() > lineTwo.length() ? lineOne : lineTwo, avail);
         Font small = fit(g, pick(Font.PLAIN, 25), "com.shahaabapps.filestorm", avail);
 
         FontMetrics tm = g.getFontMetrics(title);
@@ -244,9 +248,9 @@ public class StoreArt {
         y += 26 + lm.getAscent();
         g.setFont(line);
         g.setColor(new Color(255, 255, 255, 0xF2));
-        g.drawString("All files access", textX, y);
+        g.drawString(lineOne, textX, y);
         y += 10 + lm.getAscent();
-        g.drawString("Foreground service demo", textX, y);
+        g.drawString(lineTwo, textX, y);
 
         y += 30 + sm.getAscent();
         g.setFont(small);
