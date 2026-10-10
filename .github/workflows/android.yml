@@ -21,6 +21,12 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action installs "tools platform-tools" by default, and Google has
+          # withdrawn "tools" from the SDK repository, so the default now fails
+          # outright. The runner image already carries platform-tools, and Gradle
+          # fetches whatever else the build needs.
+          packages: ""
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
