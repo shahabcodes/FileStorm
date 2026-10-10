@@ -63,20 +63,30 @@ object FileRepository {
         return cached.sorted[sortKey(field, ascending)]
     }
 
+    /**
+     * @param force re-walks the folder, consulting neither cache.
+     *
+     * Both caches key on the folder's own timestamp, and that only moves when a
+     * file is added, removed or renamed — writing into a file that already
+     * exists leaves it untouched. So a download finishing, or a transfer
+     * growing a file, would otherwise be served its own stale entry back, with
+     * the size frozen at whatever it was when the listing was first taken.
+     */
     suspend fun list(
         path: String,
         field: SortField = Prefs.sortField,
         ascending: Boolean = Prefs.sortAscending,
         showHidden: Boolean = Prefs.showHidden,
+        force: Boolean = false,
     ): List<FsEntry> = withContext(Dispatchers.IO) {
         val dir = File(path)
         val stamp = dir.lastModified()
-        var cached = listCache[path]
+        var cached = if (force) null else listCache[path]
         if (cached == null || cached.stamp != stamp || cached.showHidden != showHidden) {
             // The in-memory cache dies with the process, so a folder of tens of
             // thousands of files was re-walked from scratch every cold start.
             // Disk holds the same listing and is read in a fraction of the time.
-            ListingCache.read(path, stamp, showHidden)?.let { stored ->
+            if (!force) ListingCache.read(path, stamp, showHidden)?.let { stored ->
                 val restored = Cached(stamp, showHidden, stored)
                 listCache[path] = restored
                 val key = sortKey(field, ascending)

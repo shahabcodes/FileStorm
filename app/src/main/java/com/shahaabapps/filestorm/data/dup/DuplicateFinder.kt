@@ -426,6 +426,9 @@ object DuplicateFinder {
                 if (!includeHidden && child.name.startsWith(".")) continue
                 if (child.isDirectory) queue.add(child)
                 else {
+                    // Matches the whole-storage walk: an empty file matches every
+                    // other empty file, which is noise rather than a duplicate.
+                    if (child.length() == 0L) continue
                     out.add(child)
                     if (out.size % 250 == 0) {
                         _state.value = _state.value.copy(scannedFiles = _state.value.scannedFiles + 250)

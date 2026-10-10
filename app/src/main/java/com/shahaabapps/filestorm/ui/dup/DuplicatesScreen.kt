@@ -249,6 +249,7 @@ fun DuplicatesScreen(onBack: () -> Unit) {
         FolderPickerSheet(
             title = "Choose folder ${picking}",
             confirmLabel = "Use This Folder",
+            showHidden = hidden,
             onDismiss = { picking = 0 },
             onConfirm = { path ->
                 if (picking == 1) folder1 = path else folder2 = path

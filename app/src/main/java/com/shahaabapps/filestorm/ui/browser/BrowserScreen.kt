@@ -1,5 +1,7 @@
 package com.shahaabapps.filestorm.ui.browser
 
+import android.os.Build
+import android.os.FileObserver
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -92,9 +94,33 @@ import com.shahaabapps.filestorm.transfer.TransferService
 import com.shahaabapps.filestorm.ui.components.SearchField
 import com.shahaabapps.filestorm.ui.components.pressScale
 import com.shahaabapps.filestorm.ui.theme.fsColors
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
+
+/** Everything that changes which files a folder holds, or how big they are. */
+private const val WATCH_MASK = FileObserver.CREATE or FileObserver.DELETE or
+    FileObserver.MOVED_FROM or FileObserver.MOVED_TO or FileObserver.CLOSE_WRITE
+
+/**
+ * A watcher for one folder, or null if the folder cannot be watched — an
+ * unreadable path or a filesystem without inotify is a reason to fall back to
+ * refresh-on-resume, not to crash.
+ */
+private fun folderWatcher(path: String, onChange: (Int) -> Unit): FileObserver? = runCatching {
+    if (Build.VERSION.SDK_INT >= 29) {
+        object : FileObserver(File(path), WATCH_MASK) {
+            override fun onEvent(event: Int, affected: String?) = onChange(event)
+        }
+    } else {
+        @Suppress("DEPRECATION")
+        object : FileObserver(path, WATCH_MASK) {
+            override fun onEvent(event: Int, affected: String?) = onChange(event)
+        }
+    }
+}.getOrNull()
 
 class BrowserViewModel(val path: String) : ViewModel() {
     // Walking into a folder builds a fresh ViewModel, so start from whatever is
@@ -106,15 +132,54 @@ class BrowserViewModel(val path: String) : ViewModel() {
     /** Guards against re-listing a huge folder every time the screen re-enters. */
     private var loadedWithHidden: Boolean? = null
 
+    /**
+     * Nothing used to tell the browser that a folder had changed, so a finished
+     * download, or a file another app deleted, stayed invisible until you left
+     * the folder and came back.
+     *
+     * Events arrive one per file, so copying a thousand files in would mean a
+     * thousand re-listings. Each event restarts a short quiet period instead and
+     * only the last one actually re-reads.
+     */
+    @Volatile
+    private var pendingRefresh: Job? = null
+
+    /** Set when something in the batch needs the caches bypassed. */
+    @Volatile
+    private var pendingForce = false
+    private val watcher = folderWatcher(path) { event -> onFolderChanged(event) }
+
     init {
         refresh()
+        runCatching { watcher?.startWatching() }
+    }
+
+    private fun onFolderChanged(event: Int) {
+        // Adding, removing or renaming moves the folder's own timestamp, which is
+        // exactly what the caches key on, so an ordinary refresh sees it. Writing
+        // into a file that already exists does not move it — only that case has to
+        // pay for a full re-walk, which on a folder of tens of thousands is the
+        // difference between free and noticeable.
+        if (event and FileObserver.CLOSE_WRITE != 0) pendingForce = true
+        pendingRefresh?.cancel()
+        pendingRefresh = viewModelScope.launch {
+            delay(300)
+            val force = pendingForce
+            pendingForce = false
+            refresh(force = force)
+        }
+    }
+
+    override fun onCleared() {
+        runCatching { watcher?.stopWatching() }
+        super.onCleared()
     }
 
     fun refresh(force: Boolean = false) {
         if (force) FileRepository.invalidate(path)
         viewModelScope.launch {
             loading.value = entries.value.isEmpty()
-            val fresh = FileRepository.list(path)
+            val fresh = FileRepository.list(path, force = force)
             // Replacing an identical list would restart every thumbnail request
             // and drop the scroll position for no reason.
             if (fresh !== entries.value) entries.value = fresh
@@ -262,6 +327,8 @@ fun BrowserScreen(
     var query by remember(path) { mutableStateOf("") }
     var selectionMode by remember(path) { mutableStateOf(false) }
     var selected by remember(path) { mutableStateOf(setOf<String>()) }
+    /** Selection as it stood when the current sweep began. */
+    var sweepBaseline by remember(path) { mutableStateOf(setOf<String>()) }
     var menuOpen by remember { mutableStateOf(false) }
     var pinchAccumulator by remember { mutableStateOf(1f) }
     var collapsedMonths by remember { mutableStateOf(setOf<String>()) }
@@ -285,6 +352,15 @@ fun BrowserScreen(
     var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Prefs.showHidden) { vm.refreshIfSettingsChanged() }
+
+    // The folder watcher covers changes while the screen is up, but a watch can
+    // be dropped — an unwatchable path, or the system reclaiming the handle — so
+    // coming back to the app re-reads as well. This is cheap when nothing moved:
+    // the listing is keyed on the folder's timestamp and returns from cache.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        vm.refresh()
+        onPauseOrDispose { }
+    }
 
     fun goBack() {
         if (!BrowserTabs.pop()) onExit()
@@ -790,11 +866,15 @@ fun BrowserScreen(
                         } else if (entry.isDirectory) {
                             openEntryFolder(entry)
                         } else {
+                            // Only fields the listing already holds — no disk access
+                            // per entry. This used to stat every visible file before
+                            // the tap could do anything at all, so in a folder of
+                            // tens of thousands it froze the UI for seconds and the
+                            // tap read as having been ignored.
                             val media = visibleEntries.filter {
                                 !it.isDirectory &&
                                     (it.kind == com.shahaabapps.filestorm.data.FileKind.IMAGE ||
-                                        it.kind == com.shahaabapps.filestorm.data.FileKind.VIDEO) &&
-                                    it.toFile().isFile
+                                        it.kind == com.shahaabapps.filestorm.data.FileKind.VIDEO)
                             }
                             val index = media.indexOfFirst { it.path == entry.path }
                             com.shahaabapps.filestorm.data.Diagnostics.log(
@@ -814,6 +894,14 @@ fun BrowserScreen(
                             contextTarget = entry
                         }
                     },
+                    onSweepStart = {
+                        // What was already selected is kept, so several sweeps add up
+                        // instead of each one throwing the last away.
+                        sweepBaseline = selected
+                        selectionMode = true
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    },
+                    onSweepSelect = { swept -> selected = sweepBaseline + swept },
                 )
             }
 

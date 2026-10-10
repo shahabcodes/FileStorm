@@ -335,9 +335,10 @@ fun CategoryScreen(
                             selected = if (entry.path in selected) selected - entry.path
                             else selected + entry.path
                         } else {
+                            // In-memory fields only; statting each entry here froze
+                            // the UI on a large category and swallowed the tap.
                             val media = visible.filter {
-                                (it.kind == FileKind.IMAGE || it.kind == FileKind.VIDEO) &&
-                                    it.toFile().isFile
+                                it.kind == FileKind.IMAGE || it.kind == FileKind.VIDEO
                             }
                             val index = media.indexOfFirst { it.path == entry.path }
                             com.shahaabapps.filestorm.data.Diagnostics.log(

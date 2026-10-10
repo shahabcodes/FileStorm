@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.shahaabapps.filestorm.data.FileRepository
 import com.shahaabapps.filestorm.data.FsEntry
+import com.shahaabapps.filestorm.data.Prefs
 import com.shahaabapps.filestorm.data.SortField
 import com.shahaabapps.filestorm.ui.components.ActionPill
 import com.shahaabapps.filestorm.ui.components.FileIconView
@@ -234,6 +235,11 @@ fun FolderPickerSheet(
     title: String,
     confirmLabel: String,
     excludedPaths: Set<String> = emptySet(),
+    // A picker that hides dot-folders cannot reach them at all, whatever the
+    // caller intends to do with the result. Callers that will act on hidden
+    // folders — the duplicate finder, with its own include-hidden switch — pass
+    // true so the browse setting does not silently veto the choice.
+    showHidden: Boolean = Prefs.showHidden,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
@@ -245,8 +251,8 @@ fun FolderPickerSheet(
     var showNewFolder by remember { mutableStateOf(false) }
     var renameFolder by remember { mutableStateOf<FsEntry?>(null) }
 
-    LaunchedEffect(currentPath, refreshTick) {
-        folders = FileRepository.list(currentPath, SortField.NAME, ascending = true)
+    LaunchedEffect(currentPath, refreshTick, showHidden) {
+        folders = FileRepository.list(currentPath, SortField.NAME, ascending = true, showHidden = showHidden)
             .filter { it.isDirectory }
     }
 
@@ -629,7 +635,14 @@ fun openFolderGated(
  * has a hard size limit.
  */
 fun shareFiles(context: android.content.Context, entries: List<FsEntry>) {
-    val files = entries.filter { !it.isDirectory && it.toFile().isFile }
+    // Cap before touching the disk. Sweeping a folder can select thousands, and
+    // statting every one of them would block the main thread for everything past
+    // the handful the chooser will actually accept.
+    val files = entries.asSequence()
+        .filter { !it.isDirectory }
+        .take(MAX_SHARE_ITEMS)
+        .filter { it.toFile().isFile }
+        .toList()
     if (files.isEmpty()) {
         android.widget.Toast
             .makeText(context, "Folders cannot be shared", android.widget.Toast.LENGTH_SHORT)

@@ -99,6 +99,10 @@ fun FileListView(
     scrollResetKey: Any? = null,
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
+    /** Fires once when a sideways sweep begins, before any file is reported. */
+    onSweepStart: () -> Unit = {},
+    /** The files the sweep currently covers, resent each time it grows. */
+    onSweepSelect: (Set<String>) -> Unit = {},
     onExitReel: (() -> Unit)? = null,
 ) {
     // A reel is one continuous feed, so month headings have nothing to attach
@@ -119,6 +123,8 @@ fun FileListView(
             onZoom = onZoom,
             onClick = onClick,
             onLongClick = onLongClick,
+            onSweepStart = onSweepStart,
+            onSweepSelect = onSweepSelect,
         )
         return
     }
@@ -129,10 +135,26 @@ fun FileListView(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     ResetScrollOnChange(scrollResetKey, listState, gridState, staggeredState)
 
+    // The reel is one item at a time, so sweeping across files means nothing there.
+    val canSweep = viewMode != ViewMode.REEL
+    val listHit = remember(listState) { listState.hitTest() }
+    val gridHit = remember(gridState) { gridState.hitTest() }
+    val staggeredHit = remember(staggeredState) { staggeredState.hitTest() }
+    // A sweep reports whatever keys it passed over; only the ones that name a
+    // file in this folder count, which is what discards month headers and gaps.
+    val entryPaths = remember(entries) { entries.mapTo(HashSet()) { it.path } }
+    val sweep: (List<Any>) -> Unit = { keys ->
+        val hit = HashSet<String>()
+        for (key in keys) if (key is String && key in entryPaths) hit.add(key)
+        onSweepSelect(hit)
+    }
+
     Box(Modifier.fillMaxSize()) {
     when (viewMode) {
         ViewMode.LIST, ViewMode.DETAILED -> LazyColumn(
-            Modifier.fillMaxSize().pinchToZoom(onZoom),
+            Modifier.fillMaxSize()
+                .swipeToSelect(canSweep, listHit, onSweepStart, sweep)
+                .pinchToZoom(onZoom),
             state = listState,
             contentPadding = contentPadding,
         ) {
@@ -171,7 +193,9 @@ fun FileListView(
         ViewMode.GRID -> LazyVerticalGrid(
             columns = GridCells.Fixed(columns.coerceIn(1, 6)),
             state = gridState,
-            modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
+            modifier = Modifier.fillMaxSize()
+                .swipeToSelect(canSweep, gridHit, onSweepStart, sweep)
+                .pinchToZoom(onZoom),
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -193,8 +217,15 @@ fun FileListView(
                 else entries.sortedByDescending { it.lastModified }
                 ordered.groupBy { monthLabel(it.lastModified) }
             }
+            // Its own state, not the plain list's: headings and gaps are items
+            // here, so the same index means a different row in each layout.
+            val timelineState = androidx.compose.foundation.lazy.rememberLazyListState()
+            val timelineHit = remember(timelineState) { timelineState.hitTest() }
             LazyColumn(
-                Modifier.fillMaxSize().pinchToZoom(onZoom),
+                Modifier.fillMaxSize()
+                    .swipeToSelect(canSweep, timelineHit, onSweepStart, sweep)
+                    .pinchToZoom(onZoom),
+                state = timelineState,
                 contentPadding = contentPadding,
             ) {
                 groups.forEach { (label, groupEntries) ->
@@ -230,7 +261,9 @@ fun FileListView(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(span),
                 state = gridState,
-                modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
+                modifier = Modifier.fillMaxSize()
+                    .swipeToSelect(canSweep, gridHit, onSweepStart, sweep)
+                    .pinchToZoom(onZoom),
                 contentPadding = contentPadding,
                 verticalArrangement = Arrangement.spacedBy(tileGap(span)),
                 horizontalArrangement = Arrangement.spacedBy(tileGap(span)),
@@ -254,7 +287,9 @@ fun FileListView(
             androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid(
                 columns = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells.Fixed(span),
                 state = staggeredState,
-                modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
+                modifier = Modifier.fillMaxSize()
+                    .swipeToSelect(canSweep, staggeredHit, onSweepStart, sweep)
+                    .pinchToZoom(onZoom),
                 contentPadding = contentPadding,
                 verticalItemSpacing = tileGap(span),
                 horizontalArrangement = Arrangement.spacedBy(tileGap(span)),
@@ -398,6 +433,8 @@ private fun GroupedByMonth(
     onZoom: (Float) -> Unit,
     onClick: (FsEntry) -> Unit,
     onLongClick: (FsEntry) -> Unit,
+    onSweepStart: () -> Unit = {},
+    onSweepSelect: (Set<String>) -> Unit = {},
 ) {
     // Grouping, per-month sorting and slot building all scale with the folder,
     // so for tens of thousands of files they cannot run during composition —
@@ -480,6 +517,16 @@ private fun GroupedByMonth(
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     ResetScrollOnChange(scrollResetKey, listState, gridState, null)
 
+    val listHit = remember(listState) { listState.hitTest() }
+    val gridHit = remember(gridState) { gridState.hitTest() }
+    // Month headings are keyed "slot<n>", so only real files survive this.
+    val entryPaths = remember(entries) { entries.mapTo(HashSet()) { it.path } }
+    val sweep: (List<Any>) -> Unit = { keys ->
+        val hit = HashSet<String>()
+        for (key in keys) if (key is String && key in entryPaths) hit.add(key)
+        onSweepSelect(hit)
+    }
+
     val firstVisible = if (tiled) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
     val topSlot = slots.getOrNull(firstVisible)
     val pinnedLabel = topSlot?.month ?: groups.firstOrNull()?.first
@@ -516,7 +563,9 @@ private fun GroupedByMonth(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(span),
                     state = gridState,
-                    modifier = Modifier.fillMaxSize().pinchToZoom(onZoom),
+                    modifier = Modifier.fillMaxSize()
+                        .swipeToSelect(true, gridHit, onSweepStart, sweep)
+                        .pinchToZoom(onZoom),
                     contentPadding = contentPadding,
                     verticalArrangement = Arrangement.spacedBy(tileGap(span)),
                     horizontalArrangement = Arrangement.spacedBy(tileGap(span)),
@@ -571,7 +620,9 @@ private fun GroupedByMonth(
                 }
             } else {
                 LazyColumn(
-                    Modifier.fillMaxSize().pinchToZoom(onZoom),
+                    Modifier.fillMaxSize()
+                        .swipeToSelect(true, listHit, onSweepStart, sweep)
+                        .pinchToZoom(onZoom),
                     state = listState,
                     contentPadding = contentPadding,
                 ) {
