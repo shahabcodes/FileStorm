@@ -377,7 +377,14 @@ fun BrowserScreen(
         }
         list
     }
-    val selectedEntries = remember(entries, selected) { entries.filter { it.path in selected } }
+    // Resolving the selection by scanning every entry cost the whole folder on
+    // each change — 37,000 comparisons to add one file, and once per frame while
+    // a sweep is running, which starved the gesture it was meant to support.
+    // Indexing once per listing makes the cost the size of the selection instead.
+    val entryByPath = remember(entries) { entries.associateBy { it.path } }
+    val selectedEntries = remember(entryByPath, selected) {
+        selected.mapNotNull { entryByPath[it] }
+    }
 
     fun exitSelection() {
         selectionMode = false

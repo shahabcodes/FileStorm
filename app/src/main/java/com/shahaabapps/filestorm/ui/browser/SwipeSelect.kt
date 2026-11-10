@@ -89,6 +89,7 @@ fun Modifier.swipeToSelect(
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         var claimed = false
         var anchor = -1
+        var lastCovered = -1
         var totalX = 0f
         var totalY = 0f
         while (true) {
@@ -108,6 +109,7 @@ fun Modifier.swipeToSelect(
                         anchor = hitTest.indexAt(down.position)
                         if (anchor < 0) break
                         claimed = true
+                        lastCovered = anchor
                         onStart()
                         onSweep(hitTest.keysBetween(anchor, anchor))
                     }
@@ -119,7 +121,12 @@ fun Modifier.swipeToSelect(
             if (claimed) {
                 change.consume()
                 val current = hitTest.indexAt(change.position)
-                if (current >= 0) {
+                // Only when the covered rows actually change. A finger produces a
+                // move event every frame, and each one re-reports the same range
+                // until it crosses into the next row — republishing that made the
+                // selection rebuild itself dozens of times a second for no gain.
+                if (current >= 0 && current != lastCovered) {
+                    lastCovered = current
                     onSweep(hitTest.keysBetween(min(anchor, current), max(anchor, current)))
                 }
             }

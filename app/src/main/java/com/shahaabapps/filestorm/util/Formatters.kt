@@ -58,13 +58,52 @@ object Formatters {
     private val dayMonthFmt = SimpleDateFormat("d MMM yyyy", Locale.US)
     private val fullFmt = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.US)
 
+    /** Midnight either side of today, so "is this today" is plain long maths. */
+    private class DayBounds(
+        val yesterdayStart: Long,
+        val todayStart: Long,
+        val tomorrowStart: Long,
+    )
+
+    @Volatile
+    private var dayBounds: DayBounds? = null
+
+    /**
+     * Held until the day turns over.
+     *
+     * Every visible row asks for a date, on every recomposition, and working it
+     * out used to cost three `Calendar.getInstance()` calls — each one reading
+     * the clock, the locale and the timezone. Scrolling a large folder spent
+     * most of a frame doing nothing but rebuilding calendars.
+     */
+    private fun bounds(): DayBounds {
+        val now = System.currentTimeMillis()
+        dayBounds?.let { if (now >= it.todayStart && now < it.tomorrowStart) return it }
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = now
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val todayStart = cal.timeInMillis
+        // Via Calendar rather than subtracting a fixed day, so the clocks
+        // changing does not make yesterday an hour long or an hour short.
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterdayStart = cal.timeInMillis
+        cal.add(Calendar.DAY_OF_YEAR, 2)
+        return DayBounds(yesterdayStart, todayStart, cal.timeInMillis)
+            .also { dayBounds = it }
+    }
+
     fun fileDate(millis: Long): String {
         if (millis <= 0) return "—"
-        val now = Calendar.getInstance()
-        val then = Calendar.getInstance().apply { time = Date(millis) }
+        val b = bounds()
         return when {
-            sameDay(now, then) -> "Today, " + timeFmt.format(Date(millis))
-            isYesterday(now, then) -> "Yesterday, " + timeFmt.format(Date(millis))
+            millis >= b.todayStart && millis < b.tomorrowStart ->
+                "Today, " + timeFmt.format(Date(millis))
+            millis >= b.yesterdayStart && millis < b.todayStart ->
+                "Yesterday, " + timeFmt.format(Date(millis))
             else -> dayMonthFmt.format(Date(millis))
         }
     }
@@ -73,12 +112,4 @@ object Formatters {
 
     fun shortDate(millis: Long): String = dayMonthFmt.format(Date(millis))
 
-    private fun sameDay(a: Calendar, b: Calendar) =
-        a.get(Calendar.YEAR) == b.get(Calendar.YEAR) &&
-            a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
-
-    private fun isYesterday(now: Calendar, then: Calendar): Boolean {
-        val y = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
-        return sameDay(y, then)
-    }
 }

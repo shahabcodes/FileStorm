@@ -155,7 +155,12 @@ fun CategoryScreen(
         if (query.isBlank()) ofKind
         else ofKind.filter { it.name.contains(query.trim(), ignoreCase = true) }
     }
-    val selectedEntries = remember(files, selected) { files.filter { it.path in selected } }
+    // Indexed once per listing, so changing the selection costs the size of the
+    // selection rather than a scan of every file in the category.
+    val fileByPath = remember(files) { files.associateBy { it.path } }
+    val selectedEntries = remember(fileByPath, selected) {
+        selected.mapNotNull { fileByPath[it] }
+    }
 
     fun exitSelection() {
         selectionMode = false
